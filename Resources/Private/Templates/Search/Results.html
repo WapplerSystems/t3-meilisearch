@@ -1,0 +1,56 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+
+<f:layout name="Default"/>
+
+<f:comment>GET only — see Search.html for the rationale.</f:comment>
+
+<f:section name="Main">
+    <form class="ws-meilisearch" action="{f:uri.page()}" method="get" role="search">
+        <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
+        <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
+        <div class="ws-meilisearch-form">
+            <label>
+                <span class="visually-hidden">
+                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
+                </span>
+                <input type="search"
+                    name="tx_wsmeilisearch_search[q]"
+                    value="{query}"
+                    placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
+            </label>
+            <button type="submit">
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
+            </button>
+        </div>
+
+        <f:if condition="{result.totalHits} > 0">
+            <f:then>
+                <p class="ws-meilisearch-meta">
+                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.count"
+                        arguments="{0: result.totalHits, 1: query}"/>
+                </p>
+
+                <div class="ws-meilisearch-layout">
+                    <aside class="ws-meilisearch-facets">
+                        <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters}"/>
+                    </aside>
+                    <main class="ws-meilisearch-hits">
+                        <f:for each="{result.hits}" as="hit">
+                            <f:render partial="Search/Result" arguments="{hit: hit}"/>
+                        </f:for>
+                    </main>
+                </div>
+            </f:then>
+            <f:else>
+                <p class="ws-meilisearch-empty">
+                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
+                        arguments="{0: query}"/>
+                </p>
+            </f:else>
+        </f:if>
+    </form>
+</f:section>
+
+</html>

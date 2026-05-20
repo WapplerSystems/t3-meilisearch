@@ -1,0 +1,36 @@
+{
+    "name": "wapplersystems/meilisearch",
+    "type": "typo3-cms-extension",
+    "description": "Meilisearch backend integration for TYPO3 via SEAL abstraction. Indexing, faceted search, typo tolerance, and (later) hybrid + RAG search.",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Sven Wappler",
+            "email": "typo3@wappler.systems",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "typo3/cms-core": "^14.0",
+        "typo3/cms-extbase": "^14.0",
+        "typo3/cms-fluid": "^14.0",
+        "typo3/cms-frontend": "^14.0",
+        "cmsig/seal": "^0.12",
+        "cmsig/seal-meilisearch-adapter": "^0.12",
+        "meilisearch/meilisearch-php": "^1.10"
+    },
+    "suggest": {
+        "georgringer/news": "Enables Meilisearch indexing of tx_news records."
+    },
+    "autoload": {
+        "psr-4": {
+            "WapplerSystems\\Meilisearch\\": "Classes/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "ws_meilisearch"
+        }
+    }
+}

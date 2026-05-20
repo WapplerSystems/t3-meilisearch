@@ -1,0 +1,33 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  WapplerSystems\Meilisearch\:
+    resource: '../Classes/*'
+    exclude:
+      - '../Classes/Domain/Schema/SchemaProviderInterface.php'
+      - '../Classes/Event/*'
+      - '../Classes/Service/SearchResult.php'
+
+  _instanceof:
+    WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
+      tags: ['ws_meilisearch.schema_provider']
+
+  WapplerSystems\Meilisearch\Service\SearchEngineFactory:
+    public: true
+    arguments:
+      $schemaProviders: !tagged_iterator ws_meilisearch.schema_provider
+
+  WapplerSystems\Meilisearch\Service\IndexerService:
+    public: true
+    arguments:
+      $schemaProviders: !tagged_iterator ws_meilisearch.schema_provider
+
+  WapplerSystems\Meilisearch\Service\SearchService:
+    public: true
+
+  # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
+  WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:
+    public: true

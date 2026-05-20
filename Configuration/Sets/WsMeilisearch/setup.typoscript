@@ -1,0 +1,27 @@
+plugin.tx_wsmeilisearch_search {
+    view {
+        templateRootPaths {
+            10 = EXT:ws_meilisearch/Resources/Private/Templates/
+        }
+        partialRootPaths {
+            10 = EXT:ws_meilisearch/Resources/Private/Partials/
+        }
+        layoutRootPaths {
+            10 = EXT:ws_meilisearch/Resources/Private/Layouts/
+        }
+    }
+
+    settings {
+        meilisearch {
+            url = {$meilisearch.url}
+            apiKey = {$meilisearch.apiKey}
+            indexPrefix = {$meilisearch.indexPrefix}
+        }
+
+        # Number of hits per page in the result template.
+        perPage = 20
+
+        # Facet attributes exposed in the result template (comma-separated).
+        facets = type,language
+    }
+}

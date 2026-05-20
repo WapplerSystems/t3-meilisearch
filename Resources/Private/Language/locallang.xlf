@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+        <header/>
+        <body>
+            <trans-unit id="search.form.placeholder">
+                <source>Search…</source>
+            </trans-unit>
+            <trans-unit id="search.form.submit">
+                <source>Search</source>
+            </trans-unit>
+            <trans-unit id="search.results.empty">
+                <source>No matches for "%s".</source>
+            </trans-unit>
+            <trans-unit id="search.results.count">
+                <source>%d results for "%s"</source>
+            </trans-unit>
+            <trans-unit id="search.facets.heading">
+                <source>Filter</source>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

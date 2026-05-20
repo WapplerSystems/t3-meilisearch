@@ -1,0 +1,8 @@
+.idea
+.vscode
+.Build/*
+.php-cs-fixer.cache
+.phpunit.result.cache
+composer.lock
+vendor
+node_modules

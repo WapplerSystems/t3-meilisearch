@@ -1,0 +1,37 @@
+<?php
+declare(strict_types=1);
+
+defined('TYPO3') or die();
+
+use TYPO3\CMS\Extbase\Utility\ExtensionUtility;
+use WapplerSystems\Meilisearch\Controller\SearchController;
+use WapplerSystems\Meilisearch\DataHandling\RecordChangeListener;
+
+ExtensionUtility::configurePlugin(
+    'WsMeilisearch',
+    'Search',
+    [SearchController::class => 'search,results'],
+    [SearchController::class => 'search,results']
+);
+
+// DataHandler hooks — keep Meilisearch documents in sync on backend writes.
+// Migrate to PSR-14 events once TYPO3 core ships record lifecycle events.
+$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][]
+    = RecordChangeListener::class;
+$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'][]
+    = RecordChangeListener::class;
+
+// The plugin renders results non-cacheable and uses GET forms — so the form
+// action URL is just the page URL and the plugin args ride as form fields.
+// GET form submission discards the action URL's query string, which means
+// neither the static (action, controller) nor the dynamic (q, page, filters)
+// args can be pre-baked into a cHash. Exclude the entire plugin namespace
+// from cHash so the resulting URL is accepted without one.
+//
+// Safety: action / controller values are still validated by Extbase against
+// the registered controller actions list — a forged URL cannot invoke an
+// arbitrary controller, only the ones in configurePlugin() above.
+$GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] = array_merge(
+    $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] ?? [],
+    ['^tx_wsmeilisearch_search']
+);

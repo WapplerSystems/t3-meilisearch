@@ -1,0 +1,23 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+<article class="ws-meilisearch-hit">
+    <h3>
+        <f:if condition="{hit.type} == 'page'">
+            <f:then>
+                <f:link.page pageUid="{hit.uid}">{hit.title}</f:link.page>
+            </f:then>
+            <f:else>
+                {hit.title}
+            </f:else>
+        </f:if>
+    </h3>
+    <p class="ws-meilisearch-hit__type">{hit.type}</p>
+    <f:if condition="{hit.teaser}">
+        <p>{hit.teaser}</p>
+    </f:if>
+    <f:if condition="{hit.description}">
+        <p>{hit.description}</p>
+    </f:if>
+</article>
+</html>

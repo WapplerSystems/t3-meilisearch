@@ -1,0 +1,43 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+<section class="ws-meilisearch-facets__panel">
+    <h2>
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.facets.heading"/>
+    </h2>
+
+    <f:comment>
+        This partial renders inside the surrounding GET form on Results.html.
+        Form submission carries q + all checked filters via URL parameters
+        (auto-submit on change is added below via inline JS so users do not
+        need a separate apply button — the form itself stays GET, no proxy
+        action required).
+    </f:comment>
+
+    <f:for each="{facets}" as="buckets" key="attribute">
+        <fieldset>
+            <legend>{attribute}</legend>
+            <ul>
+                <f:for each="{buckets}" as="count" key="value">
+                    <f:variable name="active" value="0"/>
+                    <f:for each="{filters.{attribute}}" as="active_value">
+                        <f:if condition="{active_value} == {value}">
+                            <f:variable name="active" value="1"/>
+                        </f:if>
+                    </f:for>
+                    <li>
+                        <label>
+                            <input type="checkbox"
+                                name="tx_wsmeilisearch_search[filters][{attribute}][]"
+                                value="{value}"
+                                onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"
+                                {f:if(condition: '{active} == 1', then: 'checked="checked"')}/>
+                            <span>{value} <small>({count})</small></span>
+                        </label>
+                    </li>
+                </f:for>
+            </ul>
+        </fieldset>
+    </f:for>
+</section>
+</html>

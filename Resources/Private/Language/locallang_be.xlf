@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+        <header/>
+        <body>
+            <trans-unit id="plugin.search.title">
+                <source>Meilisearch: Search Plugin</source>
+            </trans-unit>
+            <trans-unit id="plugin.search.description">
+                <source>Faceted full-text search backed by Meilisearch.</source>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

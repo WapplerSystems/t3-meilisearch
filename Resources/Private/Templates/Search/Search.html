@@ -1,0 +1,34 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+
+<f:layout name="Default"/>
+
+<f:comment>
+    All search forms in this extension use method="get" by convention.
+    Result pages must be reachable purely by URL (?q=…&filters[…]=…) so the
+    browser back button never triggers a "resubmit form?" prompt. If you ever
+    need a POST (file upload, CSRF-sensitive op), proxy it through a
+    redirect-to-results action — do not POST to resultsAction directly.
+</f:comment>
+
+<f:section name="Main">
+    <form class="ws-meilisearch-form" action="{f:uri.page()}" method="get" role="search">
+        <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
+        <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
+        <label class="ws-meilisearch-form__label">
+            <span class="visually-hidden">
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
+            </span>
+            <input type="search"
+                name="tx_wsmeilisearch_search[q]"
+                value="{query}"
+                placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
+        </label>
+        <button type="submit">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
+        </button>
+    </form>
+</f:section>
+
+</html>

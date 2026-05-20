@@ -1,0 +1,24 @@
+settings:
+  meilisearch.url:
+    label: 'Meilisearch URL'
+    description: 'HTTP endpoint of the Meilisearch server (e.g. http://meilisearch:7700).'
+    type: string
+    default: 'http://meilisearch:7700'
+
+  meilisearch.apiKey:
+    label: 'Meilisearch master / API key'
+    description: 'Master key (development) or scoped API key (production) for the Meilisearch server.'
+    type: string
+    default: ''
+
+  meilisearch.indexPrefix:
+    label: 'Index prefix'
+    description: 'Prefix for all indexes managed by this site (e.g. "site1_"). Keeps multiple sites or environments isolated on the same Meilisearch server.'
+    type: string
+    default: ''
+
+  meilisearch.indexedTables:
+    label: 'Indexed record types'
+    description: 'Comma-separated list of TCA tables to index. Pages and tx_news are wired by default.'
+    type: string
+    default: 'pages,tx_news_domain_model_news'
