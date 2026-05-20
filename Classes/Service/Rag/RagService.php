@@ -140,6 +140,129 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
+     * Streaming variant of ask(): yields RagStreamChunk events instead of
+     * returning a single RagAnswer. The first chunk is `sources` (so the
+     * UI can render "Searching… found N documents" before tokens start
+     * arriving); then a stream of `token` chunks; then a terminal `done`
+     * chunk with the full answer + parsed citation IDs. Failure modes
+     * (`disabled`, `no_context`, `failed`) yield exactly one terminal
+     * chunk and stop.
+     *
+     * @param array<string,mixed> $options
+     * @return iterable<RagStreamChunk>
+     */
+    public function askStreaming(Site $site, string $question, array $options = []): iterable
+    {
+        $question = trim($question);
+        if ($question === '') {
+            yield RagStreamChunk::noContext();
+            return;
+        }
+
+        $settings = $site->getSettings();
+        $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
+        if ($providerName === '') {
+            yield RagStreamChunk::disabled();
+            return;
+        }
+        $provider = $this->providerRegistry->get($providerName);
+        if ($provider === null) {
+            yield RagStreamChunk::failed('provider "' . $providerName . '" not registered');
+            return;
+        }
+
+        $maxHits = max(1, (int)$settings->get('meilisearch.rag.maxContextHits', 5));
+        $maxChars = max(100, (int)$settings->get('meilisearch.rag.maxContextChars', 1500));
+        $useHybrid = (bool)$settings->get('meilisearch.rag.useHybrid', true)
+            && trim((string)$settings->get('meilisearch.embedder.source', '')) !== '';
+        $conversation = $options['conversation'] ?? null;
+        if (!$conversation instanceof Conversation) {
+            $conversation = Conversation::empty();
+        }
+
+        $event = new BeforeRagQueryEvent($question, array_merge([
+            'perPage' => $maxHits,
+            'hybrid' => $useHybrid,
+        ], $options));
+        $this->eventDispatcher->dispatch($event);
+
+        $searchResult = $this->searchService->search($site, $event->question, $event->options);
+        $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === []) {
+            yield RagStreamChunk::noContext();
+            return;
+        }
+
+        // Emit sources first so the UI has something to render while
+        // tokens start streaming in.
+        yield RagStreamChunk::sources($hits);
+
+        $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');
+        $currentTurnMessages = $this->promptBuilder->build(
+            $site,
+            $event->question,
+            $hits,
+            $systemPrompt,
+            $maxChars,
+        );
+        $messages = $this->withConversation($currentTurnMessages, $conversation);
+
+        $llmOptions = [
+            'model' => (string)$settings->get('meilisearch.rag.model', ''),
+            'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
+            'url' => (string)$settings->get('meilisearch.rag.url', ''),
+            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+        ];
+
+        $before = new BeforeLlmCallEvent($messages, $llmOptions);
+        $this->eventDispatcher->dispatch($before);
+
+        // BeforeLlmCallEvent listeners may short-circuit by setting a
+        // cached response. Honor that path even when streaming — emit
+        // the cached text as a single token chunk.
+        if ($before->response !== null) {
+            yield RagStreamChunk::token($before->response);
+            $citedIds = $this->extractCitations($before->response, $hits);
+            yield RagStreamChunk::done($before->response, $citedIds);
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, new RagAnswer(
+                answer: trim($before->response),
+                sources: $hits,
+                citedIds: $citedIds,
+                status: 'ok',
+            )));
+            return;
+        }
+
+        $accumulated = '';
+        try {
+            foreach ($provider->streamComplete($before->messages, $before->options) as $delta) {
+                if ($delta === '') {
+                    continue;
+                }
+                $accumulated .= $delta;
+                yield RagStreamChunk::token($delta);
+            }
+        } catch (LlmException $e) {
+            $this->logger?->error('RAG streaming failed: {message}', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+            yield RagStreamChunk::failed($e->getMessage());
+            return;
+        }
+
+        $citedIds = $this->extractCitations($accumulated, $hits);
+        yield RagStreamChunk::done(trim($accumulated), $citedIds);
+
+        $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, new RagAnswer(
+            answer: trim($accumulated),
+            sources: $hits,
+            citedIds: $citedIds,
+            status: 'ok',
+        )));
+    }
+
+    /**
      * Splice the conversation history between the system prompt (first
      * message PromptBuilder emits) and the new user turn (everything
      * after). Caller (controller) is responsible for capping the history

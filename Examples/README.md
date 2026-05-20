@@ -20,6 +20,7 @@ read top-to-bottom and then either pasted into a site's
 | [`08-event-listener-query-rewriter.md`](08-event-listener-query-rewriter.md) | Listener that strips question words from verbose user queries before retrieval. |
 | [`09-custom-schema-provider.md`](09-custom-schema-provider.md) | Index a third-party extension's records (e.g. `tx_products_product`) into the same unified index. |
 | [`10-programmatic-api.md`](10-programmatic-api.md) | Call `SearchService` / `RagService` directly from your own controller or scheduler task. |
+| [`11-rag-streaming.md`](11-rag-streaming.md) | Server-Sent Events: tokens render as the LLM generates them. Includes a drop-in JS client. |
 
 Every example is self-contained; pick one and ignore the rest if you
 already have the rest of the stack wired.

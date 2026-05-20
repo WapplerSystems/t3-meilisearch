@@ -38,4 +38,23 @@ interface LlmProviderInterface
      *                     a malformed response.
      */
     public function complete(array $messages, array $options): string;
+
+    /**
+     * Streaming variant — yields incremental text deltas as they arrive
+     * from the provider. The concatenation of all yielded chunks equals
+     * what complete() would have returned for the same input.
+     *
+     * Providers that don't actually support streaming should still
+     * implement this by calling complete() and yielding the full result
+     * once; the SSE middleware then delivers it as a single chunk,
+     * preserving the "stream-capable" surface while paying the regular
+     * sync latency.
+     *
+     * @param list<array{role:string,content:string}> $messages
+     * @param array<string,mixed> $options
+     * @return iterable<string>
+     *
+     * @throws LlmException
+     */
+    public function streamComplete(array $messages, array $options): iterable;
 }

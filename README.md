@@ -285,7 +285,8 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | Embedder configurator | Idempotent PATCH of per-index embedder settings, source-aware field allowlist, waits for async settingsUpdate | `Classes/Service/EmbedderConfigurator.php` |
 | LLM provider abstraction | `LlmProviderInterface` with OpenAI / Anthropic / Ollama / generic REST implementations, picked per site by `LlmProviderRegistry` | `Classes/Service/Llm/` |
 | RAG orchestrator | Retrieves hits → builds cited-context prompt → calls LLM → parses `[id=...]` citations → `RagAnswer` DTO | `Classes/Service/Rag/` |
-| RAG plugin | Extbase plugin `WsMeilisearch / Rag` (CType `wsmeilisearch_rag`) with `form` + `ask` actions | `Classes/Controller/RagController.php` |
+| RAG plugin | Extbase plugin `WsMeilisearch / Rag` (CType `wsmeilisearch_rag`) with `form` + `ask` + `reset` actions | `Classes/Controller/RagController.php` |
+| RAG streaming | SSE endpoint at `/_ws_meilisearch/rag/stream`, drop-in JS client renders tokens incrementally | `Classes/Middleware/RagStreamMiddleware.php`, `Resources/Public/JavaScript/RagStream.js` |
 | RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
 | Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms | `Classes/Controller/Backend/OverviewController.php` |
 | Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
@@ -311,6 +312,7 @@ match to your setup and adapt:
 | [08](Examples/08-event-listener-query-rewriter.md) | Rewrite verbose user queries before retrieval |
 | [09](Examples/09-custom-schema-provider.md) | Index a third-party extension's records |
 | [10](Examples/10-programmatic-api.md) | Call `SearchService` / `RagService` from PHP |
+| [11](Examples/11-rag-streaming.md) | RAG streaming via Server-Sent Events |
 
 ## Frontend plugin invariants
 
@@ -381,10 +383,12 @@ factory dedupes by field name across providers.
 
 ## Known Phase 4 limitations
 
-- **No streaming output.** The LLM call is synchronous; the user waits
-  for the full response before anything renders. SSE / chunked rendering
-  is a follow-up because it needs a separate AJAX endpoint and a JS
-  client; the GET-only PRG convention works against it.
+- **Streaming requires unbuffered hosting.** The
+  `/_ws_meilisearch/rag/stream` SSE endpoint works out of the box in
+  the DDEV stack, but production behind Nginx needs `proxy_buffering
+  off` / `fastcgi_buffering off` on that path. See
+  [`Examples/11-rag-streaming.md`](Examples/11-rag-streaming.md) for
+  webserver config.
 - **Conversation memory is opt-in.** When
   `meilisearch.rag.conversation.enabled=false` (the default), each
   `ask` is stateless. Set it to `true` to enable the multi-turn flow
