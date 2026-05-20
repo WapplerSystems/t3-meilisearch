@@ -28,21 +28,35 @@ interface SchemaProviderInterface
     public function supports(string $table): bool;
 
     /**
-     * Deterministic, collision-free document id for a record.
-     * Example: "pages-42", "news-17".
+     * Default-language document id for a record. Used as a stable identifier
+     * by external code; for providers that produce multiple document
+     * variants per record (e.g. one doc per language), the variants share
+     * the same prefix and only this single id is the "canonical" one.
+     * Example: "pages-42", "news-17", "file-99".
      */
     public function buildDocumentId(int $uid): string;
 
     /**
-     * Fetch a single record and convert it to a document array.
+     * All document ids that this provider may have written for one record
+     * on one site. Removal paths iterate this so per-language variants get
+     * cleaned up too.
+     *
+     * @return iterable<string>
+     */
+    public function buildDocumentIds(int $uid, Site $site): iterable;
+
+    /**
+     * Fetch the document(s) for one record on one site. Providers without
+     * per-language variants yield exactly one document; FileSchemaProvider
+     * and other multi-language providers yield one per site language.
      *
      * The Site is supplied so providers can read per-site config (e.g. the
      * Tika URL for FileSchemaProvider) and so multi-language overlays can
-     * be applied. Providers that don't need it can simply ignore the arg.
+     * be applied.
      *
-     * @return array<string,mixed>|null
+     * @return iterable<array<string,mixed>>
      */
-    public function fetchDocument(int $uid, Site $site): ?array;
+    public function fetchDocuments(int $uid, Site $site): iterable;
 
     /**
      * Enumerate all eligible records for a full reindex.

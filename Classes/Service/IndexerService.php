@@ -97,16 +97,21 @@ final class IndexerService implements LoggerAwareInterface
             if (!$provider->supports($table)) {
                 continue;
             }
-            $document = $provider->fetchDocument($uid, $site);
-            if ($document === null) {
-                // Record vanished or got hidden — make sure it's gone from the index too.
-                $engine->deleteDocument($indexName, $provider->buildDocumentId($uid));
-                return true;
+            $any = false;
+            foreach ($provider->fetchDocuments($uid, $site) as $document) {
+                $event = new BeforeDocumentIndexedEvent($provider, $document);
+                $this->eventDispatcher->dispatch($event);
+                $engine->saveDocument($indexName, $event->document);
+                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $event->document));
+                $any = true;
             }
-            $event = new BeforeDocumentIndexedEvent($provider, $document);
-            $this->eventDispatcher->dispatch($event);
-            $engine->saveDocument($indexName, $event->document);
-            $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $event->document));
+            if (!$any) {
+                // Record vanished or got hidden — drop every document variant
+                // we might have written previously (per-language, etc.).
+                foreach ($provider->buildDocumentIds($uid, $site) as $docId) {
+                    $engine->deleteDocument($indexName, $docId);
+                }
+            }
             return true;
         }
         return false;
@@ -124,7 +129,9 @@ final class IndexerService implements LoggerAwareInterface
             if (!$provider->supports($table)) {
                 continue;
             }
-            $engine->deleteDocument($indexName, $provider->buildDocumentId($uid));
+            foreach ($provider->buildDocumentIds($uid, $site) as $docId) {
+                $engine->deleteDocument($indexName, $docId);
+            }
             return true;
         }
         return false;

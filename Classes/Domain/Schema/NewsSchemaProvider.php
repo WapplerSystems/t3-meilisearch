@@ -31,22 +31,31 @@ final class NewsSchemaProvider implements SchemaProviderInterface
         return 'news-' . $uid;
     }
 
-    public function fetchDocument(int $uid, Site $site): ?array
+    public function buildDocumentIds(int $uid, Site $site): iterable
+    {
+        // News translations live as separate tx_news_domain_model_news rows
+        // with their own uids — one document id per row, same as pages.
+        yield $this->buildDocumentId($uid);
+    }
+
+    public function fetchDocuments(int $uid, Site $site): iterable
     {
         if (!ExtensionManagementUtility::isLoaded('news')) {
-            return null;
+            return;
         }
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_news_domain_model_news');
         $row = $qb->select('uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid')
             ->from('tx_news_domain_model_news')
             ->where(
-                $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \PDO::PARAM_INT)),
+                $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)),
                 $qb->expr()->eq('deleted', 0),
                 $qb->expr()->eq('hidden', 0)
             )
             ->executeQuery()
             ->fetchAssociative();
-        return $row === false ? null : $this->toDocument($row);
+        if ($row !== false) {
+            yield $this->toDocument($row);
+        }
     }
 
     public function iterateDocuments(Site $site): iterable

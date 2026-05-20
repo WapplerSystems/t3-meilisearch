@@ -138,7 +138,7 @@ final class RecordChangeListener
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
         $row = $qb->select('file')
             ->from('sys_file_metadata')
-            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($metadataUid, \PDO::PARAM_INT)))
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($metadataUid, \Doctrine\DBAL\ParameterType::INTEGER)))
             ->executeQuery()
             ->fetchAssociative();
         return (int)($row['file'] ?? 0);

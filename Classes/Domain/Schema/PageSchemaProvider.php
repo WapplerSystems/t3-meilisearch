@@ -27,20 +27,29 @@ final class PageSchemaProvider implements SchemaProviderInterface
         return 'pages-' . $uid;
     }
 
-    public function fetchDocument(int $uid, Site $site): ?array
+    public function buildDocumentIds(int $uid, Site $site): iterable
+    {
+        // Page translations are stored as their own pages.uid rows, so each
+        // language already has a unique doc id — only one id per page uid.
+        yield $this->buildDocumentId($uid);
+    }
+
+    public function fetchDocuments(int $uid, Site $site): iterable
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('pages');
         $row = $qb->select('uid', 'pid', 'title', 'subtitle', 'description', 'abstract', 'keywords', 'sys_language_uid', 'doktype')
             ->from('pages')
             ->where(
-                $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \PDO::PARAM_INT)),
+                $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)),
                 $qb->expr()->eq('deleted', 0),
                 $qb->expr()->eq('hidden', 0)
             )
             ->executeQuery()
             ->fetchAssociative();
 
-        return $row === false ? null : $this->toDocument($row);
+        if ($row !== false) {
+            yield $this->toDocument($row);
+        }
     }
 
     public function iterateDocuments(Site $site): iterable

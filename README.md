@@ -248,7 +248,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | Plugin registration | Extbase plugin `WsMeilisearch / Search` (CType `wsmeilisearch_search`) | `ext_localconf.php`, `Configuration/TCA/Overrides/tt_content.php` |
 | Site Set | `wapplersystems/ws-meilisearch` with typed settings + TypoScript | `Configuration/Sets/WsMeilisearch/*` |
 | Indexing extension point | `SchemaProviderInterface` (auto-tagged via `_instanceof`) | `Classes/Domain/Schema/` |
-| Default providers | Pages + tx_news (gated on EXT:news) + sys_file | `PageSchemaProvider.php`, `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
+| Default providers | Pages + tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay) | `PageSchemaProvider.php`, `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
 | Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
 | Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
 | Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |
@@ -301,9 +301,6 @@ factory dedupes by field name across providers.
 
 ## Known Phase 2 limitations
 
-- **No per-language metadata** — sys_file_metadata is translatable, but the
-  indexer reads default-language only. Multi-language overlays are a
-  Phase 2.1 task.
 - **No FAL lifecycle events** — DataHandler covers metadata edits, but FAL
   file uploads/deletions/moves go through other channels. Rely on
   `ws_meilisearch:reindex` for full coverage until FAL events are wired.
