@@ -235,6 +235,20 @@ LLM question against any site without leaving the BE — useful for
 verifying that a freshly tuned `documentTemplate` or `systemPrompt`
 behaves as expected before pushing settings to production.
 
+The **Diagnostics** sub-page shows, per site, the *desired* embedder
+configuration (from `settings.yaml`) next to the *actual* one stored
+on the Meilisearch server, plus the configured RAG provider with its
+model / URL / conversation-memory flags. Two maintenance buttons:
+
+- **Re-push embedder** — runs `EmbedderConfigurator::ensureForSite()`
+  for the chosen site. Flashes one of *configured*, *unchanged*,
+  *disabled*, *skipped* so admins can tell whether the call actually
+  changed anything.
+- **Ping provider** — sends a one-shot `ping → pong` round-trip to
+  the configured LLM provider (bypassing retrieval, so it's a pure
+  endpoint health check). Flashes the latency and a truncated reply,
+  or the error message if the provider is unreachable / misconfigured.
+
 ## Scheduler task (Phase 5)
 
 `FullReindexTask` registers under **Administration → Scheduler** as

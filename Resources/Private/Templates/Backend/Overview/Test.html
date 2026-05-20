@@ -6,10 +6,7 @@
 
 <f:section name="Content">
     <h1>Meilisearch — Test Search &amp; RAG</h1>
-
-    <p>
-        <a href="{indexUrl}">&laquo; Back to overview</a>
-    </p>
+    <f:render partial="Backend/TabNav" arguments="{active: 'test', indexUrl: indexUrl, testUrl: testUrl, diagnoseUrl: diagnoseUrl}" />
 
     <form action="{testUrl}" method="get" class="mb-4">
         <input type="hidden" name="action" value="test" />

@@ -1,0 +1,135 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Diagnostics</h1>
+    <f:render partial="Backend/TabNav" arguments="{active: 'diagnose', indexUrl: indexUrl, testUrl: testUrl, diagnoseUrl: diagnoseUrl}" />
+
+    <p class="lead">
+        Embedder + RAG state per site, live from the Meilisearch server.
+        Use the maintenance buttons to force-push the embedder configuration
+        (in case it drifted out of sync) or probe the LLM provider with a
+        minimal "ping" round-trip.
+    </p>
+
+    <f:for each="{cards}" as="card">
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <strong>{card.identifier}</strong>
+                <f:if condition="{card.configured}">
+                    <f:else>
+                        <span class="badge bg-secondary ms-2">not configured</span>
+                    </f:else>
+                </f:if>
+                <f:if condition="{card.error}">
+                    <span class="badge bg-danger ms-2" title="{card.error}">error</span>
+                </f:if>
+            </div>
+            <div class="card-body">
+
+                <div class="row">
+                    <!-- Embedder column -->
+                    <div class="col-md-6 border-end">
+                        <h3 class="h5">Embedder</h3>
+                        <f:if condition="{card.desiredEmbedder}">
+                            <f:then>
+                                <h4 class="h6 text-muted mt-3">Desired (from settings)</h4>
+                                <dl class="row mb-0">
+                                    <f:for each="{card.desiredEmbedder}" as="value" key="key">
+                                        <dt class="col-sm-4"><code>{key}</code></dt>
+                                        <dd class="col-sm-8"><code>{value}</code></dd>
+                                    </f:for>
+                                </dl>
+                                <h4 class="h6 text-muted mt-3">Actual (on Meilisearch)</h4>
+                                <f:if condition="{card.actualEmbedder}">
+                                    <f:then>
+                                        <dl class="row mb-0">
+                                            <f:for each="{card.actualEmbedder}" as="value" key="key">
+                                                <dt class="col-sm-4"><code>{key}</code></dt>
+                                                <dd class="col-sm-8"><code>{value -> f:format.raw()}</code></dd>
+                                            </f:for>
+                                        </dl>
+                                    </f:then>
+                                    <f:else>
+                                        <p class="text-warning">Not applied yet. Click "Re-push" to write it.</p>
+                                    </f:else>
+                                </f:if>
+                                <f:if condition="{card.configured}">
+                                    <form action="{repushUrl}" method="post" class="mt-3">
+                                        <input type="hidden" name="site" value="{card.identifier}" />
+                                        <button type="submit" class="btn btn-sm btn-default">Re-push embedder</button>
+                                    </form>
+                                </f:if>
+                            </f:then>
+                            <f:else>
+                                <p class="text-muted">No embedder configured for this site — keyword search only.</p>
+                            </f:else>
+                        </f:if>
+                    </div>
+
+                    <!-- RAG column -->
+                    <div class="col-md-6">
+                        <h3 class="h5">RAG</h3>
+                        <f:if condition="{card.rag}">
+                            <f:then>
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-4">Provider</dt>
+                                    <dd class="col-sm-8"><code>{card.rag.provider}</code></dd>
+
+                                    <dt class="col-sm-4">Model</dt>
+                                    <dd class="col-sm-8"><code>{card.rag.model}</code></dd>
+
+                                    <f:if condition="{card.rag.url}">
+                                        <dt class="col-sm-4">URL</dt>
+                                        <dd class="col-sm-8"><code>{card.rag.url}</code></dd>
+                                    </f:if>
+
+                                    <dt class="col-sm-4">API key</dt>
+                                    <dd class="col-sm-8">
+                                        <f:if condition="{card.rag.hasApiKey}">
+                                            <f:then><span class="badge bg-success">set</span></f:then>
+                                            <f:else><span class="badge bg-secondary">not set</span></f:else>
+                                        </f:if>
+                                    </dd>
+
+                                    <dt class="col-sm-4">Hybrid retrieval</dt>
+                                    <dd class="col-sm-8">
+                                        <f:if condition="{card.rag.useHybrid}">
+                                            <f:then><span class="badge bg-success">on</span></f:then>
+                                            <f:else><span class="badge bg-secondary">off</span></f:else>
+                                        </f:if>
+                                    </dd>
+
+                                    <dt class="col-sm-4">Conversation memory</dt>
+                                    <dd class="col-sm-8">
+                                        <f:if condition="{card.rag.conversationEnabled}">
+                                            <f:then><span class="badge bg-success">enabled</span></f:then>
+                                            <f:else><span class="badge bg-secondary">disabled</span></f:else>
+                                        </f:if>
+                                    </dd>
+
+                                    <dt class="col-sm-4">Max context hits</dt>
+                                    <dd class="col-sm-8">{card.rag.maxContextHits}</dd>
+
+                                    <dt class="col-sm-4">Temperature</dt>
+                                    <dd class="col-sm-8">{card.rag.temperature}</dd>
+                                </dl>
+                                <form action="{pingUrl}" method="post" class="mt-3">
+                                    <input type="hidden" name="site" value="{card.identifier}" />
+                                    <button type="submit" class="btn btn-sm btn-default">Ping provider</button>
+                                </form>
+                            </f:then>
+                            <f:else>
+                                <p class="text-muted">No RAG provider configured for this site.</p>
+                            </f:else>
+                        </f:if>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </f:for>
+</f:section>
+</html>
