@@ -28,6 +28,7 @@ final class RecordChangeListener
         private readonly IndexerService $indexer,
         private readonly SiteFinder $siteFinder,
         private readonly ConnectionPool $connectionPool,
+        private readonly FileLifecycleHandler $fileLifecycle,
     ) {}
 
     /**
@@ -49,12 +50,12 @@ final class RecordChangeListener
         if ($table === 'sys_file_metadata') {
             $fileUid = (int)($fieldArray['file'] ?? $this->resolveFileUidFromMetadata($uid));
             if ($fileUid > 0) {
-                $this->reindexFileAcrossSites($fileUid);
+                $this->fileLifecycle->reindex($fileUid);
             }
             return;
         }
         if ($table === 'sys_file') {
-            $this->reindexFileAcrossSites($uid);
+            $this->fileLifecycle->reindex($uid);
             return;
         }
 
@@ -84,16 +85,16 @@ final class RecordChangeListener
         if ($table === 'sys_file_metadata') {
             $fileUid = $this->resolveFileUidFromMetadata($uid);
             if ($fileUid > 0) {
-                $this->reindexFileAcrossSites($fileUid);
+                $this->fileLifecycle->reindex($fileUid);
             }
             return;
         }
         if ($table === 'sys_file') {
             if ($command === 'delete') {
-                $this->removeFileAcrossSites($uid);
+                $this->fileLifecycle->remove($uid);
                 return;
             }
-            $this->reindexFileAcrossSites($uid);
+            $this->fileLifecycle->reindex($uid);
             return;
         }
 
@@ -144,25 +145,4 @@ final class RecordChangeListener
         return (int)($row['file'] ?? 0);
     }
 
-    private function reindexFileAcrossSites(int $fileUid): void
-    {
-        foreach ($this->siteFinder->getAllSites() as $site) {
-            try {
-                $this->indexer->indexRecord('sys_file', $fileUid, $site);
-            } catch (\Throwable) {
-                // Per-site failure (e.g. Tika down for one site) must not block other sites.
-            }
-        }
-    }
-
-    private function removeFileAcrossSites(int $fileUid): void
-    {
-        foreach ($this->siteFinder->getAllSites() as $site) {
-            try {
-                $this->indexer->removeRecord('sys_file', $fileUid, $site);
-            } catch (\Throwable) {
-                // ignore — best effort
-            }
-        }
-    }
 }

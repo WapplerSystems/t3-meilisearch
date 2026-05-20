@@ -290,7 +290,9 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
 | Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms | `Classes/Controller/Backend/OverviewController.php` |
 | Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
-| Realtime sync | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
+| Realtime sync (BE forms) | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
+| Realtime sync (FAL storage) | PSR-14 listeners on AfterFileAdded / Deleted / Renamed / Moved / ContentsSet / Replaced / Copied / MetaDataUpdated / RemovedFromIndex | `Classes/DataHandling/FalEventListener.php` |
+| Cross-site file dispatcher | Shared `reindex(uid)` / `remove(uid)` used by both sync paths | `Classes/DataHandling/FileLifecycleHandler.php` |
 | CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
 | Frontend templates | GET-only forms, auto-submit facets, PRG-redirect on stray POSTs | `Resources/Private/Templates/Search/` |
@@ -350,9 +352,6 @@ factory dedupes by field name across providers.
 
 ## Known Phase 2 limitations
 
-- **No FAL lifecycle events** — DataHandler covers metadata edits, but FAL
-  file uploads/deletions/moves go through other channels. Rely on
-  `ws_meilisearch:reindex` for full coverage until FAL events are wired.
 - **No OCR** — `apache/tika:3.0.0.0` (base image, ~500 MB) ships without
   Tesseract. Swap to `apache/tika:3.0.0.0-full` (~1.5 GB) for OCR on
   scanned PDFs / images. Phase 3 will revisit.
