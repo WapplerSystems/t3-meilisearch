@@ -27,9 +27,10 @@ final class IndexerService implements LoggerAwareInterface
         private readonly iterable $schemaProviders,
         private readonly SearchEngineFactory $engineFactory,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly EmbedderConfigurator $embedderConfigurator,
     ) {}
 
-    public function ensureSchema(Site $site, bool $rebuild = false): bool
+    public function ensureSchema(Site $site, bool $rebuild = false, bool $skipEmbedder = false): bool
     {
         $engine = $this->engineFactory->createForSite($site);
         if ($engine === null) {
@@ -48,6 +49,13 @@ final class IndexerService implements LoggerAwareInterface
         }
         if (!$engine->existIndex($indexName)) {
             $engine->createIndex($indexName, $options)?->wait();
+        }
+
+        // Push embedder settings *after* the index exists. Operator can
+        // suppress this with --skip-embedder when troubleshooting a wedged
+        // embedder config — the rest of the index keeps working.
+        if (!$skipEmbedder) {
+            $this->embedderConfigurator->ensureForSite($site);
         }
         return true;
     }

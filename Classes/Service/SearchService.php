@@ -7,6 +7,7 @@ use CmsIg\Seal\Search\Condition\EqualCondition;
 use CmsIg\Seal\Search\Condition\InCondition;
 use CmsIg\Seal\Search\Condition\SearchCondition;
 use CmsIg\Seal\Search\Facet\CountFacet;
+use Meilisearch\Contracts\HybridSearchOptions;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -17,9 +18,11 @@ use WapplerSystems\Meilisearch\Event\BeforeSearchEvent;
 /**
  * Frontend-facing search wrapper.
  *
- * Builds a SEAL search request from the controller's options (query, filters,
- * facets, paging) and maps SEAL's Result into the template-friendly
- * SearchResult DTO so Fluid stays decoupled from the engine.
+ * Two execution paths:
+ *  - keyword: SEAL search builder → adapter-agnostic, portable to other engines
+ *  - hybrid:  raw Meilisearch SDK so we can pass `hybrid.semanticRatio`, which
+ *             SEAL 0.12 does not yet expose. Activated when the caller passes
+ *             `hybrid: true` *and* the site has an embedder configured.
  */
 final class SearchService implements LoggerAwareInterface
 {
@@ -36,6 +39,8 @@ final class SearchService implements LoggerAwareInterface
      *     facets?: list<string>,
      *     page?: int,
      *     perPage?: int,
+     *     hybrid?: bool,
+     *     semanticRatio?: float,
      * } $options
      */
     public function search(Site $site, string $query, array $options = []): SearchResult
@@ -50,51 +55,15 @@ final class SearchService implements LoggerAwareInterface
             return $empty;
         }
 
-        $indexName = $this->engineFactory->getIndexName($site);
         $page = max(1, (int)($before->options['page'] ?? 1));
         $perPage = max(1, (int)($before->options['perPage'] ?? 20));
-
-        $builder = $engine->createSearchBuilder($indexName)
-            ->limit($perPage)
-            ->offset(($page - 1) * $perPage);
-
-        if ($before->query !== '') {
-            $builder->addFilter(new SearchCondition($before->query));
-        }
-
-        foreach ((array)($before->options['filters'] ?? []) as $field => $value) {
-            if (is_array($value)) {
-                $value = array_values(array_filter($value, static fn ($v) => $v !== '' && $v !== null));
-                if ($value === []) {
-                    continue;
-                }
-                $builder->addFilter(new InCondition((string)$field, $value));
-                continue;
-            }
-            if ($value === '' || $value === null) {
-                continue;
-            }
-            $builder->addFilter(new EqualCondition((string)$field, $value));
-        }
-
-        foreach ((array)($before->options['facets'] ?? []) as $facetField) {
-            $field = (string)$facetField;
-            if ($field === '') {
-                continue;
-            }
-            $builder->addFacet(new CountFacet($field));
-        }
+        $useHybrid = (bool)($before->options['hybrid'] ?? false)
+            && trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
 
         try {
-            $sealResult = $builder->getResult();
-            $hits = iterator_to_array($sealResult, false);
-            $result = new SearchResult(
-                hits: $hits,
-                totalHits: $sealResult->total(),
-                facets: $this->mapFacets($sealResult->facets()),
-                page: $page,
-                perPage: $perPage,
-            );
+            $result = $useHybrid
+                ? $this->hybridSearch($site, $before->query, $before->options, $page, $perPage)
+                : $this->keywordSearch($site, $before->query, $before->options, $page, $perPage);
         } catch (\Throwable $e) {
             $this->logger?->error('Meilisearch search failed: {message}', [
                 'message' => $e->getMessage(),
@@ -109,17 +78,178 @@ final class SearchService implements LoggerAwareInterface
     }
 
     /**
-     * Flatten SEAL's facet structure into a {attribute => {value => count}} map
-     * for Fluid.
+     * @param array<string,mixed> $options
+     */
+    private function keywordSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
+    {
+        $engine = $this->engineFactory->createForSite($site);
+        $indexName = $this->engineFactory->getIndexName($site);
+
+        $builder = $engine->createSearchBuilder($indexName)
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage);
+
+        if ($query !== '') {
+            $builder->addFilter(new SearchCondition($query));
+        }
+
+        foreach ((array)($options['filters'] ?? []) as $field => $value) {
+            if (is_array($value)) {
+                $value = array_values(array_filter($value, static fn ($v) => $v !== '' && $v !== null));
+                if ($value === []) {
+                    continue;
+                }
+                $builder->addFilter(new InCondition((string)$field, $value));
+                continue;
+            }
+            if ($value === '' || $value === null) {
+                continue;
+            }
+            $builder->addFilter(new EqualCondition((string)$field, $value));
+        }
+
+        foreach ((array)($options['facets'] ?? []) as $facetField) {
+            $field = (string)$facetField;
+            if ($field === '') {
+                continue;
+            }
+            $builder->addFacet(new CountFacet($field));
+        }
+
+        $sealResult = $builder->getResult();
+        $hits = iterator_to_array($sealResult, false);
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $sealResult->total(),
+            facets: $this->mapSealFacets($sealResult->facets()),
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     */
+    private function hybridSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
+    {
+        $client = $this->engineFactory->createClientForSite($site);
+        if ($client === null) {
+            return SearchResult::empty();
+        }
+        $index = $client->index($this->engineFactory->getIndexName($site));
+
+        $params = [
+            'limit' => $perPage,
+            'offset' => ($page - 1) * $perPage,
+        ];
+
+        $filter = $this->buildMeilisearchFilter((array)($options['filters'] ?? []));
+        if ($filter !== '') {
+            $params['filter'] = $filter;
+        }
+
+        $facets = [];
+        foreach ((array)($options['facets'] ?? []) as $facetField) {
+            $field = (string)$facetField;
+            if ($field !== '') {
+                $facets[] = $field;
+            }
+        }
+        if ($facets !== []) {
+            $params['facets'] = $facets;
+        }
+
+        $ratio = $this->resolveSemanticRatio($site, $options);
+        $params['hybrid'] = (new HybridSearchOptions())
+            ->setEmbedder(EmbedderConfigurator::EMBEDDER_NAME)
+            ->setSemanticRatio($ratio)
+            ->toArray();
+
+        $response = $index->search($query, $params);
+        $raw = $response->toArray();
+
+        $hits = is_array($raw['hits'] ?? null) ? $raw['hits'] : [];
+        $total = (int)($raw['estimatedTotalHits'] ?? $raw['totalHits'] ?? count($hits));
+        $facetDistribution = is_array($raw['facetDistribution'] ?? null) ? $raw['facetDistribution'] : [];
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $total,
+            facets: $this->mapMeilisearchFacets($facetDistribution),
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     */
+    private function resolveSemanticRatio(Site $site, array $options): float
+    {
+        if (array_key_exists('semanticRatio', $options) && is_numeric($options['semanticRatio'])) {
+            return $this->clampRatio((float)$options['semanticRatio']);
+        }
+        return $this->clampRatio((float)$site->getSettings()->get('meilisearch.embedder.semanticRatio', 0.5));
+    }
+
+    private function clampRatio(float $ratio): float
+    {
+        return max(0.0, min(1.0, $ratio));
+    }
+
+    /**
+     * Translate the same options.filters shape used by SEAL into a Meilisearch
+     * filter expression. Strings are wrapped in double quotes; embedded quotes
+     * are escaped. Numeric / boolean values are emitted unquoted so they hit
+     * Meilisearch's numeric/boolean comparison.
      *
-     * SEAL returns CountFacet results nested under a "count" sub-key, e.g.:
+     * @param array<string,scalar|array<int,scalar>> $filters
+     */
+    private function buildMeilisearchFilter(array $filters): string
+    {
+        $parts = [];
+        foreach ($filters as $field => $value) {
+            $field = (string)$field;
+            if ($field === '') {
+                continue;
+            }
+            if (is_array($value)) {
+                $value = array_values(array_filter($value, static fn ($v) => $v !== '' && $v !== null));
+                if ($value === []) {
+                    continue;
+                }
+                $encoded = array_map(fn ($v) => $this->encodeFilterValue($v), $value);
+                $parts[] = $field . ' IN [' . implode(', ', $encoded) . ']';
+                continue;
+            }
+            if ($value === '' || $value === null) {
+                continue;
+            }
+            $parts[] = $field . ' = ' . $this->encodeFilterValue($value);
+        }
+        return implode(' AND ', $parts);
+    }
+
+    private function encodeFilterValue(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string)$value;
+        }
+        $string = (string)$value;
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $string) . '"';
+    }
+
+    /**
+     * SEAL returns CountFacet results nested under "count":
      *   ['type' => ['count' => ['page' => 1, 'news' => 4]]]
-     * MinMax facets ship "min"/"max" instead — we ignore those for Phase 1.
      *
      * @param array<string,mixed> $facets
      * @return array<string,array<string,int>>
      */
-    private function mapFacets(array $facets): array
+    private function mapSealFacets(array $facets): array
     {
         $out = [];
         foreach ($facets as $field => $payload) {
@@ -128,6 +258,30 @@ final class SearchService implements LoggerAwareInterface
             }
             $flattened = [];
             foreach ($payload['count'] as $value => $count) {
+                $flattened[(string)$value] = (int)$count;
+            }
+            if ($flattened !== []) {
+                $out[(string)$field] = $flattened;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Meilisearch returns facetDistribution as flat {attribute => {value => count}}.
+     *
+     * @param array<string,mixed> $distribution
+     * @return array<string,array<string,int>>
+     */
+    private function mapMeilisearchFacets(array $distribution): array
+    {
+        $out = [];
+        foreach ($distribution as $field => $values) {
+            if (!is_array($values)) {
+                continue;
+            }
+            $flattened = [];
+            foreach ($values as $value => $count) {
                 $flattened[(string)$value] = (int)$count;
             }
             if ($flattened !== []) {

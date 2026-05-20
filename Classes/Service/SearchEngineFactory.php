@@ -28,6 +28,9 @@ final class SearchEngineFactory
     /** @var array<string,Engine> */
     private array $engines = [];
 
+    /** @var array<string,Client> */
+    private array $clients = [];
+
     /**
      * @param iterable<SchemaProviderInterface> $schemaProviders
      */
@@ -42,6 +45,29 @@ final class SearchEngineFactory
             return $this->engines[$cacheKey];
         }
 
+        $client = $this->createClientForSite($site);
+        if ($client === null) {
+            return null;
+        }
+
+        $adapter = new MeilisearchAdapter($client);
+        $schema = $this->buildSchema($site);
+
+        return $this->engines[$cacheKey] = new Engine($adapter, $schema);
+    }
+
+    /**
+     * Raw Meilisearch PHP client for the site. Needed for features the SEAL
+     * adapter does not (yet) expose — embedder settings, hybrid query params.
+     * Returns null when the site has no meilisearch.url configured.
+     */
+    public function createClientForSite(Site $site): ?Client
+    {
+        $cacheKey = $site->getIdentifier();
+        if (isset($this->clients[$cacheKey])) {
+            return $this->clients[$cacheKey];
+        }
+
         $settings = $site->getSettings();
         $url = (string)$settings->get('meilisearch.url', '');
         $apiKey = (string)$settings->get('meilisearch.apiKey', '');
@@ -50,11 +76,7 @@ final class SearchEngineFactory
             return null;
         }
 
-        $client = new Client($url, $apiKey !== '' ? $apiKey : null);
-        $adapter = new MeilisearchAdapter($client);
-        $schema = $this->buildSchema($site);
-
-        return $this->engines[$cacheKey] = new Engine($adapter, $schema);
+        return $this->clients[$cacheKey] = new Client($url, $apiKey !== '' ? $apiKey : null);
     }
 
     /**

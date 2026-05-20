@@ -7,10 +7,12 @@ tomorrow) without rewriting templates or services.
 
 ## Status
 
-**Phase 1 + 2 — wired and working.** Pages, news, and FAL files (PDF /
-Office / RTF / EPUB / plain text via Apache Tika) all share a single
-unified per-site index, faceted by `type`. Frontend plugin renders GET
-forms with typo-tolerant search + click-to-filter facets.
+**Phase 1 + 2 + 3 — wired and working.** Pages, news, and FAL files
+(PDF / Office / RTF / EPUB / plain text via Apache Tika) all share a
+single unified per-site index, faceted by `type`. Frontend plugin
+renders GET forms with typo-tolerant search + click-to-filter facets.
+Hybrid (keyword + semantic vector) search is available when an embedder
+is configured.
 
 ## Installation
 
@@ -70,12 +72,69 @@ meilisearch:
 Definitions live in `Configuration/Sets/WsMeilisearch/settings.definitions.yaml`
 so settings are typed and editable through the Backend Sites module.
 
+### Hybrid search (Phase 3)
+
+To enable vector + keyword hybrid search, set `meilisearch.embedder.*`
+in the site settings and enable the `vectorStore` experimental feature
+on the Meilisearch server (one-time, server-wide):
+
+```bash
+ddev exec curl -s -X PATCH \
+  -H 'Authorization: Bearer <master_key>' \
+  -H 'Content-Type: application/json' \
+  -d '{"vectorStore":true}' \
+  http://meilisearch:7700/experimental-features
+```
+
+Then pick a source:
+
+```yaml
+# OpenAI
+meilisearch:
+  embedder:
+    source: 'openAi'
+    model: 'text-embedding-3-small'
+    apiKey: '%env(OPENAI_API_KEY)%'
+    semanticRatio: 0.5
+
+# Ollama (self-hosted, no API key)
+meilisearch:
+  embedder:
+    source: 'ollama'
+    url: 'http://ollama:11434/api/embeddings'
+    model: 'nomic-embed-text'
+
+# Hugging Face Inference API
+meilisearch:
+  embedder:
+    source: 'huggingFace'
+    model: 'BAAI/bge-base-en-v1.5'
+
+# User-provided vectors (advanced — every doc must ship `_vectors.default`)
+meilisearch:
+  embedder:
+    source: 'userProvided'
+    dimensions: 384
+```
+
+`ws_meilisearch:reindex --rebuild` pushes the embedder configuration to
+Meilisearch before populating documents, so the first hybrid query
+after rebuild sees a fully vectorized corpus. Without `--rebuild`,
+existing docs are re-sent and re-vectorized in place.
+
+Frontend: `?hybrid=1` on the results URL flips to hybrid mode; the
+`hybridAvailable` flag is exposed to Fluid so the toggle stays hidden
+on sites without an embedder. `semanticRatio` (0..1) is read from site
+settings and can be overridden per request via the `options` parameter
+of `SearchService::search()`.
+
 ## CLI
 
 ```bash
-ddev exec vendor/bin/typo3 ws_meilisearch:reindex                 # all sites
-ddev exec vendor/bin/typo3 ws_meilisearch:reindex main             # one site, incremental
-ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild   # drop + recreate first
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex                        # all sites
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one site, incremental
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
 ```
 
 ## What's wired
@@ -88,8 +147,9 @@ ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild   # drop + recr
 | Default providers | Pages + tx_news (gated on EXT:news) + sys_file | `PageSchemaProvider.php`, `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
 | Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
 | Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
-| Search service | Builds SEAL query (search + filters + facets), maps result | `Classes/Service/SearchService.php` |
+| Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |
 | Tika integration | Apache Tika REST client + sha1-keyed cache | `Classes/Service/Tika/` |
+| Embedder configurator | Idempotent PATCH of per-index embedder settings, source-aware field allowlist, waits for async settingsUpdate | `Classes/Service/EmbedderConfigurator.php` |
 | Realtime sync | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
 | CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
@@ -125,7 +185,7 @@ factory dedupes by field name across providers.
 
 - **Phase 1** ✅ basic indexing + Fluid plugin with typo tolerance & facets
 - **Phase 2** ✅ FAL/Tika indexing (PDF / Office / RTF / EPUB / plain text)
-- **Phase 3** — Hybrid search + auto-embeddings (OpenAI / HF / Ollama)
+- **Phase 3** ✅ Hybrid search + auto-embeddings (OpenAI / HF / Ollama / REST / userProvided)
 - **Phase 4** — RAG module with configurable LLM provider
 - **Phase 5** — Backend module, scheduler tasks, multi-site/language polish
 
@@ -145,3 +205,21 @@ factory dedupes by field name across providers.
   sys_file_reference → page → site is a Phase 2.1 task.
 - **No file result link in the FE template** — file hits show the title
   but don't link to the public URL yet.
+
+## Known Phase 3 limitations
+
+- **Meilisearch `vectorStore` experimental feature must be enabled** (one
+  PATCH on `/experimental-features`, see "Hybrid search" above). Sending
+  `embedders` settings to a server with the feature off returns a 400
+  and aborts the reindex.
+- **`userProvided` source requires every document to ship its own vectors**
+  in `_vectors.default`. The default schema providers don't do that —
+  use `userProvided` only as an integration point for downstream code
+  that already has vectors, not for general-purpose search.
+- **API-key rotation isn't auto-detected** — Meilisearch redacts the
+  key on read-back, so the configurator can't diff "new" vs "redacted"
+  to decide whether to PATCH. Touch any other embedder setting (or run
+  `--rebuild`) to force a re-push after key rotation.
+- **Hybrid result hits skip the SEAL adapter** — frontend code that
+  inspects fields beyond the unified schema may see slightly different
+  shapes between keyword and hybrid results.

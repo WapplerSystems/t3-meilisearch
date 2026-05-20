@@ -29,7 +29,8 @@ final class ReindexCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (omit to index all sites)')
-            ->addOption('rebuild', null, InputOption::VALUE_NONE, 'Drop and recreate the index before populating it (lossy — index is unavailable while rebuilding).');
+            ->addOption('rebuild', null, InputOption::VALUE_NONE, 'Drop and recreate the index before populating it (lossy — index is unavailable while rebuilding).')
+            ->addOption('skip-embedder', null, InputOption::VALUE_NONE, 'Do not push the embedder configuration. Use when troubleshooting a wedged hybrid setup — keyword search keeps working.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -37,6 +38,7 @@ final class ReindexCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $siteId = $input->getArgument('site');
         $rebuild = (bool)$input->getOption('rebuild');
+        $skipEmbedder = (bool)$input->getOption('skip-embedder');
 
         $sites = $siteId !== null
             ? [$this->siteFinder->getSiteByIdentifier($siteId)]
@@ -44,7 +46,7 @@ final class ReindexCommand extends Command
 
         foreach ($sites as $site) {
             $io->section('Site: ' . $site->getIdentifier());
-            if (!$this->indexer->ensureSchema($site, $rebuild)) {
+            if (!$this->indexer->ensureSchema($site, $rebuild, $skipEmbedder)) {
                 $io->warning('  → not configured for Meilisearch (skip)');
                 continue;
             }

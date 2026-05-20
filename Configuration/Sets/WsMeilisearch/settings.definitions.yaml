@@ -61,3 +61,45 @@ settings:
       - 'text/plain'
       - 'text/html'
       - 'text/markdown'
+
+  meilisearch.embedder.source:
+    label: 'Embedder source'
+    description: 'Vector embedder for hybrid (keyword + semantic) search. Leave empty to disable — queries fall back to pure keyword search. Supported: openAi, huggingFace, ollama, rest, userProvided.'
+    type: string
+    default: ''
+
+  meilisearch.embedder.model:
+    label: 'Embedder model'
+    description: 'Model identifier passed to the embedder. Examples: "text-embedding-3-small" (openAi), "BAAI/bge-base-en-v1.5" (huggingFace), "nomic-embed-text" (ollama).'
+    type: string
+    default: ''
+
+  meilisearch.embedder.url:
+    label: 'Embedder URL'
+    description: 'HTTP endpoint for ollama / rest sources. Ignored for openAi and huggingFace. Example: http://ollama:11434/api/embeddings.'
+    type: string
+    default: ''
+
+  meilisearch.embedder.apiKey:
+    label: 'Embedder API key'
+    description: 'Auth token for openAi / rest sources. Ignored for huggingFace and ollama.'
+    type: string
+    default: ''
+
+  meilisearch.embedder.dimensions:
+    label: 'Embedder dimensions'
+    description: 'Vector dimensions. 0 = auto-detect (works for known openAi / huggingFace / ollama models). Must be set explicitly for rest / userProvided.'
+    type: int
+    default: 0
+
+  meilisearch.embedder.documentTemplate:
+    label: 'Document template'
+    description: 'Liquid template determining which fields get embedded. Keep it short — most embedders cap input around 512 tokens.'
+    type: text
+    default: "{{ doc.title }}. {{ doc.description }}. {{ doc.bodytext }}"
+
+  meilisearch.embedder.semanticRatio:
+    label: 'Semantic ratio (0..1)'
+    description: 'Default weight of semantic vs. keyword scoring when hybrid search is used. 0 = pure keyword, 1 = pure semantic, 0.5 = balanced. The frontend can override per request.'
+    type: number
+    default: 0.5

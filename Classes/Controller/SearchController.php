@@ -55,7 +55,7 @@ final class SearchController extends ActionController
     /**
      * @param array<string,array<int,string>> $filters
      */
-    public function resultsAction(string $q = '', int $page = 1, array $filters = []): ResponseInterface
+    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0): ResponseInterface
     {
         // Post/Redirect/Get: any POST that reaches here gets bounced to a GET
         // so the URL fully encodes the result state and the browser back
@@ -67,6 +67,7 @@ final class SearchController extends ActionController
                 'q' => $q,
                 'page' => $page,
                 'filters' => $filters,
+                'hybrid' => $hybrid,
             ]);
         }
 
@@ -80,11 +81,18 @@ final class SearchController extends ActionController
             explode(',', (string)($this->settings['facets'] ?? ''))
         )));
 
+        // Hybrid is available iff the operator configured an embedder. We
+        // surface a UI toggle only in that case so the user never gets a
+        // checkbox that silently does nothing.
+        $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
+        $useHybrid = $hybridAvailable && $hybrid === 1;
+
         $result = $this->searchService->search($site, $q, [
             'page' => max(1, $page),
             'perPage' => $perPage,
             'filters' => $filters,
             'facets' => $facetList,
+            'hybrid' => $useHybrid,
         ]);
 
         $this->view->assignMultiple([
@@ -92,6 +100,8 @@ final class SearchController extends ActionController
             'page' => $page,
             'result' => $result,
             'filters' => $filters,
+            'hybrid' => $useHybrid ? 1 : 0,
+            'hybridAvailable' => $hybridAvailable,
         ]);
         return $this->htmlResponse();
     }
