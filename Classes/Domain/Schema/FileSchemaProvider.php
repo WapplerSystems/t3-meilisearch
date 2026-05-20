@@ -10,6 +10,7 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 
@@ -28,18 +29,33 @@ use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
  * variants get added alongside on the next reindex.
  *
  * Files are not tied to a single site by structure — the same file may be
- * referenced from any number of pages across any number of sites. For
- * simplicity each site gets its own copy of every non-missing file in its
- * index; deduplication by sys_file_reference → site is a Phase 2.1 task.
+ * referenced from any number of pages across any number of sites. Two
+ * modes are supported, switched by the per-site `meilisearch.deduplicateFiles`
+ * setting:
+ *  - false (default): index every non-missing sys_file into every site's
+ *    index. Useful when the search index doubles as a global file library.
+ *  - true: only index files that are referenced (via sys_file_reference)
+ *    from a page belonging to the current site. Strict per-site results,
+ *    no cross-site leakage.
  */
 final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
+    /**
+     * Lazily-built [siteIdentifier => [fileUid => true]] map of which files
+     * are referenced on which sites. Memoized on the provider instance so a
+     * full reindex pays the underlying sys_file_reference query only once.
+     *
+     * @var array<string,array<int,bool>>|null
+     */
+    private ?array $filesPerSite = null;
+
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly ResourceFactory $resourceFactory,
         private readonly TextExtractor $textExtractor,
+        private readonly SiteFinder $siteFinder,
     ) {}
 
     public function getTable(): string
@@ -66,6 +82,10 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
 
     public function fetchDocuments(int $uid, Site $site): iterable
     {
+        if (!$this->isFileEligibleForSite($uid, $site)) {
+            return;
+        }
+
         try {
             $file = $this->resourceFactory->getFileObject($uid);
         } catch (\Throwable $e) {
@@ -94,6 +114,8 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     public function iterateDocuments(Site $site): iterable
     {
         $languages = $site->getLanguages();
+        $dedupe = $this->shouldDeduplicate($site);
+        $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
         $result = $qb->select('uid')
@@ -102,8 +124,12 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             ->executeQuery();
 
         while ($row = $result->fetchAssociative()) {
+            $fileUid = (int)$row['uid'];
+            if ($eligibleUids !== null && !isset($eligibleUids[$fileUid])) {
+                continue;
+            }
             try {
-                $file = $this->resourceFactory->getFileObject((int)$row['uid']);
+                $file = $this->resourceFactory->getFileObject($fileUid);
             } catch (\Throwable) {
                 continue;
             }
@@ -223,5 +249,65 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     {
         $result = $this->textExtractor->extract($file, $site);
         return $result->status === ExtractionResult::SUCCESS ? $result->text : '';
+    }
+
+    private function shouldDeduplicate(Site $site): bool
+    {
+        return (bool)$site->getSettings()->get('meilisearch.deduplicateFiles', false);
+    }
+
+    /**
+     * For dedup mode: is this single fileUid referenced from any page that
+     * resolves to the given site? Caller in fetchDocuments uses this; the
+     * full-rebuild path in iterateDocuments uses filesForSite() instead so
+     * we don't repeat the underlying join per row.
+     */
+    private function isFileEligibleForSite(int $fileUid, Site $site): bool
+    {
+        if (!$this->shouldDeduplicate($site)) {
+            return true;
+        }
+        return isset($this->filesForSite($site)[$fileUid]);
+    }
+
+    /**
+     * @return array<int,bool> [fileUid => true] for files referenced on this site
+     */
+    private function filesForSite(Site $site): array
+    {
+        if ($this->filesPerSite === null) {
+            $this->filesPerSite = $this->buildFilesPerSiteMap();
+        }
+        return $this->filesPerSite[$site->getIdentifier()] ?? [];
+    }
+
+    /**
+     * One round-trip to sys_file_reference for the whole map. References
+     * with pid=0 (e.g. files attached to be_users avatars) or pids that
+     * don't resolve to any site are skipped — they aren't part of any
+     * frontend search experience.
+     *
+     * @return array<string,array<int,bool>>
+     */
+    private function buildFilesPerSiteMap(): array
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
+        $rows = $qb->select('uid_local', 'pid')
+            ->distinct()
+            ->from('sys_file_reference')
+            ->where($qb->expr()->gt('pid', 0))
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $map = [];
+        foreach ($rows as $row) {
+            try {
+                $site = $this->siteFinder->getSiteByPageId((int)$row['pid']);
+            } catch (\Throwable) {
+                continue;
+            }
+            $map[$site->getIdentifier()][(int)$row['uid_local']] = true;
+        }
+        return $map;
     }
 }

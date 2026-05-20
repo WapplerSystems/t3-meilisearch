@@ -69,11 +69,19 @@ meilisearch:
   url: 'http://meilisearch:7700'
   apiKey: 'dev_master_key'
   indexPrefix: 'site1_'
+  deduplicateFiles: true     # opt-in — only index files referenced on this site
   tika:
     url: 'http://tika:9998'
     timeout: 60
     maxFileSize: 52428800
 ```
+
+`deduplicateFiles` defaults to `false` (every site indexes every FAL
+file). Set to `true` for strict per-site results — the indexer then
+follows `sys_file_reference → page → site` and only includes files
+referenced from at least one page of the current site. Files
+referenced only from non-page records (e.g. `be_users.avatar`) are
+skipped entirely.
 
 Definitions live in `Configuration/Sets/WsMeilisearch/settings.definitions.yaml`
 so settings are typed and editable through the Backend Sites module.
@@ -307,9 +315,12 @@ factory dedupes by field name across providers.
 - **No OCR** — `apache/tika:3.0.0.0` (base image, ~500 MB) ships without
   Tesseract. Swap to `apache/tika:3.0.0.0-full` (~1.5 GB) for OCR on
   scanned PDFs / images. Phase 3 will revisit.
-- **Files indexed per-site** — same file gets indexed into every
-  Meilisearch-configured site's index. Deduplication via
-  sys_file_reference → page → site is a Phase 2.1 task.
+- **Per-site file dedup doesn't react to reference changes** — when
+  `meilisearch.deduplicateFiles=true`, files only land in a site's
+  index if they're referenced from a page belonging to that site. But
+  the DataHandler hook only watches sys_file / sys_file_metadata, not
+  sys_file_reference. Editing a tt_content's file reference doesn't
+  trigger a file reindex; the next full reindex picks it up.
 
 ## Known Phase 3 limitations
 

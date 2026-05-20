@@ -23,6 +23,12 @@ settings:
     type: string
     default: 'pages,tx_news_domain_model_news'
 
+  meilisearch.deduplicateFiles:
+    label: 'Dedupe FAL files by site'
+    description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'
+    type: bool
+    default: false
+
   meilisearch.tika.url:
     label: 'Apache Tika Server URL'
     description: 'HTTP endpoint of an Apache Tika Server for text extraction from PDF / Office / RTF / EPUB files. Leave empty to disable FAL indexing entirely.'
