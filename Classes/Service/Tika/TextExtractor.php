@@ -57,7 +57,7 @@ final class TextExtractor implements LoggerAwareInterface
             return ExtractionResult::failed('Cannot compute content hash');
         }
 
-        $cacheKey = 'tika_' . $sha1;
+        $cacheKey = $this->cacheKey($sha1, $config);
         $cached = $this->cache->get($cacheKey);
         if (is_string($cached)) {
             return ExtractionResult::success($cached);
@@ -68,7 +68,18 @@ final class TextExtractor implements LoggerAwareInterface
             return ExtractionResult::failed('Cannot read file contents');
         }
 
-        $result = $this->tikaClient->extractText($config['url'], $contents, $mime, $config['timeout']);
+        $result = $this->tikaClient->extractText(
+            $config['url'],
+            $contents,
+            $mime,
+            $config['timeout'],
+            $config['ocrEnabled']
+                ? [
+                    'ocrLanguage' => $config['ocrLanguage'],
+                    'ocrStrategy' => $config['ocrStrategy'],
+                ]
+                : [],
+        );
         if ($result->status === ExtractionResult::SUCCESS) {
             // Cache forever — entries become unreachable when their sha1 stops
             // matching any sys_file row, and SimpleFileBackend handles GC.
@@ -78,7 +89,15 @@ final class TextExtractor implements LoggerAwareInterface
     }
 
     /**
-     * @return array{url: string, timeout: int, maxFileSize: int, allowedMimeTypes: list<string>}
+     * @return array{
+     *     url: string,
+     *     timeout: int,
+     *     maxFileSize: int,
+     *     allowedMimeTypes: list<string>,
+     *     ocrEnabled: bool,
+     *     ocrLanguage: string,
+     *     ocrStrategy: string,
+     * }
      */
     private function readConfig(Site $site): array
     {
@@ -92,7 +111,29 @@ final class TextExtractor implements LoggerAwareInterface
             'timeout' => max(1, (int)$settings->get('meilisearch.tika.timeout', 60)),
             'maxFileSize' => max(0, (int)$settings->get('meilisearch.tika.maxFileSize', 52428800)),
             'allowedMimeTypes' => is_array($mimes) ? array_values(array_map('strval', $mimes)) : [],
+            'ocrEnabled' => (bool)$settings->get('meilisearch.tika.ocrEnabled', false),
+            'ocrLanguage' => trim((string)$settings->get('meilisearch.tika.ocrLanguage', 'eng')),
+            'ocrStrategy' => trim((string)$settings->get('meilisearch.tika.ocrStrategy', 'auto')),
         ];
+    }
+
+    /**
+     * Cache key includes the OCR-relevant settings so a site that
+     * switches from `ocrLanguage: eng` to `ocrLanguage: deu` re-extracts
+     * instead of returning the old English text. The ocrEnabled=false
+     * variant gets its own "noocr" bucket because a no-OCR pass on a
+     * scanned PDF produces an empty string, and we'd otherwise serve
+     * that as a "valid" cached extraction for any other site enabling
+     * OCR on the shared Tika pool.
+     *
+     * @param array{ocrEnabled:bool,ocrLanguage:string,ocrStrategy:string} $config
+     */
+    private function cacheKey(string $sha1, array $config): string
+    {
+        $token = $config['ocrEnabled']
+            ? substr(sha1($config['ocrLanguage'] . '|' . $config['ocrStrategy']), 0, 8)
+            : 'noocr';
+        return 'tika_' . $sha1 . '_' . $token;
     }
 
     /**

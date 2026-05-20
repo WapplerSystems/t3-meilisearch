@@ -25,11 +25,37 @@ final class TikaClient implements LoggerAwareInterface
         private readonly RequestFactory $requestFactory,
     ) {}
 
-    public function extractText(string $tikaBaseUrl, string $fileContents, string $mimeType, int $timeout): ExtractionResult
-    {
+    /**
+     * @param array{ocrLanguage?: string, ocrStrategy?: string} $ocr
+     *     Pass an empty array to suppress all OCR-related headers — the
+     *     base `apache/tika:*` image (no Tesseract) rejects them with
+     *     HTTP 400, so the caller (TextExtractor) only fills this map
+     *     when the operator explicitly opts in via
+     *     `meilisearch.tika.ocrEnabled=true`.
+     */
+    public function extractText(
+        string $tikaBaseUrl,
+        string $fileContents,
+        string $mimeType,
+        int $timeout,
+        array $ocr = [],
+    ): ExtractionResult {
         $tikaBaseUrl = rtrim($tikaBaseUrl, '/');
         if ($tikaBaseUrl === '') {
             return ExtractionResult::skipped('Tika URL not configured');
+        }
+
+        $headers = [
+            'Accept' => 'text/plain',
+            'Content-Type' => $mimeType !== '' ? $mimeType : 'application/octet-stream',
+        ];
+        $lang = trim((string)($ocr['ocrLanguage'] ?? ''));
+        if ($lang !== '') {
+            $headers['X-Tika-OCR-Language'] = $lang;
+        }
+        $strategy = trim((string)($ocr['ocrStrategy'] ?? ''));
+        if ($strategy !== '') {
+            $headers['X-Tika-PDFOcrStrategy'] = $strategy;
         }
 
         try {
@@ -38,10 +64,7 @@ final class TikaClient implements LoggerAwareInterface
                 'PUT',
                 [
                     'body' => $fileContents,
-                    'headers' => [
-                        'Accept' => 'text/plain',
-                        'Content-Type' => $mimeType !== '' ? $mimeType : 'application/octet-stream',
-                    ],
+                    'headers' => $headers,
                     'timeout' => $timeout,
                 ],
             );

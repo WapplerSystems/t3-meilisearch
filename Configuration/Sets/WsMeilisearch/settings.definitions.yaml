@@ -47,6 +47,24 @@ settings:
     type: int
     default: 52428800
 
+  meilisearch.tika.ocrEnabled:
+    label: 'Enable OCR'
+    description: 'When true, the indexer asks Tika to OCR scanned PDFs and image files. Requires the "apache/tika:*-full" image (with Tesseract installed) — the base image rejects OCR-related headers with HTTP 400, so leave this off unless you switched to the full tag.'
+    type: bool
+    default: false
+
+  meilisearch.tika.ocrLanguage:
+    label: 'OCR language(s)'
+    description: 'Tesseract language codes for OCR, comma-separated. Examples: "eng", "deu", "eng+deu". Only sent when ocrEnabled is true.'
+    type: string
+    default: 'eng'
+
+  meilisearch.tika.ocrStrategy:
+    label: 'PDF OCR strategy'
+    description: 'How Tika decides whether to OCR a PDF. "no_ocr" = trust the embedded text layer (fast). "auto" = OCR only when the embedded text looks empty. "ocr_and_text_extraction" = always do both and concatenate (slow but thorough). "ocr_only" = ignore the embedded text layer entirely. Only sent when ocrEnabled is true.'
+    type: string
+    default: 'auto'
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'

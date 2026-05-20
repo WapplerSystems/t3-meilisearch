@@ -21,6 +21,7 @@ read top-to-bottom and then either pasted into a site's
 | [`09-custom-schema-provider.md`](09-custom-schema-provider.md) | Index a third-party extension's records (e.g. `tx_products_product`) into the same unified index. |
 | [`10-programmatic-api.md`](10-programmatic-api.md) | Call `SearchService` / `RagService` directly from your own controller or scheduler task. |
 | [`11-rag-streaming.md`](11-rag-streaming.md) | Server-Sent Events: tokens render as the LLM generates them. Includes a drop-in JS client. |
+| [`12-tika-ocr.md`](12-tika-ocr.md) | OCR for scanned PDFs and image files via the `apache/tika:*-full` image. |
 
 Every example is self-contained; pick one and ignore the rest if you
 already have the rest of the stack wired.

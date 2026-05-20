@@ -329,6 +329,7 @@ match to your setup and adapt:
 | [09](Examples/09-custom-schema-provider.md) | Index a third-party extension's records |
 | [10](Examples/10-programmatic-api.md) | Call `SearchService` / `RagService` from PHP |
 | [11](Examples/11-rag-streaming.md) | RAG streaming via Server-Sent Events |
+| [12](Examples/12-tika-ocr.md) | OCR for scanned PDFs + images |
 
 ## Frontend plugin invariants
 
@@ -366,9 +367,6 @@ factory dedupes by field name across providers.
 
 ## Known Phase 2 limitations
 
-- **No OCR** — `apache/tika:3.0.0.0` (base image, ~500 MB) ships without
-  Tesseract. Swap to `apache/tika:3.0.0.0-full` (~1.5 GB) for OCR on
-  scanned PDFs / images. Phase 3 will revisit.
 
 ## Known Phase 3 limitations
 
