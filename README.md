@@ -313,8 +313,6 @@ factory dedupes by field name across providers.
 - **Files indexed per-site** — same file gets indexed into every
   Meilisearch-configured site's index. Deduplication via
   sys_file_reference → page → site is a Phase 2.1 task.
-- **No file result link in the FE template** — file hits show the title
-  but don't link to the public URL yet.
 
 ## Known Phase 3 limitations
 

@@ -3,14 +3,20 @@
     data-namespace-typo3-fluid="true">
 <article class="ws-meilisearch-hit">
     <h3>
-        <f:if condition="{hit.type} == 'page'">
-            <f:then>
+        <f:switch expression="{hit.type}">
+            <f:case value="page">
                 <f:link.page pageUid="{hit.uid}">{hit.title}</f:link.page>
-            </f:then>
-            <f:else>
-                {hit.title}
-            </f:else>
-        </f:if>
+            </f:case>
+            <f:case value="file">
+                <f:if condition="{hit.publicUrl}">
+                    <f:then>
+                        <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link" target="_blank" rel="noopener">{hit.title}</a>
+                    </f:then>
+                    <f:else>{hit.title}</f:else>
+                </f:if>
+            </f:case>
+            <f:defaultCase>{hit.title}</f:defaultCase>
+        </f:switch>
     </h3>
     <p class="ws-meilisearch-hit__type">{hit.type}</p>
     <f:if condition="{hit.teaser}">

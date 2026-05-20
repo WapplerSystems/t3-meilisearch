@@ -92,6 +92,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             new TextField('mimeType', searchable: false, filterable: true, facet: true),
             new TextField('extension', searchable: false, filterable: true),
             new IntegerField('fileSize', filterable: true, sortable: true),
+            new TextField('publicUrl', searchable: false),
             // `bodytext` already declared by NewsSchemaProvider; the factory
             // dedupes by name, so adding it here costs nothing and keeps the
             // Files schema self-describing.
@@ -115,6 +116,12 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             $bodytext = $result->text;
         }
 
+        // getPublicUrl() returns null for private storages (e.g. internal /
+        // protected fileadmin folders, or S3 buckets with no public ACL).
+        // We index the empty string in that case so the schema stays
+        // consistent, and the template falls back to a non-link title.
+        $publicUrl = $file->getPublicUrl() ?? '';
+
         return [
             'id' => $this->buildDocumentId((int)$file->getUid()),
             'type' => 'file',
@@ -128,6 +135,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             'mimeType' => (string)$file->getMimeType(),
             'extension' => (string)$file->getExtension(),
             'fileSize' => (int)$file->getSize(),
+            'publicUrl' => $publicUrl,
         ];
     }
 }
