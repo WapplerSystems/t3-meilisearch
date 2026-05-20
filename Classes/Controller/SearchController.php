@@ -55,19 +55,15 @@ final class SearchController extends ActionController
     /**
      * @param array<string,array<int,string>> $filters
      */
-    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0): ResponseInterface
+    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0, string $sort = ''): ResponseInterface
     {
-        // Post/Redirect/Get: any POST that reaches here gets bounced to a GET
-        // so the URL fully encodes the result state and the browser back
-        // button never asks "Resubmit form?". Templates use method=get by
-        // convention; this guard catches third-party callers or hand-crafted
-        // forms that violate that convention.
         if (strtoupper($this->request->getMethod()) === 'POST') {
             return $this->redirect('results', null, null, [
                 'q' => $q,
                 'page' => $page,
                 'filters' => $filters,
                 'hybrid' => $hybrid,
+                'sort' => $sort,
             ]);
         }
 
@@ -81,11 +77,13 @@ final class SearchController extends ActionController
             explode(',', (string)($this->settings['facets'] ?? ''))
         )));
 
-        // Hybrid is available iff the operator configured an embedder. We
-        // surface a UI toggle only in that case so the user never gets a
-        // checkbox that silently does nothing.
         $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
         $useHybrid = $hybridAvailable && $hybrid === 1;
+
+        // Sort: a single "field:direction" string from the FE, or empty
+        // for relevance-only ranking. The SearchService accepts a list
+        // — wrap the scalar; it handles "" / null gracefully.
+        $sortOption = trim($sort);
 
         $result = $this->searchService->search($site, $q, [
             'page' => max(1, $page),
@@ -93,16 +91,39 @@ final class SearchController extends ActionController
             'filters' => $filters,
             'facets' => $facetList,
             'hybrid' => $useHybrid,
+            'sort' => $sortOption,
         ]);
 
         $this->view->assignMultiple([
             'query' => $q,
-            'page' => $page,
+            'page' => max(1, $page),
             'result' => $result,
             'filters' => $filters,
             'hybrid' => $useHybrid ? 1 : 0,
             'hybridAvailable' => $hybridAvailable,
+            'sort' => $sortOption,
+            // Pre-built links so templates don't have to compute them.
+            'sortOptions' => $this->sortOptions(),
         ]);
         return $this->htmlResponse();
+    }
+
+    /**
+     * Sort presets exposed to the template. The default is empty
+     * (relevance ranking) — we surface the most commonly useful sort
+     * directions across the unified-index field set. Site packages can
+     * override / extend by replacing the partial that consumes this.
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    private function sortOptions(): array
+    {
+        return [
+            ['value' => '',                'label' => 'Relevance'],
+            ['value' => 'datetime:desc',   'label' => 'Newest first'],
+            ['value' => 'datetime:asc',    'label' => 'Oldest first'],
+            ['value' => 'fileSize:desc',   'label' => 'Largest file first'],
+            ['value' => 'fileSize:asc',    'label' => 'Smallest file first'],
+        ];
     }
 }

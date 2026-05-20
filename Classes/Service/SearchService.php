@@ -41,6 +41,7 @@ final class SearchService implements LoggerAwareInterface
      *     perPage?: int,
      *     hybrid?: bool,
      *     semanticRatio?: float,
+     *     sort?: list<string>|string,
      * } $options
      */
     public function search(Site $site, string $query, array $options = []): SearchResult
@@ -116,6 +117,10 @@ final class SearchService implements LoggerAwareInterface
             $builder->addFacet(new CountFacet($field));
         }
 
+        foreach ($this->normalizeSort($options['sort'] ?? null) as [$field, $direction]) {
+            $builder->addSortBy($field, $direction);
+        }
+
         $sealResult = $builder->getResult();
         $hits = iterator_to_array($sealResult, false);
         return new SearchResult(
@@ -165,6 +170,14 @@ final class SearchService implements LoggerAwareInterface
             ->setSemanticRatio($ratio)
             ->toArray();
 
+        $sort = [];
+        foreach ($this->normalizeSort($options['sort'] ?? null) as [$field, $direction]) {
+            $sort[] = $field . ':' . $direction;
+        }
+        if ($sort !== []) {
+            $params['sort'] = $sort;
+        }
+
         $response = $index->search($query, $params);
         $raw = $response->toArray();
 
@@ -195,6 +208,42 @@ final class SearchService implements LoggerAwareInterface
     private function clampRatio(float $ratio): float
     {
         return max(0.0, min(1.0, $ratio));
+    }
+
+    /**
+     * Normalize the `sort` option into [field, direction] pairs.
+     * Accepts:
+     *  - a string `"field:desc"` (single sort)
+     *  - a list of strings `["fileSize:desc", "title:asc"]` (multi-sort)
+     *  - a list of [field, direction] tuples
+     * Unknown directions default to asc — keyword that always works in both
+     * SEAL and Meilisearch syntax. Empty / malformed entries are skipped so
+     * a stray "" from a form submission doesn't poison the whole sort.
+     *
+     * @return iterable<array{0:string,1:'asc'|'desc'}>
+     */
+    private function normalizeSort(mixed $raw): iterable
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return;
+        }
+        $entries = is_array($raw) ? $raw : [$raw];
+        foreach ($entries as $entry) {
+            if (is_string($entry) && $entry !== '') {
+                $parts = explode(':', $entry, 2);
+                $field = trim($parts[0] ?? '');
+                $dir = strtolower(trim($parts[1] ?? 'asc'));
+            } elseif (is_array($entry) && count($entry) >= 2) {
+                $field = trim((string)$entry[0]);
+                $dir = strtolower(trim((string)$entry[1]));
+            } else {
+                continue;
+            }
+            if ($field === '') {
+                continue;
+            }
+            yield [$field, $dir === 'desc' ? 'desc' : 'asc'];
+        }
     }
 
     /**

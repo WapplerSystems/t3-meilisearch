@@ -330,6 +330,7 @@ match to your setup and adapt:
 | [10](Examples/10-programmatic-api.md) | Call `SearchService` / `RagService` from PHP |
 | [11](Examples/11-rag-streaming.md) | RAG streaming via Server-Sent Events |
 | [12](Examples/12-tika-ocr.md) | OCR for scanned PDFs + images |
+| [13](Examples/13-sort-pagination.md) | Sort dropdown + pagination in the FE plugin |
 
 ## Frontend plugin invariants
 

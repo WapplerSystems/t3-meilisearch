@@ -25,4 +25,27 @@ final class SearchResult
     {
         return new self();
     }
+
+    /**
+     * Total page count derived from totalHits / perPage. Always >= 1 for a
+     * non-empty result, and 0 when there are no hits — that lets templates
+     * distinguish "no results" from "page 1 of 1".
+     */
+    public function getTotalPages(): int
+    {
+        if ($this->totalHits <= 0 || $this->perPage <= 0) {
+            return 0;
+        }
+        return (int)ceil($this->totalHits / $this->perPage);
+    }
+
+    public function getHasPreviousPage(): bool
+    {
+        return $this->page > 1;
+    }
+
+    public function getHasNextPage(): bool
+    {
+        return $this->page < $this->getTotalPages();
+    }
 }

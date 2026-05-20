@@ -118,6 +118,8 @@ final class OverviewController
         $askQuery = (string)($request->getQueryParams()['ask'] ?? '');
         $siteId = (string)($request->getQueryParams()['site'] ?? '');
         $hybrid = (bool)($request->getQueryParams()['hybrid'] ?? false);
+        $sort = trim((string)($request->getQueryParams()['sort'] ?? ''));
+        $page = max(1, (int)($request->getQueryParams()['page'] ?? 1));
 
         $sites = $this->siteFinder->getAllSites();
         $site = null;
@@ -137,8 +139,10 @@ final class OverviewController
         if ($site instanceof Site && $query !== '') {
             $searchResult = $this->searchService->search($site, $query, [
                 'hybrid' => $hybrid,
+                'page' => $page,
                 'perPage' => 10,
                 'facets' => ['type', 'language'],
+                'sort' => $sort,
             ]);
         }
 
@@ -162,6 +166,8 @@ final class OverviewController
             'query' => $query,
             'askQuery' => $askQuery,
             'hybrid' => $hybrid,
+            'sort' => $sort,
+            'page' => $page,
             'searchResult' => $searchResult,
             'ragAnswer' => $ragAnswer,
             'ragSources' => $ragSources,
