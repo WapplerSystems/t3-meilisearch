@@ -7,7 +7,10 @@ use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use WapplerSystems\Meilisearch\Service\Rag\Conversation;
+use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
+use WapplerSystems\Meilisearch\Service\Rag\Turn;
 
 /**
  * Frontend-facing RAG controller. Mirrors SearchController's GET-only, PRG
@@ -23,6 +26,7 @@ final class RagController extends ActionController
     public function __construct(
         private readonly RagService $ragService,
         private readonly SiteFinder $siteFinder,
+        private readonly ConversationStore $conversationStore,
     ) {}
 
     private function resolveSite(): ?Site
@@ -51,7 +55,13 @@ final class RagController extends ActionController
 
     public function formAction(string $q = ''): ResponseInterface
     {
-        $this->view->assign('question', $q);
+        $site = $this->resolveSite();
+        $conversation = $this->loadConversation($site);
+        $this->view->assignMultiple([
+            'question' => $q,
+            'conversation' => $conversation->turns,
+            'conversationEnabled' => $this->conversationEnabled($site),
+        ]);
         return $this->htmlResponse();
     }
 
@@ -67,11 +77,59 @@ final class RagController extends ActionController
             return $this->htmlResponse();
         }
 
-        $answer = $this->ragService->ask($site, $q);
+        $conversation = $this->loadConversation($site);
+        $answer = $this->ragService->ask($site, $q, [
+            'conversation' => $conversation,
+        ]);
+
+        if ($answer->status === 'ok' && $this->conversationEnabled($site)) {
+            $turn = new Turn($q, $answer->answer, $answer->citedIds);
+            $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
+            $conversation = $conversation->withTurn($turn, $maxTurns);
+            $sessionKey = $this->sessionKey($site);
+            $this->conversationStore->save($this->request, $sessionKey, $conversation);
+        }
+
         $this->view->assignMultiple([
             'question' => $q,
             'answer' => $answer,
+            'conversation' => $conversation->turns,
+            'conversationEnabled' => $this->conversationEnabled($site),
         ]);
         return $this->htmlResponse();
+    }
+
+    public function resetAction(): ResponseInterface
+    {
+        $site = $this->resolveSite();
+        if ($site instanceof Site && $this->conversationEnabled($site)) {
+            $this->conversationStore->clear($this->request, $this->sessionKey($site));
+        }
+        return $this->redirect('form');
+    }
+
+    private function conversationEnabled(?Site $site): bool
+    {
+        if (!$site instanceof Site) {
+            return false;
+        }
+        return (bool)$site->getSettings()->get('meilisearch.rag.conversation.enabled', false);
+    }
+
+    private function sessionKey(Site $site): string
+    {
+        $key = trim((string)$site->getSettings()->get(
+            'meilisearch.rag.conversation.sessionKey',
+            'ws_meilisearch_rag_conversation',
+        ));
+        return $key !== '' ? $key : 'ws_meilisearch_rag_conversation';
+    }
+
+    private function loadConversation(?Site $site): Conversation
+    {
+        if (!$this->conversationEnabled($site)) {
+            return Conversation::empty();
+        }
+        return $this->conversationStore->load($this->request, $this->sessionKey($site));
     }
 }

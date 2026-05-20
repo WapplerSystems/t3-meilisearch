@@ -196,6 +196,27 @@ CLI for debugging without rendering the FE plugin:
 ddev exec vendor/bin/typo3 ws_meilisearch:ask "What is X?" main
 ```
 
+Multi-turn conversation memory (opt-in):
+
+```yaml
+meilisearch:
+  rag:
+    conversation:
+      enabled: true        # default false — each ask stays single-turn
+      maxTurns: 3          # cap the prompt size; oldest pair drops first
+      sessionKey: 'ws_meilisearch_rag_conversation'   # change to run multiple plugins independently
+```
+
+When enabled, the controller stores the last N (question, answer)
+pairs in the anonymous TYPO3 frontend user session (cookie-backed by
+TYPO3 itself). RagService splices them between the system prompt and
+the new user turn, so the LLM sees:
+`[system, prior_user, prior_assistant, …, current_user_with_context]`.
+A new `?action=reset` URL on the RAG plugin clears the stored state
+so a visitor can start over. Sources from past turns are not
+re-displayed; the controller only keeps `citedIds` for the template
+to show as "this answer cited X".
+
 ## Backend module (Phase 5)
 
 After installing the extension, an admin-only entry **System → Meilisearch**
@@ -273,6 +294,24 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
 | Frontend templates | GET-only forms, auto-submit facets, PRG-redirect on stray POSTs | `Resources/Private/Templates/Search/` |
 
+## Examples
+
+End-to-end snippets in [`Examples/`](Examples/) — pick the closest
+match to your setup and adapt:
+
+| File | Topic |
+|---|---|
+| [01](Examples/01-minimal-keyword-search.md) | Minimal keyword search |
+| [02](Examples/02-fal-with-tika.md) | FAL files via Apache Tika |
+| [03](Examples/03-hybrid-openai.md) | Hybrid search with OpenAI embeddings |
+| [04](Examples/04-hybrid-ollama.md) | Hybrid search with self-hosted Ollama |
+| [05](Examples/05-rag-anthropic.md) | RAG chat with Anthropic Claude |
+| [06](Examples/06-rag-conversation.md) | Multi-turn RAG conversation memory |
+| [07](Examples/07-event-listener-prompt-cache.md) | Cache identical RAG calls via `BeforeLlmCallEvent` |
+| [08](Examples/08-event-listener-query-rewriter.md) | Rewrite verbose user queries before retrieval |
+| [09](Examples/09-custom-schema-provider.md) | Index a third-party extension's records |
+| [10](Examples/10-programmatic-api.md) | Call `SearchService` / `RagService` from PHP |
+
 ## Frontend plugin invariants
 
 - **All forms are `method="get"`** — the result page must be fully reproducible
@@ -346,10 +385,12 @@ factory dedupes by field name across providers.
   for the full response before anything renders. SSE / chunked rendering
   is a follow-up because it needs a separate AJAX endpoint and a JS
   client; the GET-only PRG convention works against it.
-- **No conversation memory.** Each `ask` call is stateless — the LLM
-  receives only the current question + retrieved context. Multi-turn
-  chats need either a frontend-side history (assembled into messages
-  on each call) or backend session storage.
+- **Conversation memory is opt-in.** When
+  `meilisearch.rag.conversation.enabled=false` (the default), each
+  `ask` is stateless. Set it to `true` to enable the multi-turn flow
+  documented under "Retrieval-Augmented Generation (Phase 4)" — the
+  anonymous frontend session holds the last N (Q, A) pairs and the
+  controller splices them into every subsequent LLM call.
 - **Citation extraction is regex-based.** Models that wrap markers in
   prose ("see [id=foo and id=bar]") only get the first id captured;
   models that ignore the citation instruction yield zero `citedIds`.

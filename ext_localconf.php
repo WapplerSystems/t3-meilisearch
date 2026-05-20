@@ -20,8 +20,8 @@ ExtensionUtility::configurePlugin(
 ExtensionUtility::configurePlugin(
     'WsMeilisearch',
     'Rag',
-    [RagController::class => 'form,ask'],
-    [RagController::class => 'form,ask']
+    [RagController::class => 'form,ask,reset'],
+    [RagController::class => 'form,ask,reset']
 );
 
 // DataHandler hooks — keep Meilisearch documents in sync on backend writes.

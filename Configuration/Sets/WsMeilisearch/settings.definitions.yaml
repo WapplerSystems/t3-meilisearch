@@ -163,3 +163,21 @@ settings:
     description: 'When true, RAG retrieval uses hybrid (keyword + semantic) search instead of keyword-only. Requires a configured embedder. Ignored when no embedder is configured.'
     type: bool
     default: true
+
+  meilisearch.rag.conversation.enabled:
+    label: 'Multi-turn conversation memory'
+    description: 'When enabled, the RAG plugin keeps the last N (question, answer) pairs in the anonymous frontend user session and feeds them back to the LLM, so visitors can ask follow-ups without restating context. Default: disabled — each question is independent.'
+    type: bool
+    default: false
+
+  meilisearch.rag.conversation.maxTurns:
+    label: 'Max conversation turns'
+    description: 'How many prior (question, answer) pairs to remember. Higher = better context but more tokens (and slower / costlier per call). Default 3.'
+    type: int
+    default: 3
+
+  meilisearch.rag.conversation.sessionKey:
+    label: 'Session key'
+    description: 'Storage key in the frontend session. Change if multiple RAG plugins on the same site should keep independent conversation states.'
+    type: string
+    default: 'ws_meilisearch_rag_conversation'

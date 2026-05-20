@@ -71,6 +71,10 @@ final class RagService implements LoggerAwareInterface
         $maxChars = max(100, (int)$settings->get('meilisearch.rag.maxContextChars', 1500));
         $useHybrid = (bool)$settings->get('meilisearch.rag.useHybrid', true)
             && trim((string)$settings->get('meilisearch.embedder.source', '')) !== '';
+        $conversation = $options['conversation'] ?? null;
+        if (!$conversation instanceof Conversation) {
+            $conversation = Conversation::empty();
+        }
 
         $event = new BeforeRagQueryEvent($question, array_merge([
             'perPage' => $maxHits,
@@ -87,13 +91,19 @@ final class RagService implements LoggerAwareInterface
         }
 
         $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');
-        $messages = $this->promptBuilder->build(
+        $currentTurnMessages = $this->promptBuilder->build(
             $site,
             $event->question,
             $hits,
             $systemPrompt,
             $maxChars,
         );
+
+        // Splice prior turns between the system prompt and the current
+        // user message. PromptBuilder always emits [system, user]; we
+        // insert the conversation history between those two so the LLM
+        // sees: system → history → current user (with fresh context).
+        $messages = $this->withConversation($currentTurnMessages, $conversation);
 
         $llmOptions = [
             'model' => (string)$settings->get('meilisearch.rag.model', ''),
@@ -127,6 +137,30 @@ final class RagService implements LoggerAwareInterface
         $after = new AfterRagAnswerEvent($event->question, $answer);
         $this->eventDispatcher->dispatch($after);
         return $after->answer;
+    }
+
+    /**
+     * Splice the conversation history between the system prompt (first
+     * message PromptBuilder emits) and the new user turn (everything
+     * after). Caller (controller) is responsible for capping the history
+     * via Conversation::withTurn() before passing it in here.
+     *
+     * @param list<array{role:string,content:string}> $currentTurnMessages
+     * @return list<array{role:string,content:string}>
+     */
+    private function withConversation(array $currentTurnMessages, Conversation $conversation): array
+    {
+        if ($conversation->isEmpty()) {
+            return $currentTurnMessages;
+        }
+        if ($currentTurnMessages === []) {
+            return $conversation->toMessages();
+        }
+        // First element is the system prompt; the rest is the new user
+        // turn. Insert history between them.
+        $system = array_slice($currentTurnMessages, 0, 1);
+        $rest = array_slice($currentTurnMessages, 1);
+        return array_merge($system, $conversation->toMessages(), $rest);
     }
 
     /**
