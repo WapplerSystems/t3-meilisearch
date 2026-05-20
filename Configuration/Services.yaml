@@ -10,10 +10,15 @@ services:
       - '../Classes/Domain/Schema/SchemaProviderInterface.php'
       - '../Classes/Event/*'
       - '../Classes/Service/SearchResult.php'
+      - '../Classes/Service/Llm/LlmProviderInterface.php'
+      - '../Classes/Service/Llm/LlmException.php'
+      - '../Classes/Service/Rag/RagAnswer.php'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
       tags: ['ws_meilisearch.schema_provider']
+    WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface:
+      tags: ['ws_meilisearch.llm_provider']
 
   WapplerSystems\Meilisearch\Service\SearchEngineFactory:
     public: true
@@ -27,6 +32,13 @@ services:
 
   WapplerSystems\Meilisearch\Service\SearchService:
     public: true
+
+  WapplerSystems\Meilisearch\Service\Rag\RagService:
+    public: true
+
+  WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry:
+    arguments:
+      $providers: !tagged_iterator ws_meilisearch.llm_provider
 
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:

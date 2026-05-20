@@ -13,3 +13,12 @@ ExtensionUtility::registerPlugin(
     'plugins',
     'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:plugin.search.description'
 );
+
+ExtensionUtility::registerPlugin(
+    'WsMeilisearch',
+    'Rag',
+    'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:plugin.rag.title',
+    'content-elements-chatbot',
+    'plugins',
+    'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:plugin.rag.description'
+);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 defined('TYPO3') or die();
 
 use TYPO3\CMS\Extbase\Utility\ExtensionUtility;
+use WapplerSystems\Meilisearch\Controller\RagController;
 use WapplerSystems\Meilisearch\Controller\SearchController;
 use WapplerSystems\Meilisearch\DataHandling\RecordChangeListener;
 
@@ -12,6 +13,15 @@ ExtensionUtility::configurePlugin(
     'Search',
     [SearchController::class => 'search,results'],
     [SearchController::class => 'search,results']
+);
+
+// RAG plugin (Phase 4). Separate plugin so sites can use search without
+// committing to RAG (which costs LLM tokens per question).
+ExtensionUtility::configurePlugin(
+    'WsMeilisearch',
+    'Rag',
+    [RagController::class => 'form,ask'],
+    [RagController::class => 'form,ask']
 );
 
 // DataHandler hooks — keep Meilisearch documents in sync on backend writes.
@@ -33,7 +43,7 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['proc
 // arbitrary controller, only the ones in configurePlugin() above.
 $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] = array_merge(
     $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] ?? [],
-    ['^tx_wsmeilisearch_search']
+    ['^tx_wsmeilisearch_search', '^tx_wsmeilisearch_rag']
 );
 
 // Tika text extraction cache — keyed by file content sha1, so identical

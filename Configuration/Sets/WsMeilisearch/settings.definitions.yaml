@@ -103,3 +103,57 @@ settings:
     description: 'Default weight of semantic vs. keyword scoring when hybrid search is used. 0 = pure keyword, 1 = pure semantic, 0.5 = balanced. The frontend can override per request.'
     type: number
     default: 0.5
+
+  meilisearch.rag.provider:
+    label: 'RAG LLM provider'
+    description: 'Large-language-model provider for retrieval-augmented generation. Leave empty to disable the RAG plugin. Supported: openAi, anthropic, ollama, rest (any OpenAI-compatible chat completions endpoint).'
+    type: string
+    default: ''
+
+  meilisearch.rag.url:
+    label: 'RAG provider URL'
+    description: 'HTTP endpoint for ollama / rest providers. Ignored for openAi and anthropic — those use the official API URLs. Example for Ollama: http://ollama:11434.'
+    type: string
+    default: ''
+
+  meilisearch.rag.apiKey:
+    label: 'RAG provider API key'
+    description: 'Auth token for openAi / anthropic / rest. Ignored for ollama.'
+    type: string
+    default: ''
+
+  meilisearch.rag.model:
+    label: 'RAG model'
+    description: 'Model identifier. Examples: "gpt-4o-mini" (openAi), "claude-haiku-4-5" (anthropic), "llama3.1:8b" (ollama).'
+    type: string
+    default: ''
+
+  meilisearch.rag.maxContextHits:
+    label: 'Max context hits'
+    description: 'How many top-ranked search hits to feed into the LLM as context. Higher = better grounding but more tokens. Defaults to 5.'
+    type: int
+    default: 5
+
+  meilisearch.rag.maxContextChars:
+    label: 'Max characters per context hit'
+    description: 'Per-hit body truncation. Prevents one huge document from blowing the LLM context window. Defaults to 1500.'
+    type: int
+    default: 1500
+
+  meilisearch.rag.temperature:
+    label: 'LLM temperature'
+    description: 'Sampling temperature passed to the LLM. Low values (0.0-0.3) yield more grounded, deterministic answers. RAG normally benefits from low temperature.'
+    type: number
+    default: 0.2
+
+  meilisearch.rag.systemPrompt:
+    label: 'System prompt'
+    description: 'System message that instructs the LLM how to answer. Reference {{language}} for the site language label.'
+    type: text
+    default: "You are a helpful site assistant. Answer the user's question strictly using the provided context excerpts. If the answer cannot be derived from the context, say so. Cite each fact by appending [id] markers that match the IDs in the context. Respond in the user's language."
+
+  meilisearch.rag.useHybrid:
+    label: 'Use hybrid search for retrieval'
+    description: 'When true, RAG retrieval uses hybrid (keyword + semantic) search instead of keyword-only. Requires a configured embedder. Ignored when no embedder is configured.'
+    type: bool
+    default: true

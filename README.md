@@ -7,12 +7,15 @@ tomorrow) without rewriting templates or services.
 
 ## Status
 
-**Phase 1 + 2 + 3 — wired and working.** Pages, news, and FAL files
+**Phase 1 + 2 + 3 + 4 — wired and working.** Pages, news, and FAL files
 (PDF / Office / RTF / EPUB / plain text via Apache Tika) all share a
 single unified per-site index, faceted by `type`. Frontend plugin
 renders GET forms with typo-tolerant search + click-to-filter facets.
 Hybrid (keyword + semantic vector) search is available when an embedder
-is configured.
+is configured. A second Extbase plugin exposes Retrieval-Augmented
+Generation: search → context → LLM → cited answer, with OpenAI,
+Anthropic, Ollama, and generic OpenAI-compatible REST providers
+selectable per site.
 
 ## Installation
 
@@ -128,6 +131,60 @@ on sites without an embedder. `semanticRatio` (0..1) is read from site
 settings and can be overridden per request via the `options` parameter
 of `SearchService::search()`.
 
+### Retrieval-Augmented Generation (Phase 4)
+
+Pick an LLM provider in site settings and the `WsMeilisearch / Rag`
+Extbase plugin becomes a "ask the site" chat. Search runs first
+(hybrid by default if an embedder is configured); the top hits become
+context for the LLM, which returns a grounded answer with `[id=...]`
+citation markers.
+
+```yaml
+# OpenAI
+meilisearch:
+  rag:
+    provider: 'openAi'
+    model: 'gpt-4o-mini'
+    apiKey: '%env(OPENAI_API_KEY)%'
+    temperature: 0.2
+
+# Anthropic
+meilisearch:
+  rag:
+    provider: 'anthropic'
+    model: 'claude-haiku-4-5'
+    apiKey: '%env(ANTHROPIC_API_KEY)%'
+
+# Ollama (local, no key)
+meilisearch:
+  rag:
+    provider: 'ollama'
+    url: 'http://ollama:11434'
+    model: 'llama3.1:8b'
+
+# Any OpenAI-compatible endpoint (vLLM, Together, Groq, LM Studio, …)
+meilisearch:
+  rag:
+    provider: 'rest'
+    url: 'https://api.together.xyz'
+    apiKey: '%env(TOGETHER_API_KEY)%'
+    model: 'meta-llama/Llama-3-8b-chat-hf'
+```
+
+Citations: the default system prompt instructs the LLM to mark facts
+with `[id=<hit-id>]` and the controller extracts them via regex,
+returning a `citedIds` list alongside the rendered answer so the
+template can show a "Sources" block.
+
+Caching / replay: listen to `BeforeLlmCallEvent` and set `$response`
+to a cached value to skip the LLM call entirely. Useful for tests and
+for FAQ-style questions that don't need a fresh generation per visit.
+
+CLI for debugging without rendering the FE plugin:
+```bash
+ddev exec vendor/bin/typo3 ws_meilisearch:ask "What is X?" main
+```
+
 ## CLI
 
 ```bash
@@ -135,6 +192,9 @@ ddev exec vendor/bin/typo3 ws_meilisearch:reindex                        # all s
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one site, incremental
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
+
+# RAG (Phase 4) — runs the configured LLM provider against the site index
+ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 ```
 
 ## What's wired
@@ -150,6 +210,10 @@ ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leav
 | Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |
 | Tika integration | Apache Tika REST client + sha1-keyed cache | `Classes/Service/Tika/` |
 | Embedder configurator | Idempotent PATCH of per-index embedder settings, source-aware field allowlist, waits for async settingsUpdate | `Classes/Service/EmbedderConfigurator.php` |
+| LLM provider abstraction | `LlmProviderInterface` with OpenAI / Anthropic / Ollama / generic REST implementations, picked per site by `LlmProviderRegistry` | `Classes/Service/Llm/` |
+| RAG orchestrator | Retrieves hits → builds cited-context prompt → calls LLM → parses `[id=...]` citations → `RagAnswer` DTO | `Classes/Service/Rag/` |
+| RAG plugin | Extbase plugin `WsMeilisearch / Rag` (CType `wsmeilisearch_rag`) with `form` + `ask` actions | `Classes/Controller/RagController.php` |
+| RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
 | Realtime sync | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
 | CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
@@ -186,7 +250,7 @@ factory dedupes by field name across providers.
 - **Phase 1** ✅ basic indexing + Fluid plugin with typo tolerance & facets
 - **Phase 2** ✅ FAL/Tika indexing (PDF / Office / RTF / EPUB / plain text)
 - **Phase 3** ✅ Hybrid search + auto-embeddings (OpenAI / HF / Ollama / REST / userProvided)
-- **Phase 4** — RAG module with configurable LLM provider
+- **Phase 4** ✅ RAG module with configurable LLM provider (OpenAI / Anthropic / Ollama / REST)
 - **Phase 5** — Backend module, scheduler tasks, multi-site/language polish
 
 ## Known Phase 2 limitations
@@ -223,3 +287,29 @@ factory dedupes by field name across providers.
 - **Hybrid result hits skip the SEAL adapter** — frontend code that
   inspects fields beyond the unified schema may see slightly different
   shapes between keyword and hybrid results.
+
+## Known Phase 4 limitations
+
+- **No streaming output.** The LLM call is synchronous; the user waits
+  for the full response before anything renders. SSE / chunked rendering
+  is a follow-up because it needs a separate AJAX endpoint and a JS
+  client; the GET-only PRG convention works against it.
+- **No conversation memory.** Each `ask` call is stateless — the LLM
+  receives only the current question + retrieved context. Multi-turn
+  chats need either a frontend-side history (assembled into messages
+  on each call) or backend session storage.
+- **Citation extraction is regex-based.** Models that wrap markers in
+  prose ("see [id=foo and id=bar]") only get the first id captured;
+  models that ignore the citation instruction yield zero `citedIds`.
+  Tune the system prompt per model.
+- **No token budgeting.** `maxContextHits` × `maxContextChars` is a
+  rough cap. A very long question or many large hits can blow past
+  small-model context windows; provider returns the underlying API
+  error, surfaced through `RagAnswer::failed`.
+- **No cost / rate-limit guard.** Every frontend submission triggers an
+  LLM call. Pair with `BeforeLlmCallEvent` listeners (response cache,
+  per-session rate limit) for production deployments.
+- **Retrieval query = user question, verbatim.** Verbose questions
+  (e.g. "What is X about?") often miss the keyword retriever. Enable
+  the hybrid path (`useHybrid: true` + configured embedder) or insert
+  a query-rewriting `BeforeRagQueryEvent` listener.
