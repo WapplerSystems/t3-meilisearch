@@ -251,6 +251,17 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         return $result->status === ExtractionResult::SUCCESS ? $result->text : '';
     }
 
+    /**
+     * Drop the lazy filesPerSite map so the next read query
+     * sys_file_reference fresh. Called by the DataHandler hook after a
+     * sys_file_reference row changed — without this, a same-request
+     * reindex would still see the pre-edit membership.
+     */
+    public function clearMembershipCache(): void
+    {
+        $this->filesPerSite = null;
+    }
+
     private function shouldDeduplicate(Site $site): bool
     {
         return (bool)$site->getSettings()->get('meilisearch.deduplicateFiles', false);

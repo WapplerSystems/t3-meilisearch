@@ -7,6 +7,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use WapplerSystems\Meilisearch\Domain\Schema\FileSchemaProvider;
 use WapplerSystems\Meilisearch\Service\IndexerService;
 
 /**
@@ -29,6 +30,7 @@ final class RecordChangeListener
         private readonly SiteFinder $siteFinder,
         private readonly ConnectionPool $connectionPool,
         private readonly FileLifecycleHandler $fileLifecycle,
+        private readonly FileSchemaProvider $fileSchemaProvider,
     ) {}
 
     /**
@@ -56,6 +58,19 @@ final class RecordChangeListener
         }
         if ($table === 'sys_file') {
             $this->fileLifecycle->reindex($uid);
+            return;
+        }
+        if ($table === 'sys_file_reference') {
+            // A reference came or went — invalidate the dedup membership
+            // cache so the next indexRecord sees the fresh state, then
+            // reindex the underlying file across every Meilisearch-aware
+            // site. The dedup logic re-evaluates per-site membership; the
+            // file appears or disappears in the right indexes automatically.
+            $fileUid = (int)($fieldArray['uid_local'] ?? $this->resolveFileUidFromReference($uid));
+            if ($fileUid > 0) {
+                $this->fileSchemaProvider->clearMembershipCache();
+                $this->fileLifecycle->reindex($fileUid);
+            }
             return;
         }
 
@@ -95,6 +110,17 @@ final class RecordChangeListener
                 return;
             }
             $this->fileLifecycle->reindex($uid);
+            return;
+        }
+        if ($table === 'sys_file_reference') {
+            // Delete soft-deletes the row, so we can still look up
+            // uid_local. Other commands (move / copy) also keep the row
+            // queryable. Either way: reindex the file with a fresh cache.
+            $fileUid = $this->resolveFileUidFromReference($uid);
+            if ($fileUid > 0) {
+                $this->fileSchemaProvider->clearMembershipCache();
+                $this->fileLifecycle->reindex($fileUid);
+            }
             return;
         }
 
@@ -143,6 +169,21 @@ final class RecordChangeListener
             ->executeQuery()
             ->fetchAssociative();
         return (int)($row['file'] ?? 0);
+    }
+
+    private function resolveFileUidFromReference(int $referenceUid): int
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
+        // Don't apply the deleted-row restriction — for cmdmap deletes
+        // the row is already soft-deleted but we still want to know which
+        // file it referenced so we can recompute its site membership.
+        $qb->getRestrictions()->removeAll();
+        $row = $qb->select('uid_local')
+            ->from('sys_file_reference')
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($referenceUid, \Doctrine\DBAL\ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchAssociative();
+        return (int)($row['uid_local'] ?? 0);
     }
 
 }
