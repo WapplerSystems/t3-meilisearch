@@ -9,6 +9,60 @@
             <trans-unit id="plugin.search.description">
                 <source>Faceted full-text search backed by Meilisearch.</source>
             </trans-unit>
+            <trans-unit id="plugin.rag.title">
+                <source>Meilisearch: RAG (ask the site)</source>
+            </trans-unit>
+            <trans-unit id="plugin.rag.description">
+                <source>Retrieval-Augmented Generation: search the site index and ask an LLM to summarize the matching documents.</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.title">
+                <source>Meilisearch: Full Reindex</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.description">
+                <source>Iterates all sites (or a single site) and re-pushes every indexed record to Meilisearch.</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.site_identifier">
+                <source>Site identifier</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.site_identifier.description">
+                <source>Empty = all sites. Otherwise the TYPO3 site identifier (matches the directory under config/sites/).</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.rebuild">
+                <source>Rebuild</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.rebuild.description">
+                <source>Drop and recreate the Meilisearch index before populating. Use only after schema changes — the index is unavailable for the duration.</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.skip_embedder">
+                <source>Skip embedder push</source>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.skip_embedder.description">
+                <source>Leave the configured embedder settings untouched on Meilisearch. Use when troubleshooting a wedged hybrid setup.</source>
+            </trans-unit>
+            <trans-unit id="module.overview.title">
+                <source>Meilisearch</source>
+            </trans-unit>
+            <trans-unit id="module.overview.description">
+                <source>Index status and ad-hoc search / RAG testing.</source>
+            </trans-unit>
+            <trans-unit id="module.action.reindex">
+                <source>Reindex</source>
+            </trans-unit>
+            <trans-unit id="module.action.rebuild">
+                <source>Rebuild</source>
+            </trans-unit>
+            <trans-unit id="module.action.test_search">
+                <source>Test search</source>
+            </trans-unit>
+            <trans-unit id="module.action.test_ask">
+                <source>Test RAG</source>
+            </trans-unit>
+            <trans-unit id="module.flash.reindex_done">
+                <source>Reindexed %d document(s) for site "%s".</source>
+            </trans-unit>
+            <trans-unit id="module.flash.reindex_skipped">
+                <source>Site "%s" is not configured for Meilisearch.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

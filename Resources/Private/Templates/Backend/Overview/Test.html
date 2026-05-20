@@ -1,0 +1,123 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Test Search &amp; RAG</h1>
+
+    <p>
+        <a href="{indexUrl}">&laquo; Back to overview</a>
+    </p>
+
+    <form action="{testUrl}" method="get" class="mb-4">
+        <input type="hidden" name="action" value="test" />
+
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Site</label>
+                <select name="site" class="form-select">
+                    <f:for each="{siteOptions}" as="opt">
+                        <option value="{opt}" {f:if(condition: '{opt} == {selectedSite}', then: 'selected="selected"')}>{opt}</option>
+                    </f:for>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Search query</label>
+                <input type="text" name="q" value="{query}" class="form-control" placeholder="e.g. saskatchewan" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="form-check">
+                    <input type="checkbox" name="hybrid" value="1" id="hybrid" class="form-check-input" {f:if(condition: hybrid, then: 'checked="checked"')} />
+                    <label for="hybrid" class="form-check-label">Hybrid</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+            </div>
+        </div>
+
+        <div class="row g-2 align-items-end mt-3">
+            <div class="col-md-10">
+                <label class="form-label">RAG question</label>
+                <input type="text" name="ask" value="{askQuery}" class="form-control" placeholder="Ask the site assistant…" />
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-success w-100">Ask</button>
+            </div>
+        </div>
+    </form>
+
+    <f:if condition="{searchResult}">
+        <div class="mb-4">
+            <h2>Search results <small class="text-muted">({searchResult.totalHits} hit{f:if(condition: '{searchResult.totalHits} != 1', then: 's')})</small></h2>
+
+            <f:if condition="{searchResult.facets}">
+                <div class="mb-3">
+                    <strong>Facets:</strong>
+                    <f:for each="{searchResult.facets}" as="values" key="facet">
+                        <span class="me-3"><code>{facet}</code>:
+                            <f:for each="{values}" as="count" key="value" iteration="it">
+                                {value} ({count}){f:if(condition: '!{it.isLast}', then: ',')}
+                            </f:for>
+                        </span>
+                    </f:for>
+                </div>
+            </f:if>
+
+            <table class="table table-sm">
+                <thead><tr><th>ID</th><th>Type</th><th>Title</th></tr></thead>
+                <tbody>
+                    <f:for each="{searchResult.hits}" as="hit">
+                        <tr>
+                            <td><code>{hit.id}</code></td>
+                            <td>{hit.type}</td>
+                            <td>{hit.title}</td>
+                        </tr>
+                    </f:for>
+                </tbody>
+            </table>
+        </div>
+    </f:if>
+
+    <f:if condition="{ragAnswer}">
+        <div class="mb-4">
+            <h2>RAG answer</h2>
+            <f:switch expression="{ragAnswer.status}">
+                <f:case value="ok">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <p style="white-space: pre-wrap;">{ragAnswer.answer}</p>
+                        </div>
+                    </div>
+                    <h3 class="h5">Sources ({ragAnswer.citedIds -> f:count()} of {ragSources -> f:count()} cited)</h3>
+                    <table class="table table-sm">
+                        <tbody>
+                            <f:for each="{ragSources}" as="src">
+                                <tr>
+                                    <td style="width: 2em;">
+                                        <f:if condition="{src.cited}"><strong title="cited">✓</strong></f:if>
+                                    </td>
+                                    <td><code>{src.id}</code></td>
+                                    <td>{src.title}</td>
+                                </tr>
+                            </f:for>
+                        </tbody>
+                    </table>
+                </f:case>
+                <f:case value="disabled">
+                    <div class="alert alert-info">RAG is not configured for this site (set <code>meilisearch.rag.provider</code> in site settings).</div>
+                </f:case>
+                <f:case value="no_context">
+                    <div class="alert alert-warning">Retrieval returned no documents for this question — the LLM was not called.</div>
+                </f:case>
+                <f:case value="failed">
+                    <div class="alert alert-danger">RAG failed: {ragAnswer.error}</div>
+                </f:case>
+            </f:switch>
+        </div>
+    </f:if>
+</f:section>
+</html>

@@ -13,9 +13,11 @@
     "require": {
         "php": "^8.2",
         "typo3/cms-core": "^14.0",
+        "typo3/cms-backend": "^14.0",
         "typo3/cms-extbase": "^14.0",
         "typo3/cms-fluid": "^14.0",
         "typo3/cms-frontend": "^14.0",
+        "typo3/cms-scheduler": "^14.0",
         "cmsig/seal": "^0.12",
         "cmsig/seal-meilisearch-adapter": "^0.12",
         "meilisearch/meilisearch-php": "^1.10"

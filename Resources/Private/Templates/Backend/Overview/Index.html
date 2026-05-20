@@ -1,0 +1,95 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Site Overview</h1>
+
+    <p class="lead">
+        One index per site, faceted by record type. The columns below reflect the live
+        state of each Meilisearch index plus the configured embedder / RAG provider
+        from the site settings.
+    </p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Site</th>
+                <th>Index</th>
+                <th>Documents</th>
+                <th>Embedder</th>
+                <th>RAG</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <f:for each="{sites}" as="site">
+                <tr>
+                    <td><code>{site.identifier}</code></td>
+                    <td>
+                        <f:if condition="{site.configured}">
+                            <f:then><code>{site.indexName}</code></f:then>
+                            <f:else><span class="badge bg-secondary">not configured</span></f:else>
+                        </f:if>
+                    </td>
+                    <td>
+                        <f:if condition="{site.error}">
+                            <f:then><span class="text-danger" title="{site.error}">error</span></f:then>
+                            <f:else>
+                                <f:if condition="{site.docCount}">
+                                    <f:then>{site.docCount}</f:then>
+                                    <f:else>—</f:else>
+                                </f:if>
+                            </f:else>
+                        </f:if>
+                    </td>
+                    <td>
+                        <f:if condition="{site.embedderSource}">
+                            <f:then>
+                                <code>{site.embedderSource}</code>
+                                <f:if condition="{site.embedderActive}">
+                                    <f:then><span class="badge bg-success ms-1">active</span></f:then>
+                                    <f:else><span class="badge bg-warning ms-1">not pushed</span></f:else>
+                                </f:if>
+                            </f:then>
+                            <f:else><span class="text-muted">keyword only</span></f:else>
+                        </f:if>
+                    </td>
+                    <td>
+                        <f:if condition="{site.ragProvider}">
+                            <f:then><code>{site.ragProvider}</code></f:then>
+                            <f:else><span class="text-muted">disabled</span></f:else>
+                        </f:if>
+                    </td>
+                    <td class="text-end">
+                        <f:if condition="{site.configured}">
+                            <form action="{reindexUrl}" method="post" class="d-inline">
+                                <input type="hidden" name="site" value="{site.identifier}" />
+                                <button type="submit" class="btn btn-sm btn-default">Reindex</button>
+                            </form>
+                            <form action="{reindexUrl}" method="post" class="d-inline ms-1">
+                                <input type="hidden" name="site" value="{site.identifier}" />
+                                <input type="hidden" name="rebuild" value="1" />
+                                <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Drop and recreate the {site.identifier} index? Search is unavailable during the rebuild.');">Rebuild</button>
+                            </form>
+                        </f:if>
+                    </td>
+                </tr>
+            </f:for>
+        </tbody>
+    </table>
+
+    <p>
+        <a href="{testUrl}" class="btn btn-primary">Test search &amp; RAG &raquo;</a>
+    </p>
+
+    <h2 class="mt-4">Registered LLM providers</h2>
+    <p>
+        <f:for each="{availableProviders}" as="p">
+            <code class="me-2">{p}</code>
+        </f:for>
+    </p>
+</f:section>
+</html>

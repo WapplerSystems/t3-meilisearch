@@ -7,15 +7,18 @@ tomorrow) without rewriting templates or services.
 
 ## Status
 
-**Phase 1 + 2 + 3 + 4 — wired and working.** Pages, news, and FAL files
+**All five phases wired and working.** Pages, news, and FAL files
 (PDF / Office / RTF / EPUB / plain text via Apache Tika) all share a
-single unified per-site index, faceted by `type`. Frontend plugin
-renders GET forms with typo-tolerant search + click-to-filter facets.
-Hybrid (keyword + semantic vector) search is available when an embedder
-is configured. A second Extbase plugin exposes Retrieval-Augmented
-Generation: search → context → LLM → cited answer, with OpenAI,
-Anthropic, Ollama, and generic OpenAI-compatible REST providers
-selectable per site.
+single unified per-site index, faceted by `type`. Frontend Search
+plugin renders GET forms with typo-tolerant search + click-to-filter
+facets. Hybrid (keyword + semantic vector) search is available when
+an embedder is configured. A second Extbase plugin exposes
+Retrieval-Augmented Generation: search → context → LLM → cited answer,
+with OpenAI, Anthropic, Ollama, and generic OpenAI-compatible REST
+providers selectable per site. A backend module under System →
+Meilisearch shows per-site index status, exposes Reindex / Rebuild
+buttons, and includes an ad-hoc Search + RAG test form. A scheduler
+task runs `indexAll` against one or all sites on a cron.
 
 ## Installation
 
@@ -185,6 +188,47 @@ CLI for debugging without rendering the FE plugin:
 ddev exec vendor/bin/typo3 ws_meilisearch:ask "What is X?" main
 ```
 
+## Backend module (Phase 5)
+
+After installing the extension, an admin-only entry **System → Meilisearch**
+shows up. The overview action lists every site with:
+
+- index name + live document count (queried from Meilisearch on render)
+- embedder source from settings + an `active` / `not pushed` badge based on
+  what Meilisearch actually has applied
+- RAG provider from settings (or `disabled` when empty)
+- per-row Reindex / Rebuild buttons (Rebuild prompts for confirmation
+  because it drops the index — search is unavailable for the rebuild
+  window)
+
+The **Test search & RAG** sub-page lets an editor type a query and an
+LLM question against any site without leaving the BE — useful for
+verifying that a freshly tuned `documentTemplate` or `systemPrompt`
+behaves as expected before pushing settings to production.
+
+## Scheduler task (Phase 5)
+
+`FullReindexTask` registers under **Administration → Scheduler** as
+*Meilisearch: Full Reindex*. TYPO3 v14 native task — fields are
+TCA-driven on `tx_scheduler_task`, no `AdditionalFieldProviderInterface`:
+
+- **Site identifier** — empty for all sites, or one TYPO3 site
+  identifier (matches the directory under `config/sites/`).
+- **Rebuild** — drop + recreate the Meilisearch index before
+  populating. Only enable after schema changes; the index is
+  unavailable for the duration.
+- **Skip embedder push** — leave the embedder settings on Meilisearch
+  untouched. Use for troubleshooting a wedged hybrid setup while still
+  keeping the document corpus fresh.
+
+Typical cadences:
+
+- Nightly incremental: site=`main`, rebuild=off, skip-embedder=off
+- After deploy with new SchemaProvider fields: one-shot run with
+  rebuild=on, skip-embedder=off (recreates schema + re-vectorizes)
+- After embedder rotation: rebuild=off, skip-embedder=off (forces a
+  re-push of embedder settings)
+
 ## CLI
 
 ```bash
@@ -214,6 +258,8 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | RAG orchestrator | Retrieves hits → builds cited-context prompt → calls LLM → parses `[id=...]` citations → `RagAnswer` DTO | `Classes/Service/Rag/` |
 | RAG plugin | Extbase plugin `WsMeilisearch / Rag` (CType `wsmeilisearch_rag`) with `form` + `ask` actions | `Classes/Controller/RagController.php` |
 | RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
+| Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms | `Classes/Controller/Backend/OverviewController.php` |
+| Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
 | Realtime sync | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
 | CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
@@ -251,7 +297,7 @@ factory dedupes by field name across providers.
 - **Phase 2** ✅ FAL/Tika indexing (PDF / Office / RTF / EPUB / plain text)
 - **Phase 3** ✅ Hybrid search + auto-embeddings (OpenAI / HF / Ollama / REST / userProvided)
 - **Phase 4** ✅ RAG module with configurable LLM provider (OpenAI / Anthropic / Ollama / REST)
-- **Phase 5** — Backend module, scheduler tasks, multi-site/language polish
+- **Phase 5** ✅ Backend module + scheduler task
 
 ## Known Phase 2 limitations
 
