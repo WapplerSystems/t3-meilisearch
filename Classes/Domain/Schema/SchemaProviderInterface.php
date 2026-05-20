@@ -36,9 +36,13 @@ interface SchemaProviderInterface
     /**
      * Fetch a single record and convert it to a document array.
      *
+     * The Site is supplied so providers can read per-site config (e.g. the
+     * Tika URL for FileSchemaProvider) and so multi-language overlays can
+     * be applied. Providers that don't need it can simply ignore the arg.
+     *
      * @return array<string,mixed>|null
      */
-    public function fetchDocument(int $uid): ?array;
+    public function fetchDocument(int $uid, Site $site): ?array;
 
     /**
      * Enumerate all eligible records for a full reindex.

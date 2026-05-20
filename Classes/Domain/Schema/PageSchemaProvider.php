@@ -27,7 +27,7 @@ final class PageSchemaProvider implements SchemaProviderInterface
         return 'pages-' . $uid;
     }
 
-    public function fetchDocument(int $uid): ?array
+    public function fetchDocument(int $uid, Site $site): ?array
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('pages');
         $row = $qb->select('uid', 'pid', 'title', 'subtitle', 'description', 'abstract', 'keywords', 'sys_language_uid', 'doktype')

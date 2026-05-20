@@ -7,10 +7,10 @@ tomorrow) without rewriting templates or services.
 
 ## Status
 
-**Phase 1 — Skeleton.** All wiring is in place (DI, plugin registration,
-Site Set, DataHandler listener, CLI command, Fluid templates, PSR-14 events),
-but the actual SEAL Engine calls are stubbed with `TODO` markers. The next
-step is `composer require` followed by replacing those stubs.
+**Phase 1 + 2 — wired and working.** Pages, news, and FAL files (PDF /
+Office / RTF / EPUB / plain text via Apache Tika) all share a single
+unified per-site index, faceted by `type`. Frontend plugin renders GET
+forms with typo-tolerant search + click-to-filter facets.
 
 ## Installation
 
@@ -21,12 +21,29 @@ already picked up by the root `composer.json`. To install:
 ddev composer require wapplersystems/meilisearch:@dev
 ```
 
-This pulls in the SEAL deps:
+This pulls in:
 
 - `cmsig/seal` — engine + schema abstraction
 - `cmsig/seal-meilisearch-adapter` — Meilisearch backend
-- `lochmueller/seal` — TYPO3 integration glue
 - `meilisearch/meilisearch-php` — official PHP SDK
+
+## DDEV setup
+
+Two services drop into `.ddev/`:
+
+- `docker-compose.meilisearch.yaml` — Meilisearch server on port 7700 (also
+  reachable via Traefik at `https://<project>.ddev.site:7701` for the
+  built-in dashboard).
+- `docker-compose.tika.yaml` — Apache Tika server on port 9998, used for
+  text extraction from PDF / Office files (Phase 2). Optional — leave the
+  `meilisearch.tika.url` site setting empty to disable FAL indexing.
+
+After `ddev restart`:
+
+```bash
+ddev exec curl -s http://meilisearch:7700/health     # {"status":"available"}
+ddev exec curl -s http://tika:9998/version           # Apache Tika 3.0.0
+```
 
 ## Configuration
 
@@ -44,54 +61,87 @@ meilisearch:
   url: 'http://meilisearch:7700'
   apiKey: 'dev_master_key'
   indexPrefix: 'site1_'
+  tika:
+    url: 'http://tika:9998'
+    timeout: 60
+    maxFileSize: 52428800
 ```
 
 Definitions live in `Configuration/Sets/WsMeilisearch/settings.definitions.yaml`
-so they are typed and editable through the Backend Sites module.
+so settings are typed and editable through the Backend Sites module.
 
-## What's wired in Phase 1
+## CLI
+
+```bash
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex                 # all sites
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex main             # one site, incremental
+ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild   # drop + recreate first
+```
+
+## What's wired
 
 | Layer | Component | File |
 |---|---|---|
-| Plugin registration | Extbase plugin `WsMeilisearch / Search` | `ext_localconf.php`, `Configuration/TCA/Overrides/tt_content.php` |
+| Plugin registration | Extbase plugin `WsMeilisearch / Search` (CType `wsmeilisearch_search`) | `ext_localconf.php`, `Configuration/TCA/Overrides/tt_content.php` |
 | Site Set | `wapplersystems/ws-meilisearch` with typed settings + TypoScript | `Configuration/Sets/WsMeilisearch/*` |
-| Indexing extension point | `SchemaProviderInterface` (tagged service `ws_meilisearch.schema_provider`) | `Classes/Domain/Schema/` |
-| Default providers | Pages + tx_news (gated on EXT:news being loaded) | `PageSchemaProvider.php`, `NewsSchemaProvider.php` |
-| Engine factory | Reads site settings, builds SEAL Engine | `Classes/Service/SearchEngineFactory.php` |
-| Indexer | Iterates providers, dispatches lifecycle events | `Classes/Service/IndexerService.php` |
-| Search service | FE wrapper around SEAL | `Classes/Service/SearchService.php` |
-| Realtime sync | DataHandler hook → indexer | `Classes/DataHandling/RecordChangeListener.php` |
-| CLI | `vendor/bin/typo3 ws_meilisearch:reindex [site]` | `Classes/Command/ReindexCommand.php` |
+| Indexing extension point | `SchemaProviderInterface` (auto-tagged via `_instanceof`) | `Classes/Domain/Schema/` |
+| Default providers | Pages + tx_news (gated on EXT:news) + sys_file | `PageSchemaProvider.php`, `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
+| Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
+| Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
+| Search service | Builds SEAL query (search + filters + facets), maps result | `Classes/Service/SearchService.php` |
+| Tika integration | Apache Tika REST client + sha1-keyed cache | `Classes/Service/Tika/` |
+| Realtime sync | DataHandler hook → indexer (sys_file_metadata translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
+| CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
-| Templates | Search form + faceted results | `Resources/Private/Templates/Search/` |
+| Frontend templates | GET-only forms, auto-submit facets, PRG-redirect on stray POSTs | `Resources/Private/Templates/Search/` |
 
-## What's stubbed (TODO before Phase 1 ships)
+## Frontend plugin invariants
 
-Search for `TODO` in `Classes/Service/`:
-
-1. `SearchEngineFactory::createForSite()` — return a real `CmsIg\Seal\Engine`
-   built from `MeilisearchAdapter` + the combined schema of all providers.
-2. `IndexerService::indexProvider/indexRecord/removeRecord` — call
-   `$engine->saveDocument()` / `deleteDocument()` with the SEAL Index name.
-3. Each `SchemaProvider::getSchema()` — return a `CmsIg\Seal\Schema\Schema`
-   describing searchable/filterable/sortable fields.
-4. `SearchService::search()` — build a SEAL search query, map hits + facets
-   into the existing `SearchResult` DTO.
+- **All forms are `method="get"`** — the result page must be fully reproducible
+  from the URL so the browser back button never asks "Resubmit form?".
+- **`resultsAction` PRG-redirects any POST to GET** as a defensive measure
+  for third-party callers that might violate the GET convention.
+- **`^tx_wsmeilisearch_search` is excluded from cHash** because GET form
+  submission discards the action URL's query string. action / controller
+  values are still validated by Extbase against the registered actions
+  list, so a forged URL cannot invoke arbitrary controllers.
+- **Facet checkboxes auto-submit on change** (`this.form.requestSubmit()`),
+  so users don't need a separate "Apply filters" button.
 
 ## Adding a new record type
 
-Implement `SchemaProviderInterface`. The class is auto-wired and auto-tagged
-via `_instanceof` in `Configuration/Services.yaml`, no manual registration
-needed.
+Implement `SchemaProviderInterface`. Auto-wired and auto-tagged via
+`_instanceof` in `Configuration/Services.yaml`, no manual registration.
 
 ```php
 final class ProductSchemaProvider implements SchemaProviderInterface { ... }
 ```
 
-## Roadmap (from BRIEFING.md)
+Optional `getAdditionalFields()` lets a provider contribute extra SEAL
+schema fields (e.g. `price` as IntegerField sortable + filterable). The
+factory dedupes by field name across providers.
 
-- **Phase 1** ← *current* — basic indexing + Fluid plugin with typo tolerance & facets
-- **Phase 2** — FAL/Tika indexing (PDF/Office)
-- **Phase 3** — Hybrid search + auto-embeddings (OpenAI/HF/Ollama)
+## Roadmap
+
+- **Phase 1** ✅ basic indexing + Fluid plugin with typo tolerance & facets
+- **Phase 2** ✅ FAL/Tika indexing (PDF / Office / RTF / EPUB / plain text)
+- **Phase 3** — Hybrid search + auto-embeddings (OpenAI / HF / Ollama)
 - **Phase 4** — RAG module with configurable LLM provider
 - **Phase 5** — Backend module, scheduler tasks, multi-site/language polish
+
+## Known Phase 2 limitations
+
+- **No per-language metadata** — sys_file_metadata is translatable, but the
+  indexer reads default-language only. Multi-language overlays are a
+  Phase 2.1 task.
+- **No FAL lifecycle events** — DataHandler covers metadata edits, but FAL
+  file uploads/deletions/moves go through other channels. Rely on
+  `ws_meilisearch:reindex` for full coverage until FAL events are wired.
+- **No OCR** — `apache/tika:3.0.0.0` (base image, ~500 MB) ships without
+  Tesseract. Swap to `apache/tika:3.0.0.0-full` (~1.5 GB) for OCR on
+  scanned PDFs / images. Phase 3 will revisit.
+- **Files indexed per-site** — same file gets indexed into every
+  Meilisearch-configured site's index. Deduplication via
+  sys_file_reference → page → site is a Phase 2.1 task.
+- **No file result link in the FE template** — file hits show the title
+  but don't link to the public URL yet.

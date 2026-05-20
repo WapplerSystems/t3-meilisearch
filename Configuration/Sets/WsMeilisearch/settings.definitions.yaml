@@ -22,3 +22,42 @@ settings:
     description: 'Comma-separated list of TCA tables to index. Pages and tx_news are wired by default.'
     type: string
     default: 'pages,tx_news_domain_model_news'
+
+  meilisearch.tika.url:
+    label: 'Apache Tika Server URL'
+    description: 'HTTP endpoint of an Apache Tika Server for text extraction from PDF / Office / RTF / EPUB files. Leave empty to disable FAL indexing entirely.'
+    type: string
+    default: 'http://tika:9998'
+
+  meilisearch.tika.timeout:
+    label: 'Tika request timeout (seconds)'
+    description: 'How long to wait for a single file extraction before giving up. Heavy PDFs / scanned documents can take 30+ s.'
+    type: int
+    default: 60
+
+  meilisearch.tika.maxFileSize:
+    label: 'Tika max file size (bytes)'
+    description: 'Files larger than this are skipped without contacting Tika. Default 50 MB.'
+    type: int
+    default: 52428800
+
+  meilisearch.tika.allowedMimeTypes:
+    label: 'Tika allowed mime types'
+    description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
+    type: stringlist
+    default:
+      - 'application/pdf'
+      - 'application/msword'
+      - 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      - 'application/vnd.ms-excel'
+      - 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      - 'application/vnd.ms-powerpoint'
+      - 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      - 'application/rtf'
+      - 'application/vnd.oasis.opendocument.text'
+      - 'application/vnd.oasis.opendocument.spreadsheet'
+      - 'application/vnd.oasis.opendocument.presentation'
+      - 'application/epub+zip'
+      - 'text/plain'
+      - 'text/html'
+      - 'text/markdown'

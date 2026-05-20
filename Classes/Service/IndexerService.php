@@ -89,7 +89,7 @@ final class IndexerService implements LoggerAwareInterface
             if (!$provider->supports($table)) {
                 continue;
             }
-            $document = $provider->fetchDocument($uid);
+            $document = $provider->fetchDocument($uid, $site);
             if ($document === null) {
                 // Record vanished or got hidden — make sure it's gone from the index too.
                 $engine->deleteDocument($indexName, $provider->buildDocumentId($uid));

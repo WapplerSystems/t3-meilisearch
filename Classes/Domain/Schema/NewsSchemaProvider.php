@@ -31,7 +31,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
         return 'news-' . $uid;
     }
 
-    public function fetchDocument(int $uid): ?array
+    public function fetchDocument(int $uid, Site $site): ?array
     {
         if (!ExtensionManagementUtility::isLoaded('news')) {
             return null;

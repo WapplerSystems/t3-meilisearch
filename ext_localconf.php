@@ -35,3 +35,14 @@ $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] = array_mer
     $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludedParameters'] ?? [],
     ['^tx_wsmeilisearch_search']
 );
+
+// Tika text extraction cache — keyed by file content sha1, so identical
+// content across multiple sys_file rows extracts exactly once and content
+// changes invalidate naturally (new sha1 → new key). File-backend so a
+// reindex after a deploy reuses extractions; flush via the system group.
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilisearch_tika'] ??= [
+    'backend' => \TYPO3\CMS\Core\Cache\Backend\SimpleFileBackend::class,
+    'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+    'options' => [],
+    'groups' => ['system'],
+];
