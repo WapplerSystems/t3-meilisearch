@@ -7,50 +7,53 @@
 <f:comment>GET only — see Search.html for the rationale.</f:comment>
 
 <f:section name="Main">
-    <form class="ws-meilisearch" action="{f:uri.page()}" method="get" role="search">
-        <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
-        <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
-        <div class="ws-meilisearch-form">
-            <label>
-                <span class="visually-hidden">
-                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
-                </span>
+    <div class="ws-meilisearch container my-4">
+        <form class="ws-meilisearch-form" action="{f:uri.page()}" method="get" role="search">
+            <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
+            <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
+
+            <label for="ws-meilisearch-q" class="visually-hidden">
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
+            </label>
+            <div class="input-group input-group-lg mb-4">
                 <input type="search"
+                    id="ws-meilisearch-q"
+                    class="form-control"
                     name="tx_wsmeilisearch_search[q]"
                     value="{query}"
                     placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
-            </label>
-            <button type="submit">
-                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
-            </button>
-        </div>
+                <button type="submit" class="btn btn-primary">
+                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
+                </button>
+            </div>
 
-        <f:if condition="{result.totalHits} > 0">
-            <f:then>
-                <p class="ws-meilisearch-meta">
-                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.count"
-                        arguments="{0: result.totalHits, 1: query}"/>
-                </p>
+            <f:if condition="{result.totalHits} > 0">
+                <f:then>
+                    <p class="ws-meilisearch-meta text-muted mb-3">
+                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.count"
+                            arguments="{0: result.totalHits, 1: query}"/>
+                    </p>
 
-                <div class="ws-meilisearch-layout">
-                    <aside class="ws-meilisearch-facets">
-                        <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters}"/>
-                    </aside>
-                    <main class="ws-meilisearch-hits">
-                        <f:for each="{result.hits}" as="hit">
-                            <f:render partial="Search/Result" arguments="{hit: hit}"/>
-                        </f:for>
-                    </main>
-                </div>
-            </f:then>
-            <f:else>
-                <p class="ws-meilisearch-empty">
-                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
-                        arguments="{0: query}"/>
-                </p>
-            </f:else>
-        </f:if>
-    </form>
+                    <div class="ws-meilisearch-layout row g-4">
+                        <aside class="ws-meilisearch-facets col-lg-3">
+                            <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters}"/>
+                        </aside>
+                        <main class="ws-meilisearch-hits col-lg-9">
+                            <f:for each="{result.hits}" as="hit">
+                                <f:render partial="Search/Result" arguments="{hit: hit}"/>
+                            </f:for>
+                        </main>
+                    </div>
+                </f:then>
+                <f:else>
+                    <div class="alert alert-info ws-meilisearch-empty" role="status">
+                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
+                            arguments="{0: query}"/>
+                    </div>
+                </f:else>
+            </f:if>
+        </form>
+    </div>
 </f:section>
 
 </html>

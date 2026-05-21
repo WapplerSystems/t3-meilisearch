@@ -1,29 +1,38 @@
 <html
     xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
     data-namespace-typo3-fluid="true">
-<article class="ws-meilisearch-hit">
-    <h3>
-        <f:switch expression="{hit.type}">
-            <f:case value="page">
-                <f:link.page pageUid="{hit.uid}">{hit.title}</f:link.page>
-            </f:case>
-            <f:case value="file">
-                <f:if condition="{hit.publicUrl}">
-                    <f:then>
-                        <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link" target="_blank" rel="noopener">{hit.title}</a>
-                    </f:then>
-                    <f:else>{hit.title}</f:else>
-                </f:if>
-            </f:case>
-            <f:defaultCase>{hit.title}</f:defaultCase>
-        </f:switch>
-    </h3>
-    <p class="ws-meilisearch-hit__type">{hit.type}</p>
-    <f:if condition="{hit.teaser}">
-        <p>{hit.teaser}</p>
-    </f:if>
-    <f:if condition="{hit.description}">
-        <p>{hit.description}</p>
-    </f:if>
+<article class="ws-meilisearch-hit card mb-3">
+    <div class="card-body">
+        <div class="d-flex align-items-start gap-2 mb-2">
+            <h3 class="card-title h5 mb-0 flex-grow-1">
+                <f:switch expression="{hit.type}">
+                    <f:case value="page">
+                        <f:link.page pageUid="{hit.uid}" class="stretched-link text-decoration-none">{hit.title}</f:link.page>
+                    </f:case>
+                    <f:case value="file">
+                        <f:if condition="{hit.publicUrl}">
+                            <f:then>
+                                <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link stretched-link text-decoration-none" target="_blank" rel="noopener">{hit.title}</a>
+                            </f:then>
+                            <f:else>{hit.title}</f:else>
+                        </f:if>
+                    </f:case>
+                    <f:defaultCase>{hit.title}</f:defaultCase>
+                </f:switch>
+            </h3>
+            <f:switch expression="{hit.type}">
+                <f:case value="page"><span class="badge text-bg-primary ws-meilisearch-hit__type">{hit.type}</span></f:case>
+                <f:case value="news"><span class="badge text-bg-info ws-meilisearch-hit__type">{hit.type}</span></f:case>
+                <f:case value="file"><span class="badge text-bg-warning ws-meilisearch-hit__type">{hit.type}</span></f:case>
+                <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">{hit.type}</span></f:defaultCase>
+            </f:switch>
+        </div>
+        <f:if condition="{hit.teaser}">
+            <p class="card-text text-muted mb-0">{hit.teaser}</p>
+        </f:if>
+        <f:if condition="{hit.description}">
+            <p class="card-text text-muted mb-0">{hit.description}</p>
+        </f:if>
+    </div>
 </article>
 </html>

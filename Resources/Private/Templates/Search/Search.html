@@ -13,22 +13,27 @@
 </f:comment>
 
 <f:section name="Main">
-    <form class="ws-meilisearch-form" action="{f:uri.page()}" method="get" role="search">
-        <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
-        <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
-        <label class="ws-meilisearch-form__label">
-            <span class="visually-hidden">
+    <div class="ws-meilisearch container my-4">
+        <form class="ws-meilisearch-form" action="{f:uri.page()}" method="get" role="search">
+            <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
+            <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
+
+            <label for="ws-meilisearch-q" class="visually-hidden">
                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
-            </span>
-            <input type="search"
-                name="tx_wsmeilisearch_search[q]"
-                value="{query}"
-                placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
-        </label>
-        <button type="submit">
-            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
-        </button>
-    </form>
+            </label>
+            <div class="input-group input-group-lg">
+                <input type="search"
+                    id="ws-meilisearch-q"
+                    class="form-control"
+                    name="tx_wsmeilisearch_search[q]"
+                    value="{query}"
+                    placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
+                <button type="submit" class="btn btn-primary">
+                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
+                </button>
+            </div>
+        </form>
+    </div>
 </f:section>
 
 </html>
