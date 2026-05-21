@@ -8,122 +8,209 @@
     <h1>Meilisearch — Test Search &amp; RAG</h1>
     <f:render partial="Backend/TabNav" arguments="{active: 'test', indexUrl: indexUrl, testUrl: testUrl, diagnoseUrl: diagnoseUrl}" />
 
-    <form action="{testUrl}" method="get" class="mb-4">
-        <input type="hidden" name="action" value="test" />
+    {f:render(partial: 'Backend/TestExamples', arguments: {examples: examples})}
 
-        <div class="row g-2 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label">Site</label>
-                <select name="site" class="form-select">
-                    <f:for each="{siteOptions}" as="opt">
-                        <option value="{opt}" {f:if(condition: '{opt} == {selectedSite}', then: 'selected="selected"')}>{opt}</option>
-                    </f:for>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Search query</label>
-                <input type="text" name="q" value="{query}" class="form-control" placeholder="e.g. saskatchewan" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Sort</label>
-                <select name="sort" class="form-select">
-                    <option value="" {f:if(condition: '{sort} == \'\'', then: 'selected="selected"')}>Relevance</option>
-                    <option value="datetime:desc" {f:if(condition: '{sort} == \'datetime:desc\'', then: 'selected="selected"')}>Newest first</option>
-                    <option value="datetime:asc" {f:if(condition: '{sort} == \'datetime:asc\'', then: 'selected="selected"')}>Oldest first</option>
-                    <option value="fileSize:desc" {f:if(condition: '{sort} == \'fileSize:desc\'', then: 'selected="selected"')}>Largest file</option>
-                    <option value="fileSize:asc" {f:if(condition: '{sort} == \'fileSize:asc\'', then: 'selected="selected"')}>Smallest file</option>
-                </select>
-            </div>
-            <div class="col-md-1">
-                <label class="form-label">&nbsp;</label>
-                <div class="form-check">
-                    <input type="checkbox" name="hybrid" value="1" id="hybrid" class="form-check-input" {f:if(condition: hybrid, then: 'checked="checked"')} />
-                    <label for="hybrid" class="form-check-label">Hybrid</label>
+    <div class="row g-3">
+        <!-- ===================== SEARCH CARD ===================== -->
+        <div class="col-md-7">
+            <div class="card h-100">
+                <div class="card-header"><strong>Search</strong></div>
+                <div class="card-body">
+                    <form action="{testUrl}" method="get">
+                        <input type="hidden" name="action" value="test" />
+                        <input type="hidden" name="ask" value="{askQuery}" />
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Site</label>
+                            <select name="site" class="form-select form-select-sm">
+                                <f:for each="{siteOptions}" as="opt">
+                                    <option value="{opt}" {f:if(condition: '{opt} == {selectedSite}', then: 'selected="selected"')}>{opt}</option>
+                                </f:for>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Query</label>
+                            <input type="text" name="q" value="{query}" class="form-control" placeholder="e.g. saskatchewan" autofocus="autofocus" />
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Sort</label>
+                                <select name="sort" class="form-select form-select-sm">
+                                    <option value="" {f:if(condition: '{sort} == \'\'', then: 'selected="selected"')}>Relevance</option>
+                                    <option value="datetime:desc" {f:if(condition: '{sort} == \'datetime:desc\'', then: 'selected="selected"')}>Newest first</option>
+                                    <option value="datetime:asc" {f:if(condition: '{sort} == \'datetime:asc\'', then: 'selected="selected"')}>Oldest first</option>
+                                    <option value="fileSize:desc" {f:if(condition: '{sort} == \'fileSize:desc\'', then: 'selected="selected"')}>Largest file</option>
+                                    <option value="fileSize:asc" {f:if(condition: '{sort} == \'fileSize:asc\'', then: 'selected="selected"')}>Smallest file</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Type filter</label>
+                                <select name="filter[type]" class="form-select form-select-sm">
+                                    <option value="">All</option>
+                                    <option value="page" {f:if(condition: '{filters.type} == \'page\'', then: 'selected="selected"')}>Pages</option>
+                                    <option value="news" {f:if(condition: '{filters.type} == \'news\'', then: 'selected="selected"')}>News</option>
+                                    <option value="file" {f:if(condition: '{filters.type} == \'file\'', then: 'selected="selected"')}>Files</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="form-check">
+                                <input type="checkbox" name="hybrid" value="1" id="hybrid" class="form-check-input" {f:if(condition: hybrid, then: 'checked="checked"')} />
+                                <label for="hybrid" class="form-check-label">Hybrid (semantic + keyword)</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary ms-auto">Run search</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">Search</button>
-            </div>
         </div>
 
-        <div class="row g-2 align-items-end mt-3">
-            <div class="col-md-10">
-                <label class="form-label">RAG question</label>
-                <input type="text" name="ask" value="{askQuery}" class="form-control" placeholder="Ask the site assistant…" />
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-success w-100">Ask</button>
+        <!-- ===================== RAG CARD ===================== -->
+        <div class="col-md-5">
+            <div class="card h-100">
+                <div class="card-header"><strong>RAG</strong> <span class="text-muted">(Ask the site)</span></div>
+                <div class="card-body">
+                    <form action="{testUrl}" method="get">
+                        <input type="hidden" name="action" value="test" />
+                        <input type="hidden" name="site" value="{selectedSite}" />
+                        <input type="hidden" name="q" value="{query}" />
+                        <input type="hidden" name="sort" value="{sort}" />
+                        <f:if condition="{hybrid}"><input type="hidden" name="hybrid" value="1" /></f:if>
+                        <f:if condition="{filters.type}"><input type="hidden" name="filter[type]" value="{filters.type}" /></f:if>
+
+                        <label class="form-label small text-muted">Question</label>
+                        <input type="text" name="ask" value="{askQuery}" class="form-control mb-2" placeholder="Ask the site assistant…" />
+
+                        <div class="d-flex">
+                            <button type="submit" class="btn btn-success ms-auto">Ask</button>
+                        </div>
+
+                        <p class="text-muted small mt-3 mb-0">
+                            Submits to the same Test view; the answer renders below the
+                            search results.
+                        </p>
+                    </form>
+                </div>
             </div>
         </div>
-    </form>
+    </div>
 
+    <!-- ===================== SEARCH RESULTS ===================== -->
     <f:if condition="{searchResult}">
-        <div class="mb-4">
-            <h2>Search results <small class="text-muted">({searchResult.totalHits} hit{f:if(condition: '{searchResult.totalHits} != 1', then: 's')})</small></h2>
+        <section class="mt-4">
+            <div class="d-flex align-items-center mb-2">
+                <h2 class="h4 mb-0">Search results</h2>
+                <span class="badge bg-secondary ms-2">{searchResult.totalHits} hit<f:if condition="{searchResult.totalHits} != 1">s</f:if></span>
+                <f:if condition="{searchResult.totalPages} > 1">
+                    <span class="text-muted ms-2 small">page {searchResult.page} / {searchResult.totalPages}</span>
+                </f:if>
+            </div>
 
             <f:if condition="{searchResult.facets}">
                 <div class="mb-3">
-                    <strong>Facets:</strong>
                     <f:for each="{searchResult.facets}" as="values" key="facet">
-                        <span class="me-3"><code>{facet}</code>:
-                            <f:for each="{values}" as="count" key="value" iteration="it">
-                                {value} ({count}){f:if(condition: '!{it.isLast}', then: ',')}
-                            </f:for>
-                        </span>
+                        <span class="text-muted small me-2"><code>{facet}</code>:</span>
+                        <f:for each="{values}" as="count" key="value">
+                            <span class="badge bg-light text-dark border me-1">{value} <span class="text-muted">({count})</span></span>
+                        </f:for>
                     </f:for>
                 </div>
             </f:if>
 
-            <table class="table table-sm">
-                <thead><tr><th>ID</th><th>Type</th><th>Title</th></tr></thead>
-                <tbody>
-                    <f:for each="{searchResult.hits}" as="hit">
-                        <tr>
-                            <td><code>{hit.id}</code></td>
-                            <td>{hit.type}</td>
-                            <td>{hit.title}</td>
-                        </tr>
-                    </f:for>
-                </tbody>
-            </table>
+            <f:if condition="{searchResult.hits}">
+                <f:then>
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th style="width: 8em;">ID</th>
+                                <th style="width: 5em;">Type</th>
+                                <th>Title</th>
+                                <th style="width: 6em;" class="text-end">Lang</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <f:for each="{searchResult.hits}" as="hit">
+                                <tr>
+                                    <td><code>{hit.id}</code></td>
+                                    <td>
+                                        <f:switch expression="{hit.type}">
+                                            <f:case value="page"><span class="badge bg-primary">page</span></f:case>
+                                            <f:case value="news"><span class="badge bg-info">news</span></f:case>
+                                            <f:case value="file"><span class="badge bg-warning text-dark">file</span></f:case>
+                                            <f:defaultCase><span class="badge bg-secondary">{hit.type}</span></f:defaultCase>
+                                        </f:switch>
+                                    </td>
+                                    <td>
+                                        <f:if condition="{hit.type} == 'file' && {hit.publicUrl}">
+                                            <f:then><a href="/{hit.publicUrl}" target="_blank" rel="noopener">{hit.title}</a></f:then>
+                                            <f:else>{hit.title}</f:else>
+                                        </f:if>
+                                    </td>
+                                    <td class="text-end text-muted small">{hit.language}</td>
+                                </tr>
+                            </f:for>
+                        </tbody>
+                    </table>
+                </f:then>
+                <f:else>
+                    <div class="alert alert-light">No hits.</div>
+                </f:else>
+            </f:if>
 
             <f:if condition="{searchResult.totalPages} > 1">
-                <nav class="d-flex justify-content-between align-items-center">
-                    <span class="text-muted">
-                        Page {searchResult.page} of {searchResult.totalPages}
-                    </span>
-                    <div>
-                        <f:if condition="{searchResult.hasPreviousPage}">
-                            <a class="btn btn-sm btn-default" href="{testUrl}&site={selectedSite}&q={query -> f:format.htmlspecialchars()}&sort={sort -> f:format.htmlspecialchars()}&hybrid={hybrid -> f:format.raw()}&page={searchResult.page - 1}">&laquo; Previous</a>
+                <nav class="d-flex justify-content-between align-items-center mt-3">
+                    <span class="text-muted small">Page {searchResult.page} of {searchResult.totalPages}</span>
+                    <div class="btn-group btn-group-sm">
+                        <f:if condition="{prevPageUrl}">
+                            <f:then><a href="{prevPageUrl}" class="btn btn-default">&laquo; Prev</a></f:then>
+                            <f:else><span class="btn btn-default disabled">&laquo; Prev</span></f:else>
                         </f:if>
-                        <f:if condition="{searchResult.hasNextPage}">
-                            <a class="btn btn-sm btn-default" href="{testUrl}&site={selectedSite}&q={query -> f:format.htmlspecialchars()}&sort={sort -> f:format.htmlspecialchars()}&hybrid={hybrid -> f:format.raw()}&page={searchResult.page + 1}">Next &raquo;</a>
+                        <f:if condition="{nextPageUrl}">
+                            <f:then><a href="{nextPageUrl}" class="btn btn-default">Next &raquo;</a></f:then>
+                            <f:else><span class="btn btn-default disabled">Next &raquo;</span></f:else>
                         </f:if>
                     </div>
                 </nav>
             </f:if>
-        </div>
+        </section>
     </f:if>
 
+    <!-- ===================== RAG ANSWER ===================== -->
     <f:if condition="{ragAnswer}">
-        <div class="mb-4">
-            <h2>RAG answer</h2>
+        <section class="mt-4">
+            <h2 class="h4">RAG answer</h2>
             <f:switch expression="{ragAnswer.status}">
                 <f:case value="ok">
                     <div class="card mb-3">
                         <div class="card-body">
-                            <p style="white-space: pre-wrap;">{ragAnswer.answer}</p>
+                            <div style="white-space: pre-wrap;">{ragAnswer.answer}</div>
                         </div>
                     </div>
-                    <h3 class="h5">Sources ({ragAnswer.citedIds -> f:count()} of {ragSources -> f:count()} cited)</h3>
+                    <h3 class="h6 text-muted">
+                        Sources
+                        <span class="badge bg-success">{ragAnswer.citedIds -> f:count()} cited</span>
+                        <span class="badge bg-secondary">{ragSources -> f:count()} fed as context</span>
+                    </h3>
                     <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width: 2.5em;"></th>
+                                <th style="width: 8em;">ID</th>
+                                <th style="width: 5em;">Type</th>
+                                <th>Title</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <f:for each="{ragSources}" as="src">
-                                <tr>
-                                    <td style="width: 2em;">
+                                <tr {f:if(condition: src.cited, then: 'class="table-success"')}>
+                                    <td>
                                         <f:if condition="{src.cited}"><strong title="cited">✓</strong></f:if>
                                     </td>
                                     <td><code>{src.id}</code></td>
+                                    <td>{src.type}</td>
                                     <td>{src.title}</td>
                                 </tr>
                             </f:for>
@@ -131,16 +218,16 @@
                     </table>
                 </f:case>
                 <f:case value="disabled">
-                    <div class="alert alert-info">RAG is not configured for this site (set <code>meilisearch.rag.provider</code> in site settings).</div>
+                    <div class="alert alert-info"><strong>Status: disabled.</strong> Set <code>meilisearch.rag.provider</code> in this site's <code>settings.yaml</code> to enable.</div>
                 </f:case>
                 <f:case value="no_context">
-                    <div class="alert alert-warning">Retrieval returned no documents for this question — the LLM was not called.</div>
+                    <div class="alert alert-warning"><strong>Status: no_context.</strong> Retrieval returned no documents for this question — the LLM was not called.</div>
                 </f:case>
                 <f:case value="failed">
-                    <div class="alert alert-danger">RAG failed: {ragAnswer.error}</div>
+                    <div class="alert alert-danger"><strong>Status: failed.</strong> {ragAnswer.error}</div>
                 </f:case>
             </f:switch>
-        </div>
+        </section>
     </f:if>
 </f:section>
 </html>

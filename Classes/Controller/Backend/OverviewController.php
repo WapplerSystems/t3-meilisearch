@@ -120,6 +120,8 @@ final class OverviewController
         $hybrid = (bool)($request->getQueryParams()['hybrid'] ?? false);
         $sort = trim((string)($request->getQueryParams()['sort'] ?? ''));
         $page = max(1, (int)($request->getQueryParams()['page'] ?? 1));
+        $rawFilters = $request->getQueryParams()['filter'] ?? [];
+        $filters = is_array($rawFilters) ? array_filter(array_map('strval', $rawFilters), static fn ($v) => $v !== '') : [];
 
         $sites = $this->siteFinder->getAllSites();
         $site = null;
@@ -131,17 +133,28 @@ final class OverviewController
             }
         }
         if ($site === null && $sites !== []) {
-            $site = $sites[array_key_first($sites)];
+            // Default to the first site that is actually configured for
+            // Meilisearch — landing on a "not configured" site by accident
+            // shows nothing and confuses first-time users.
+            foreach ($sites as $candidate) {
+                if (trim((string)$candidate->getSettings()->get('meilisearch.url', '')) !== '') {
+                    $site = $candidate;
+                    break;
+                }
+            }
+            $site ??= $sites[array_key_first($sites)];
             $siteId = $site->getIdentifier();
         }
 
         $searchResult = null;
-        if ($site instanceof Site && $query !== '') {
+        $hasSearchInput = $query !== '' || $sort !== '' || $filters !== [];
+        if ($site instanceof Site && $hasSearchInput) {
             $searchResult = $this->searchService->search($site, $query, [
                 'hybrid' => $hybrid,
                 'page' => $page,
                 'perPage' => 10,
                 'facets' => ['type', 'language'],
+                'filters' => $filters,
                 'sort' => $sort,
             ]);
         }
@@ -168,12 +181,36 @@ final class OverviewController
             'hybrid' => $hybrid,
             'sort' => $sort,
             'page' => $page,
+            'filters' => $filters,
             'searchResult' => $searchResult,
             'ragAnswer' => $ragAnswer,
             'ragSources' => $ragSources,
+            'examples' => $this->buildExamples($site, $siteId),
+            'prevPageUrl' => $searchResult?->getHasPreviousPage()
+                ? $this->buildPageUrl($request, $page - 1)
+                : null,
+            'nextPageUrl' => $searchResult?->getHasNextPage()
+                ? $this->buildPageUrl($request, $page + 1)
+                : null,
             ...$this->commonTabUrls(),
         ]);
         return $moduleTemplate->renderResponse('Backend/Overview/Test');
+    }
+
+    /**
+     * Build a paginated link by replacing the `page` parameter in the
+     * current request's query string. Used by the Test view's Prev /
+     * Next buttons. We can't use f:link.action here because this
+     * module isn't Extbase — there's no Request in the ViewHelper
+     * scope to resolve from.
+     */
+    private function buildPageUrl(ServerRequestInterface $request, int $page): string
+    {
+        $params = $request->getQueryParams();
+        $params['page'] = $page;
+        // Drop the BE module token; backendUriBuilder regenerates it.
+        unset($params['token']);
+        return (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', $params);
     }
 
     private function diagnoseAction(ServerRequestInterface $request): ResponseInterface
@@ -192,6 +229,82 @@ final class OverviewController
             ...$this->commonTabUrls(),
         ]);
         return $moduleTemplate->renderResponse('Backend/Overview/Diagnose');
+    }
+
+    /**
+     * Preset queries that demonstrate each major feature. Each one is
+     * rendered as a clickable card in the Test page; the link carries
+     * the full set of query params required to reproduce the example
+     * (site, q, sort, hybrid, filter[*], ask). The presets stay
+     * available even when the selected site doesn't support the
+     * specific feature — clicking a hybrid example without an
+     * embedder configured just shows the regular keyword result,
+     * which is still useful as a "what does it look like" preview.
+     *
+     * @return list<array{label:string,description:string,feature:string,params:array<string,mixed>}>
+     */
+    private function buildExamples(?Site $site, string $siteId): array
+    {
+        $hasEmbedder = $site instanceof Site
+            && trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
+        $hasRag = $site instanceof Site
+            && trim((string)$site->getSettings()->get('meilisearch.rag.provider', '')) !== '';
+
+        $base = ['site' => $siteId];
+        $examples = [
+            [
+                'label' => 'Keyword search',
+                'description' => 'Plain typo-tolerant full-text search across pages, news, and indexed files.',
+                'feature' => 'phase 1',
+                'params' => $base + ['q' => 'saskatchewan'],
+            ],
+            [
+                'label' => 'Filter: only files',
+                'description' => 'Same query restricted to `type=file` — handy for "find me the PDF".',
+                'feature' => 'phase 1 + facets',
+                'params' => $base + ['q' => '', 'filter' => ['type' => 'file']],
+            ],
+            [
+                'label' => 'Sort by file size',
+                'description' => 'Empty query + sort descending. Surfaces the biggest indexed binaries.',
+                'feature' => 'sort',
+                'params' => $base + ['q' => '', 'sort' => 'fileSize:desc'],
+            ],
+            [
+                'label' => 'Pagination',
+                'description' => 'Empty query → all docs, walk pages with Prev / Next at the bottom.',
+                'feature' => 'pagination',
+                'params' => $base + ['q' => '', 'page' => 1],
+            ],
+            [
+                'label' => 'Hybrid (semantic + keyword)',
+                'description' => $hasEmbedder
+                    ? 'Vector + keyword blend — finds docs even when the wording is paraphrased.'
+                    : 'Needs an embedder configured. The toggle stays a no-op on sites without one.',
+                'feature' => 'phase 3' . ($hasEmbedder ? '' : ' (no embedder)'),
+                'params' => $base + ['q' => 'how do I reset my password', 'hybrid' => 1],
+            ],
+            [
+                'label' => 'RAG: ask the site',
+                'description' => $hasRag
+                    ? 'LLM-grounded answer with cited sources, retrieval bias toward the question topic.'
+                    : 'Needs a RAG provider configured. Click anyway to see the "disabled" status.',
+                'feature' => 'phase 4' . ($hasRag ? '' : ' (no provider)'),
+                'params' => $base + ['ask' => 'What is this site about?'],
+            ],
+        ];
+
+        // Compute the URL for each preset and inline it. Templates then
+        // render a simple <a href="{ex.url}">{ex.label}</a> instead of
+        // re-running buildUriFromRoute() per row.
+        $base = (string)$this->backendUriBuilder->buildUriFromRoute(
+            'system_wsmeilisearch',
+            ['action' => 'test'],
+        );
+        foreach ($examples as &$ex) {
+            $ex['url'] = $base . '&' . http_build_query($ex['params']);
+        }
+        return $examples;
     }
 
     /**

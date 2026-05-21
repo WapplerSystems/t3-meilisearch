@@ -1,0 +1,28 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<details class="mb-3" open="open">
+    <summary class="text-muted small" style="cursor: pointer;">
+        <strong>Examples</strong> — click any preset to run it. Tags show which phase / feature it demonstrates.
+    </summary>
+    <div class="row g-2 mt-2">
+        <f:for each="{examples}" as="ex">
+            <div class="col-md-6 col-xl-4">
+                <a href="{ex.url}" class="d-block text-decoration-none">
+                    <div class="card h-100 example-card">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center mb-1">
+                                <strong class="me-2">{ex.label}</strong>
+                                <span class="badge bg-light text-muted border ms-auto">{ex.feature}</span>
+                            </div>
+                            <p class="card-text text-muted small mb-0">{ex.description}</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </f:for>
+    </div>
+    <style>
+        .example-card { transition: background-color 0.15s, border-color 0.15s; }
+        .example-card:hover { background-color: #f5f9ff; border-color: #6390e0; }
+    </style>
+</details>
+</html>
