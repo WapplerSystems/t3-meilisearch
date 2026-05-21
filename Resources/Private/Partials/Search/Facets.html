@@ -2,11 +2,12 @@
     xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
     data-namespace-typo3-fluid="true">
 <section class="ws-meilisearch-facets__panel card">
-    <div class="card-body">
-        <h2 class="card-title h5 mb-3">
+    <header class="card-header bg-body-tertiary">
+        <h2 class="ws-meilisearch-facets__heading h6 mb-0 text-uppercase text-muted small fw-semibold">
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.facets.heading"/>
         </h2>
-
+    </header>
+    <div class="card-body">
         <f:comment>
             This partial renders inside the surrounding GET form on Results.html.
             Form submission carries q + all checked filters via URL parameters
@@ -15,8 +16,8 @@
             action required).
         </f:comment>
 
-        <f:for each="{facets}" as="buckets" key="attribute">
-            <fieldset class="ws-meilisearch-facets__group mb-3">
+        <f:for each="{facets}" as="buckets" key="attribute" iteration="facetIter">
+            <fieldset class="ws-meilisearch-facets__group {f:if(condition: '!{facetIter.isLast}', then: 'mb-3')}">
                 <legend class="ws-meilisearch-facets__legend h6 text-uppercase text-muted small mb-2">{attribute}</legend>
                 <f:for each="{buckets}" as="count" key="value">
                     <f:variable name="active" value="0"/>
@@ -34,7 +35,7 @@
                             value="{value}"
                             onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"
                             {f:if(condition: '{active} == 1', then: 'checked="checked"')}/>
-                        <label class="form-check-label d-flex justify-content-between align-items-center" for="{facetId}">
+                        <label class="form-check-label d-flex justify-content-between align-items-center w-100" for="{facetId}">
                             <span>{value}</span>
                             <span class="badge text-bg-secondary ms-2">{count}</span>
                         </label>
