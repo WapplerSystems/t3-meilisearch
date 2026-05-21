@@ -1,0 +1,72 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+
+<f:layout name="Default"/>
+
+<f:section name="Main">
+    <div class="ws-meilisearch-rag">
+        <h2 class="h4 mb-3">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
+        </h2>
+
+        <f:comment>
+            With conversation memory enabled, the controller has already
+            appended the just-asked turn to {conversation}, so the thread
+            already shows the new answer at the bottom. With conversation
+            memory off, {conversation} stays empty and we render the
+            stand-alone answer card from {answer} instead.
+        </f:comment>
+        <f:if condition="{conversationEnabled} && {conversation}">
+            <f:then>
+                <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+            </f:then>
+            <f:else>
+                <f:if condition="{answer}">
+                    <f:switch expression="{answer.status}">
+                        <f:case value="ok">
+                            <div class="card border-primary mb-4">
+                                <div class="card-header text-primary fw-semibold">
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.heading"/>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text" style="white-space: pre-wrap;">{answer.answer}</p>
+                                    <f:if condition="{answer.citedIds}">
+                                        <div class="mt-3">
+                                            <small class="text-muted">
+                                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources"/>:
+                                            </small>
+                                            <f:for each="{answer.citedIds}" as="id">
+                                                <span class="badge text-bg-light border ms-1">{id}</span>
+                                            </f:for>
+                                        </div>
+                                    </f:if>
+                                </div>
+                            </div>
+                        </f:case>
+                        <f:case value="disabled">
+                            <div class="alert alert-info" role="status">
+                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.disabled"/>
+                            </div>
+                        </f:case>
+                        <f:case value="no_context">
+                            <div class="alert alert-warning" role="status">
+                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.no_context"/>
+                            </div>
+                        </f:case>
+                        <f:case value="failed">
+                            <div class="alert alert-danger" role="alert">
+                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.failed"
+                                    arguments="{0: answer.error}"/>
+                            </div>
+                        </f:case>
+                    </f:switch>
+                </f:if>
+            </f:else>
+        </f:if>
+
+        <f:render partial="Rag/Form" arguments="{question: '', conversation: conversation, conversationEnabled: conversationEnabled}"/>
+    </div>
+</f:section>
+
+</html>

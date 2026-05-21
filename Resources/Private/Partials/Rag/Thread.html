@@ -1,0 +1,41 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    Renders a conversation history list (one card per (question, answer)
+    turn). Empty when conversation memory is off or this is the first
+    question — the form below the thread does the heavy lifting then.
+</f:comment>
+<f:if condition="{conversation}">
+    <ol class="ws-meilisearch-rag-thread list-unstyled mb-4">
+        <f:for each="{conversation}" as="turn">
+            <li class="ws-meilisearch-rag-turn mb-3">
+                <div class="card mb-2">
+                    <div class="card-body py-2">
+                        <small class="text-muted d-block mb-1">
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you"/>
+                        </small>
+                        <p class="card-text mb-0">{turn.question}</p>
+                    </div>
+                </div>
+                <div class="card border-primary">
+                    <div class="card-body py-2">
+                        <small class="text-primary d-block mb-1">
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant"/>
+                        </small>
+                        <p class="card-text mb-0" style="white-space: pre-wrap;">{turn.answer}</p>
+                        <f:if condition="{turn.citedIds}">
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources"/>:
+                                </small>
+                                <f:for each="{turn.citedIds}" as="id">
+                                    <span class="badge text-bg-light border ms-1">{id}</span>
+                                </f:for>
+                            </div>
+                        </f:if>
+                    </div>
+                </div>
+            </li>
+        </f:for>
+    </ol>
+</f:if>
+</html>

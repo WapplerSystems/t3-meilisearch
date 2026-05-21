@@ -18,6 +18,39 @@
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
             </trans-unit>
+            <trans-unit id="rag.form.heading">
+                <source>Ask the site</source>
+            </trans-unit>
+            <trans-unit id="rag.form.placeholder">
+                <source>Type your question…</source>
+            </trans-unit>
+            <trans-unit id="rag.form.submit">
+                <source>Ask</source>
+            </trans-unit>
+            <trans-unit id="rag.form.reset">
+                <source>Start over</source>
+            </trans-unit>
+            <trans-unit id="rag.answer.heading">
+                <source>Answer</source>
+            </trans-unit>
+            <trans-unit id="rag.answer.sources">
+                <source>Sources</source>
+            </trans-unit>
+            <trans-unit id="rag.status.disabled">
+                <source>The site assistant is not configured.</source>
+            </trans-unit>
+            <trans-unit id="rag.status.no_context">
+                <source>No matching documents found for this question.</source>
+            </trans-unit>
+            <trans-unit id="rag.status.failed">
+                <source>Sorry, something went wrong: %s</source>
+            </trans-unit>
+            <trans-unit id="rag.conversation.you">
+                <source>You</source>
+            </trans-unit>
+            <trans-unit id="rag.conversation.assistant">
+                <source>Assistant</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>
