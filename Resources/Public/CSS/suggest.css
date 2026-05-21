@@ -1,0 +1,54 @@
+/*
+ * Live-suggestion dropdown for the search input. Sits absolutely under
+ * the input, picks up Bootstrap's dropdown-menu visual language so the
+ * style stays consistent on sites that ship Bootstrap 5.
+ */
+.ws-meilisearch-suggest {
+    position: relative;
+}
+
+.ws-meilisearch-suggest__menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    margin: 0.25rem 0 0;
+    padding: 0.5rem 0;
+    list-style: none;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.176);
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.075);
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.ws-meilisearch-suggest__menu[hidden] {
+    display: none;
+}
+
+.ws-meilisearch-suggest__item {
+    margin: 0;
+    padding: 0;
+}
+
+.ws-meilisearch-suggest__item a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    color: inherit;
+    cursor: pointer;
+}
+
+.ws-meilisearch-suggest__item:hover a,
+.ws-meilisearch-suggest__item.active a {
+    background: rgba(13, 110, 253, 0.08);
+}
+
+.ws-meilisearch-suggest__footer {
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 0.25rem;
+}

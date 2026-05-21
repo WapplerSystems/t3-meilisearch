@@ -21,18 +21,23 @@
             <label for="ws-meilisearch-q" class="visually-hidden">
                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
             </label>
-            <div class="input-group input-group-lg">
+            <div class="input-group input-group-lg ws-meilisearch-suggest" data-ws-meilisearch-suggest>
                 <input type="search"
                     id="ws-meilisearch-q"
                     class="form-control"
                     name="tx_wsmeilisearch_search[q]"
                     value="{query}"
-                    placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"/>
+                    placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"
+                    autocomplete="off"
+                    data-suggest-input="data-suggest-input"/>
                 <button type="submit" class="btn btn-primary">
                     <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.submit"/>
                 </button>
+                <ul class="ws-meilisearch-suggest__menu" data-suggest-menu="data-suggest-menu" hidden="hidden"></ul>
             </div>
         </form>
+        <f:asset.script identifier="ws_meilisearch-suggest" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/suggest.js" defer="defer"/>
+        <f:asset.css identifier="ws_meilisearch-suggest" href="EXT:ws_meilisearch/Resources/Public/CSS/suggest.css"/>
     </div>
 </f:section>
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use WapplerSystems\Meilisearch\Middleware\RagStreamMiddleware;
+use WapplerSystems\Meilisearch\Middleware\SuggestEndpoint;
 
 return [
     'frontend' => [
@@ -11,6 +12,11 @@ return [
             // Must run *after* site resolution so the request carries the
             // resolved Site attribute; runs *before* page resolution so
             // the streaming path doesn't trigger a TYPO3 404 lookup.
+            'after' => ['typo3/cms-frontend/site'],
+            'before' => ['typo3/cms-frontend/page-resolver'],
+        ],
+        'wapplersystems/meilisearch/suggest' => [
+            'target' => SuggestEndpoint::class,
             'after' => ['typo3/cms-frontend/site'],
             'before' => ['typo3/cms-frontend/page-resolver'],
         ],
