@@ -23,6 +23,41 @@
     const DEBOUNCE_MS = 150;
     const MIN_QUERY_LENGTH = 2;
     const DEFAULT_ENDPOINT = '/_ws_meilisearch/suggest';
+    const RECENT_KEY = 'ws-meilisearch:recent';
+    const RECENT_MAX = 5;
+
+    /**
+     * Read the last-N submitted queries from localStorage. Returns []
+     * on parse errors, missing storage (incognito Safari), or empty
+     * string entries.
+     */
+    function loadRecent() {
+        try {
+            const raw = window.localStorage.getItem(RECENT_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(function (q) { return typeof q === 'string' && q.trim() !== ''; }).slice(0, RECENT_MAX);
+        } catch (_) {
+            return [];
+        }
+    }
+
+    /**
+     * Prepend a query, dedupe (case-insensitive), cap at RECENT_MAX.
+     * Silently no-ops if localStorage is blocked.
+     */
+    function saveRecent(query) {
+        const q = (query || '').trim();
+        if (q === '') return;
+        try {
+            const list = loadRecent().filter(function (other) {
+                return other.toLowerCase() !== q.toLowerCase();
+            });
+            list.unshift(q);
+            window.localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+        } catch (_) { /* ignore */ }
+    }
 
     function init(root) {
         const input = root.querySelector('[data-suggest-input]');
@@ -55,6 +90,16 @@
             activeIndex = -1;
         }
 
+        function openRecent() {
+            const recent = loadRecent();
+            if (recent.length === 0) return false;
+            menu.innerHTML = renderRecent(recent);
+            menu.hidden = false;
+            items = Array.from(menu.querySelectorAll('[data-suggest-item]'));
+            activeIndex = -1;
+            return true;
+        }
+
         function highlight(index) {
             items.forEach(function (li, i) { li.classList.toggle('active', i === index); });
             const active = items[index];
@@ -69,6 +114,10 @@
         function fire() {
             const query = input.value.trim();
             if (query.length < MIN_QUERY_LENGTH) {
+                // Sub-threshold input: show the recent-queries history
+                // instead of going dark. If the user has none, fall
+                // through to the close()-default below.
+                if (query === '' && openRecent()) return;
                 close();
                 return;
             }
@@ -131,13 +180,52 @@
         });
 
         input.addEventListener('focus', function () {
-            if (input.value.trim().length >= MIN_QUERY_LENGTH) fire();
+            if (input.value.trim().length >= MIN_QUERY_LENGTH) {
+                fire();
+            } else {
+                // Empty / short input on focus → reveal the recent list
+                // immediately (no debounce wait — it's local data).
+                openRecent();
+            }
+        });
+
+        // Persist the query on form submit so the next page load has a
+        // history to show. Click on a suggestion also triggers this via
+        // the synthetic submit further down.
+        if (form) {
+            form.addEventListener('submit', function () {
+                saveRecent(input.value);
+            });
+        }
+
+        // Click on a recent-queries entry: fill the input and submit
+        // the form so the existing GET pipeline runs. We listen on
+        // `mousedown` (not `click`) because the input's blur handler
+        // closes the menu on mousedown — `click` would never fire.
+        menu.addEventListener('mousedown', function (ev) {
+            const recentItem = ev.target.closest('[data-recent-query]');
+            if (!recentItem) return;
+            ev.preventDefault();
+            input.value = recentItem.dataset.recentQuery || '';
+            if (form) {
+                saveRecent(input.value);
+                form.submit();
+            }
         });
 
         // Optional: clicking outside the wrapper closes the menu too.
         document.addEventListener('click', function (ev) {
             if (!root.contains(ev.target)) close();
         });
+
+        // If we landed on this page with the input already filled in
+        // (Results.html pre-populates from the GET query), that's a
+        // completed search the user might want to return to — record
+        // it in recents right away rather than waiting for them to
+        // submit something new.
+        if (input.value.trim() !== '') {
+            saveRecent(input.value);
+        }
 
         // ARIA wiring for the combobox / listbox pair.
         input.setAttribute('role', 'combobox');
@@ -152,6 +240,22 @@
             input.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
         });
         observer.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+    }
+
+    function renderRecent(queries) {
+        const header = '<li class="ws-meilisearch-suggest__header text-muted small text-uppercase">Recent searches</li>';
+        const items = queries.map(function (q, i) {
+            return [
+                '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
+                ' data-suggest-item class="ws-meilisearch-suggest__item">',
+                '<a href="#" data-recent-query="' + escapeAttr(q) + '" class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
+                '<span class="ws-meilisearch-suggest__icon" aria-hidden="true">↻</span>',
+                '<span class="flex-grow-1 text-truncate">' + escapeText(q) + '</span>',
+                '</a>',
+                '</li>',
+            ].join('');
+        }).join('');
+        return header + items;
     }
 
     function renderMenu(hits, totalHits, query) {
