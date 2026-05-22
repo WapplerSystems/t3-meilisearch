@@ -1,23 +1,38 @@
 <html
     xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
     data-namespace-typo3-fluid="true">
+<f:comment>
+    Renders one search hit. The {hit._formatted.<field>} variants are
+    produced by Meilisearch's attributesToHighlight pipeline — they
+    contain the raw `title` / `description` / `teaser` / `bodytext`
+    with matched terms wrapped in <mark>…</mark>. We render them via
+    `f:format.raw` so the marks survive, falling back to the plain
+    field when no highlight was generated (e.g. the hit matched on a
+    different field).
+</f:comment>
 <article class="ws-meilisearch-hit card mb-3">
     <div class="card-body">
         <div class="d-flex align-items-start gap-2 mb-2">
             <h3 class="card-title h5 mb-0 flex-grow-1">
+                <f:variable name="titleHtml">
+                    <f:if condition="{hit._formatted.title}">
+                        <f:then><f:format.raw>{hit._formatted.title}</f:format.raw></f:then>
+                        <f:else>{hit.title}</f:else>
+                    </f:if>
+                </f:variable>
                 <f:switch expression="{hit.type}">
                     <f:case value="page">
-                        <f:link.page pageUid="{hit.uid}" class="stretched-link text-decoration-none">{hit.title}</f:link.page>
+                        <f:link.page pageUid="{hit.uid}" class="stretched-link text-decoration-none">{titleHtml -> f:format.raw()}</f:link.page>
                     </f:case>
                     <f:case value="file">
                         <f:if condition="{hit.publicUrl}">
                             <f:then>
-                                <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link stretched-link text-decoration-none" target="_blank" rel="noopener">{hit.title}</a>
+                                <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link stretched-link text-decoration-none" target="_blank" rel="noopener">{titleHtml -> f:format.raw()}</a>
                             </f:then>
-                            <f:else>{hit.title}</f:else>
+                            <f:else>{titleHtml -> f:format.raw()}</f:else>
                         </f:if>
                     </f:case>
-                    <f:defaultCase>{hit.title}</f:defaultCase>
+                    <f:defaultCase>{titleHtml -> f:format.raw()}</f:defaultCase>
                 </f:switch>
             </h3>
             <f:switch expression="{hit.type}">
@@ -27,11 +42,39 @@
                 <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">{hit.type}</span></f:defaultCase>
             </f:switch>
         </div>
-        <f:if condition="{hit.teaser}">
-            <p class="card-text text-muted mb-0">{hit.teaser}</p>
+
+        <f:comment>
+            Preview block: prefer the highlight-aware _formatted.teaser /
+            description / bodytext snippet (which already has <mark>
+            around the matched terms). Crop to ~250 chars so a giant
+            Tika-extracted bodytext doesn't dwarf the card.
+        </f:comment>
+        <f:if condition="{hit._formatted.teaser} || {hit.teaser}">
+            <p class="card-text text-muted mb-1">
+                <f:if condition="{hit._formatted.teaser}">
+                    <f:then><f:format.raw>{hit._formatted.teaser}</f:format.raw></f:then>
+                    <f:else>{hit.teaser -> f:format.crop(maxCharacters: 250, append: '…')}</f:else>
+                </f:if>
+            </p>
         </f:if>
-        <f:if condition="{hit.description}">
-            <p class="card-text text-muted mb-0">{hit.description}</p>
+        <f:if condition="{hit._formatted.description} || {hit.description}">
+            <p class="card-text text-muted mb-1">
+                <f:if condition="{hit._formatted.description}">
+                    <f:then><f:format.raw>{hit._formatted.description}</f:format.raw></f:then>
+                    <f:else>{hit.description -> f:format.crop(maxCharacters: 250, append: '…')}</f:else>
+                </f:if>
+            </p>
+        </f:if>
+        <f:if condition="{hit._formatted.bodytext}">
+            <p class="card-text text-muted small mb-1">
+                <f:format.raw>{hit._formatted.bodytext}</f:format.raw>
+            </p>
+        </f:if>
+
+        <f:if condition="{hit.languageLabel}">
+            <p class="card-text mb-0">
+                <small class="text-muted">{hit.languageLabel}</small>
+            </p>
         </f:if>
     </div>
 </article>

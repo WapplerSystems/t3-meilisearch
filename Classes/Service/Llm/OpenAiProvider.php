@@ -17,10 +17,37 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
     use LoggerAwareTrait;
 
     protected const DEFAULT_BASE_URL = 'https://api.openai.com';
+    /**
+     * Path appended to the base URL for chat completions. OpenAI uses
+     * `/v1/chat/completions`; OpenAI-compatible vendors that omit the `/v1`
+     * version segment (e.g. Infomaniak's `/openai/chat/completions`) override
+     * this constant in their subclass.
+     */
+    protected const CHAT_PATH = '/v1/chat/completions';
 
     public function __construct(
         protected readonly RequestFactory $requestFactory,
     ) {}
+
+    /**
+     * Resolve the base URL the chat path is appended to. Subclasses can
+     * override to derive the URL from non-URL options (e.g. a product/tenant
+     * id) while still honouring an explicit `url` override.
+     *
+     * @param array<string,mixed> $options
+     */
+    protected function resolveBaseUrl(array $options): string
+    {
+        return rtrim((string)($options['url'] ?? static::DEFAULT_BASE_URL), '/');
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     */
+    protected function chatUrl(array $options): string
+    {
+        return $this->resolveBaseUrl($options) . static::CHAT_PATH;
+    }
 
     public function name(): string
     {
@@ -37,7 +64,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
         if ($apiKey === '') {
             throw new LlmException('OpenAI: apiKey is required');
         }
-        $baseUrl = rtrim((string)($options['url'] ?? static::DEFAULT_BASE_URL), '/');
+        $chatUrl = $this->chatUrl($options);
 
         $body = [
             'model' => $model,
@@ -50,7 +77,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
 
         try {
             $response = $this->requestFactory->request(
-                $baseUrl . '/v1/chat/completions',
+                $chatUrl,
                 'POST',
                 [
                     'headers' => [
@@ -97,7 +124,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
         if ($apiKey === '') {
             throw new LlmException(static::class . ': apiKey is required');
         }
-        $baseUrl = rtrim((string)($options['url'] ?? static::DEFAULT_BASE_URL), '/');
+        $chatUrl = $this->chatUrl($options);
 
         $body = [
             'model' => $model,
@@ -111,7 +138,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
 
         try {
             $response = $this->requestFactory->request(
-                $baseUrl . '/v1/chat/completions',
+                $chatUrl,
                 'POST',
                 [
                     'headers' => [

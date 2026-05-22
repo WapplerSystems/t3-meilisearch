@@ -1,85 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+    <file source-language="en" target-language="bg" datatype="plaintext" original="messages" date="2026-05-21T00:00:00Z" product-name="ws_meilisearch">
         <header/>
         <body>
             <trans-unit id="search.form.placeholder">
                 <source>Search…</source>
+                <target>Търсене…</target>
             </trans-unit>
             <trans-unit id="search.form.submit">
                 <source>Search</source>
+                <target>Търсене</target>
             </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
+                <target>Няма съвпадения за „%s".</target>
             </trans-unit>
             <trans-unit id="search.results.count">
                 <source>%d results for "%s"</source>
+                <target>%d резултата за „%s"</target>
             </trans-unit>
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
+                <target>Филтър</target>
             </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
+                <target>Попитайте сайта</target>
             </trans-unit>
             <trans-unit id="rag.form.placeholder">
                 <source>Type your question…</source>
+                <target>Въведете своя въпрос…</target>
             </trans-unit>
             <trans-unit id="rag.form.submit">
                 <source>Ask</source>
+                <target>Питай</target>
             </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
+                <target>Започни отначало</target>
             </trans-unit>
             <trans-unit id="rag.answer.heading">
                 <source>Answer</source>
+                <target>Отговор</target>
             </trans-unit>
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
+                <target>Източници</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
+                <target>Асистентът на сайта не е конфигуриран.</target>
             </trans-unit>
             <trans-unit id="rag.status.no_context">
                 <source>No matching documents found for this question.</source>
+                <target>Не са намерени съответстващи документи за този въпрос.</target>
             </trans-unit>
             <trans-unit id="rag.status.failed">
                 <source>Sorry, something went wrong: %s</source>
+                <target>Съжаляваме, нещо се обърка: %s</target>
             </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
+                <target>Вие</target>
             </trans-unit>
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
+                <target>Асистент</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
+                <target>Скорошни търсения</target>
             </trans-unit>
             <trans-unit id="suggest.more">
                 <source>%d more — submit to see all</source>
+                <target>Още %d — изпратете, за да видите всички</target>
             </trans-unit>
             <trans-unit id="hit.language">
                 <source>Language</source>
+                <target>Език</target>
             </trans-unit>
             <trans-unit id="facet.attr.type">
                 <source>Type</source>
+                <target>Тип</target>
             </trans-unit>
             <trans-unit id="facet.attr.language">
                 <source>Language</source>
+                <target>Език</target>
             </trans-unit>
             <trans-unit id="facet.value.type.page">
                 <source>Page</source>
+                <target>Страница</target>
             </trans-unit>
             <trans-unit id="facet.value.type.news">
                 <source>News</source>
+                <target>Новини</target>
             </trans-unit>
             <trans-unit id="facet.value.type.file">
                 <source>File</source>
+                <target>Файл</target>
             </trans-unit>
             <trans-unit id="facet.value.type.event">
                 <source>Event</source>
+                <target>Събитие</target>
             </trans-unit>
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
+                <target>Елемент на съдържание</target>
             </trans-unit>
         </body>
     </file>

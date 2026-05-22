@@ -1,85 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+    <file source-language="en" target-language="mt" datatype="plaintext" original="messages" date="2026-05-21T00:00:00Z" product-name="ws_meilisearch">
         <header/>
         <body>
             <trans-unit id="search.form.placeholder">
                 <source>Search…</source>
+                <target>Fittex…</target>
             </trans-unit>
             <trans-unit id="search.form.submit">
                 <source>Search</source>
+                <target>Fittex</target>
             </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
+                <target>L-ebda riżultat għal "%s".</target>
             </trans-unit>
             <trans-unit id="search.results.count">
                 <source>%d results for "%s"</source>
+                <target>%d riżultati għal "%s"</target>
             </trans-unit>
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
+                <target>Filtru</target>
             </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
+                <target>Staqsi lis-sit</target>
             </trans-unit>
             <trans-unit id="rag.form.placeholder">
                 <source>Type your question…</source>
+                <target>Ittajpja l-mistoqsija tiegħek…</target>
             </trans-unit>
             <trans-unit id="rag.form.submit">
                 <source>Ask</source>
+                <target>Staqsi</target>
             </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
+                <target>Erġa' ibda</target>
             </trans-unit>
             <trans-unit id="rag.answer.heading">
                 <source>Answer</source>
+                <target>Tweġiba</target>
             </trans-unit>
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
+                <target>Sorsi</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
+                <target>L-assistent tas-sit mhuwiex ikkonfigurat.</target>
             </trans-unit>
             <trans-unit id="rag.status.no_context">
                 <source>No matching documents found for this question.</source>
+                <target>Ma nstabux dokumenti li jaqblu għal din il-mistoqsija.</target>
             </trans-unit>
             <trans-unit id="rag.status.failed">
                 <source>Sorry, something went wrong: %s</source>
+                <target>Skużaw, xi ħaġa marret ħażin: %s</target>
             </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
+                <target>Int</target>
             </trans-unit>
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
+                <target>Assistent</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
+                <target>Tfittxijiet riċenti</target>
             </trans-unit>
             <trans-unit id="suggest.more">
                 <source>%d more — submit to see all</source>
+                <target>%d aktar — issottometti biex tara kollox</target>
             </trans-unit>
             <trans-unit id="hit.language">
                 <source>Language</source>
+                <target>Lingwa</target>
             </trans-unit>
             <trans-unit id="facet.attr.type">
                 <source>Type</source>
+                <target>Tip</target>
             </trans-unit>
             <trans-unit id="facet.attr.language">
                 <source>Language</source>
+                <target>Lingwa</target>
             </trans-unit>
             <trans-unit id="facet.value.type.page">
                 <source>Page</source>
+                <target>Paġna</target>
             </trans-unit>
             <trans-unit id="facet.value.type.news">
                 <source>News</source>
+                <target>Aħbarijiet</target>
             </trans-unit>
             <trans-unit id="facet.value.type.file">
                 <source>File</source>
+                <target>Fajl</target>
             </trans-unit>
             <trans-unit id="facet.value.type.event">
                 <source>Event</source>
+                <target>Avveniment</target>
             </trans-unit>
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
+                <target>Element ta' kontenut</target>
             </trans-unit>
         </body>
     </file>

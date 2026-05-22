@@ -94,6 +94,35 @@ final class SearchController extends ActionController
             'sort' => $sortOption,
         ]);
 
+        // Resolve the numeric language id of each hit to the site-
+        // language label declared in the site config (e.g. "Deutsch"
+        // for id 0, "English" for id 1). Doing it here keeps the
+        // template trivial — `{hit.languageLabel}` instead of a
+        // ViewHelper call per hit.
+        $hits = [];
+        foreach ($result->hits as $hit) {
+            $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            $hits[] = $hit;
+        }
+        // Rebuild SearchResult with the enriched hits — DTO is readonly,
+        // so a new instance with the same paging metadata is the way.
+        $result = new \WapplerSystems\Meilisearch\Service\SearchResult(
+            hits: $hits,
+            totalHits: $result->totalHits,
+            facets: $result->facets,
+            page: $result->page,
+            perPage: $result->perPage,
+        );
+
+        // Map of language-id → title so the language facet shows
+        // "Deutsch" / "English" instead of the raw numeric id. Built once
+        // from the site config; the template looks values up by string
+        // key (e.g. {languageLabels.0}).
+        $languageLabels = [];
+        foreach ($site->getAllLanguages() as $language) {
+            $languageLabels[(string)$language->getLanguageId()] = $language->getTitle();
+        }
+
         $this->view->assignMultiple([
             'query' => $q,
             'page' => max(1, $page),
@@ -104,8 +133,18 @@ final class SearchController extends ActionController
             'sort' => $sortOption,
             // Pre-built links so templates don't have to compute them.
             'sortOptions' => $this->sortOptions(),
+            'languageLabels' => $languageLabels,
         ]);
         return $this->htmlResponse();
+    }
+
+    private function resolveLanguageLabel(Site $site, int $languageId): string
+    {
+        try {
+            return $site->getLanguageById($languageId)->getTitle();
+        } catch (\Throwable) {
+            return (string)$languageId;
+        }
     }
 
     /**

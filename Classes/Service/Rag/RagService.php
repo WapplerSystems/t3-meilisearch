@@ -110,6 +110,9 @@ final class RagService implements LoggerAwareInterface
             'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
             'url' => (string)$settings->get('meilisearch.rag.url', ''),
             'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+            // Tenant id for vendor-specific providers (currently Infomaniak).
+            // Generic providers ignore it.
+            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
         ];
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);
@@ -212,6 +215,9 @@ final class RagService implements LoggerAwareInterface
             'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
             'url' => (string)$settings->get('meilisearch.rag.url', ''),
             'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+            // Tenant id for vendor-specific providers (currently Infomaniak).
+            // Generic providers ignore it.
+            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
         ];
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);

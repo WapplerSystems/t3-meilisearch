@@ -1,85 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+    <file source-language="en" target-language="fr" datatype="plaintext" original="messages" date="2026-05-21T00:00:00Z" product-name="ws_meilisearch">
         <header/>
         <body>
             <trans-unit id="search.form.placeholder">
                 <source>Search…</source>
+                <target>Rechercher…</target>
             </trans-unit>
             <trans-unit id="search.form.submit">
                 <source>Search</source>
+                <target>Rechercher</target>
             </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
+                <target>Aucun résultat pour « %s ».</target>
             </trans-unit>
             <trans-unit id="search.results.count">
                 <source>%d results for "%s"</source>
+                <target>%d résultats pour « %s »</target>
             </trans-unit>
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
+                <target>Filtre</target>
             </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
+                <target>Interroger le site</target>
             </trans-unit>
             <trans-unit id="rag.form.placeholder">
                 <source>Type your question…</source>
+                <target>Saisissez votre question…</target>
             </trans-unit>
             <trans-unit id="rag.form.submit">
                 <source>Ask</source>
+                <target>Demander</target>
             </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
+                <target>Recommencer</target>
             </trans-unit>
             <trans-unit id="rag.answer.heading">
                 <source>Answer</source>
+                <target>Réponse</target>
             </trans-unit>
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
+                <target>Sources</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
+                <target>L'assistant du site n'est pas configuré.</target>
             </trans-unit>
             <trans-unit id="rag.status.no_context">
                 <source>No matching documents found for this question.</source>
+                <target>Aucun document correspondant n'a été trouvé pour cette question.</target>
             </trans-unit>
             <trans-unit id="rag.status.failed">
                 <source>Sorry, something went wrong: %s</source>
+                <target>Désolé, une erreur est survenue : %s</target>
             </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
+                <target>Vous</target>
             </trans-unit>
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
+                <target>Assistant</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
+                <target>Recherches récentes</target>
             </trans-unit>
             <trans-unit id="suggest.more">
                 <source>%d more — submit to see all</source>
+                <target>%d de plus — soumettre pour tout voir</target>
             </trans-unit>
             <trans-unit id="hit.language">
                 <source>Language</source>
+                <target>Langue</target>
             </trans-unit>
             <trans-unit id="facet.attr.type">
                 <source>Type</source>
+                <target>Type</target>
             </trans-unit>
             <trans-unit id="facet.attr.language">
                 <source>Language</source>
+                <target>Langue</target>
             </trans-unit>
             <trans-unit id="facet.value.type.page">
                 <source>Page</source>
+                <target>Page</target>
             </trans-unit>
             <trans-unit id="facet.value.type.news">
                 <source>News</source>
+                <target>Actualités</target>
             </trans-unit>
             <trans-unit id="facet.value.type.file">
                 <source>File</source>
+                <target>Fichier</target>
             </trans-unit>
             <trans-unit id="facet.value.type.event">
                 <source>Event</source>
+                <target>Événement</target>
             </trans-unit>
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
+                <target>Élément de contenu</target>
             </trans-unit>
         </body>
     </file>

@@ -21,7 +21,9 @@
             <label for="ws-meilisearch-q" class="visually-hidden">
                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
             </label>
-            <div class="input-group input-group-lg ws-meilisearch-suggest" data-ws-meilisearch-suggest>
+            <div class="input-group input-group-lg ws-meilisearch-suggest" data-ws-meilisearch-suggest
+                data-label-recent="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.recent.heading')}"
+                data-label-more="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.more')}">
                 <input type="search"
                     id="ws-meilisearch-q"
                     class="form-control"

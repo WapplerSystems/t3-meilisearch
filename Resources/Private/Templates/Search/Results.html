@@ -15,7 +15,9 @@
             <label for="ws-meilisearch-q" class="visually-hidden">
                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
             </label>
-            <div class="input-group input-group-lg mb-4 ws-meilisearch-suggest" data-ws-meilisearch-suggest>
+            <div class="input-group input-group-lg mb-4 ws-meilisearch-suggest" data-ws-meilisearch-suggest
+                data-label-recent="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.recent.heading')}"
+                data-label-more="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.more')}">
                 <input type="search"
                     id="ws-meilisearch-q"
                     class="form-control"
@@ -32,6 +34,8 @@
             <f:asset.script identifier="ws_meilisearch-suggest" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/suggest.js" defer="defer"/>
             <f:asset.css identifier="ws_meilisearch-suggest" href="EXT:ws_meilisearch/Resources/Public/CSS/suggest.css"/>
 
+            <a id="ws-meilisearch-results" tabindex="-1" class="visually-hidden">Results</a>
+
             <f:if condition="{result.totalHits} > 0">
                 <f:then>
                     <p class="ws-meilisearch-meta text-muted small mb-3">
@@ -41,7 +45,7 @@
 
                     <div class="ws-meilisearch-layout row g-4">
                         <aside class="ws-meilisearch-facets col-lg-3">
-                            <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters}"/>
+                            <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters, languageLabels: languageLabels}"/>
                         </aside>
                         <main class="ws-meilisearch-hits col-lg-9">
                             <f:for each="{result.hits}" as="hit">
@@ -57,6 +61,8 @@
                     </div>
                 </f:else>
             </f:if>
+
+            <f:asset.script identifier="ws_meilisearch-scroll-to-results" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/scroll-to-results.js" defer="defer"/>
         </form>
     </div>
 </f:section>

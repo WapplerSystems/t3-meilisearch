@@ -1,85 +1,111 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-05-19T00:00:00Z" product-name="ws_meilisearch">
+    <file source-language="en" target-language="no" datatype="plaintext" original="messages" date="2026-05-21T00:00:00Z" product-name="ws_meilisearch">
         <header/>
         <body>
             <trans-unit id="search.form.placeholder">
                 <source>Search…</source>
+                <target>Søk…</target>
             </trans-unit>
             <trans-unit id="search.form.submit">
                 <source>Search</source>
+                <target>Søk</target>
             </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
+                <target>Ingen treff for "%s".</target>
             </trans-unit>
             <trans-unit id="search.results.count">
                 <source>%d results for "%s"</source>
+                <target>%d treff for "%s"</target>
             </trans-unit>
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
+                <target>Filter</target>
             </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
+                <target>Spør nettstedet</target>
             </trans-unit>
             <trans-unit id="rag.form.placeholder">
                 <source>Type your question…</source>
+                <target>Skriv inn spørsmålet…</target>
             </trans-unit>
             <trans-unit id="rag.form.submit">
                 <source>Ask</source>
+                <target>Spør</target>
             </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
+                <target>Start på nytt</target>
             </trans-unit>
             <trans-unit id="rag.answer.heading">
                 <source>Answer</source>
+                <target>Svar</target>
             </trans-unit>
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
+                <target>Kilder</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
+                <target>Nettstedsassistenten er ikke konfigurert.</target>
             </trans-unit>
             <trans-unit id="rag.status.no_context">
                 <source>No matching documents found for this question.</source>
+                <target>Fant ingen samsvarende dokumenter for dette spørsmålet.</target>
             </trans-unit>
             <trans-unit id="rag.status.failed">
                 <source>Sorry, something went wrong: %s</source>
+                <target>Beklager, noe gikk galt: %s</target>
             </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
+                <target>Du</target>
             </trans-unit>
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
+                <target>Assistent</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
+                <target>Nylige søk</target>
             </trans-unit>
             <trans-unit id="suggest.more">
                 <source>%d more — submit to see all</source>
+                <target>%d til — send for å se alle</target>
             </trans-unit>
             <trans-unit id="hit.language">
                 <source>Language</source>
+                <target>Språk</target>
             </trans-unit>
             <trans-unit id="facet.attr.type">
                 <source>Type</source>
+                <target>Type</target>
             </trans-unit>
             <trans-unit id="facet.attr.language">
                 <source>Language</source>
+                <target>Språk</target>
             </trans-unit>
             <trans-unit id="facet.value.type.page">
                 <source>Page</source>
+                <target>Side</target>
             </trans-unit>
             <trans-unit id="facet.value.type.news">
                 <source>News</source>
+                <target>Nyheter</target>
             </trans-unit>
             <trans-unit id="facet.value.type.file">
                 <source>File</source>
+                <target>Fil</target>
             </trans-unit>
             <trans-unit id="facet.value.type.event">
                 <source>Event</source>
+                <target>Hendelse</target>
             </trans-unit>
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
+                <target>Innholdselement</target>
             </trans-unit>
         </body>
     </file>

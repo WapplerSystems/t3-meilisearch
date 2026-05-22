@@ -130,6 +130,14 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         if ($source === '') {
             return [];
         }
+
+        // Infomaniak isn't a native Meilisearch source — it's a preset that
+        // resolves to the OpenAI-compatible source with a derived URL, so the
+        // user only has to fill productId + model + apiKey.
+        if ($source === 'infomaniak') {
+            return $this->buildInfomaniakEmbedder($site);
+        }
+
         $allowed = self::SOURCE_FIELDS[$source] ?? null;
         if ($allowed === null) {
             $this->logger?->warning(
@@ -155,6 +163,37 @@ final class EmbedderConfigurator implements LoggerAwareInterface
             }
         }
 
+        return [self::EMBEDDER_NAME => $embedder];
+    }
+
+    /**
+     * @return array<string,array<string,mixed>>
+     */
+    private function buildInfomaniakEmbedder(Site $site): array
+    {
+        $settings = $site->getSettings();
+        $productId = trim((string)$settings->get('meilisearch.infomaniak.productId', ''));
+        if ($productId === '') {
+            $this->logger?->warning(
+                'Infomaniak embedder preset requires meilisearch.infomaniak.productId for site {id} — skipping embedder push',
+                ['id' => $site->getIdentifier()],
+            );
+            return [];
+        }
+        $embedder = [
+            'source' => 'openAi',
+            'url' => 'https://api.infomaniak.com/1/ai/' . rawurlencode($productId) . '/openai/embeddings',
+        ];
+        foreach (['model', 'apiKey', 'documentTemplate'] as $field) {
+            $value = trim((string)$settings->get('meilisearch.embedder.' . $field, ''));
+            if ($value !== '') {
+                $embedder[$field] = $value;
+            }
+        }
+        $dims = (int)$settings->get('meilisearch.embedder.dimensions', 0);
+        if ($dims > 0) {
+            $embedder['dimensions'] = $dims;
+        }
         return [self::EMBEDDER_NAME => $embedder];
     }
 

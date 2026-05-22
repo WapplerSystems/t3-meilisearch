@@ -65,6 +65,14 @@
         if (!(input instanceof HTMLInputElement) || !(menu instanceof HTMLElement)) return;
 
         const endpoint = root.dataset.endpoint || DEFAULT_ENDPOINT;
+        // Labels arrive pre-translated from the Fluid template via
+        // data-label-* attributes on the wrapper. English fallbacks
+        // keep the dropdown usable if the template forgets to wire one.
+        const labels = {
+            recent: root.dataset.labelRecent || 'Recent searches',
+            // 'more' uses %d as the placeholder for the count.
+            more: root.dataset.labelMore || '%d more — submit to see all',
+        };
         const form = input.closest('form');
         let timer = null;
         let pending = null;
@@ -84,7 +92,7 @@
                 close();
                 return;
             }
-            menu.innerHTML = renderMenu(hits, payload.totalHits, query);
+            menu.innerHTML = renderMenu(hits, payload.totalHits, query, labels);
             menu.hidden = false;
             items = Array.from(menu.querySelectorAll('[data-suggest-item]'));
             activeIndex = -1;
@@ -93,7 +101,7 @@
         function openRecent() {
             const recent = loadRecent();
             if (recent.length === 0) return false;
-            menu.innerHTML = renderRecent(recent);
+            menu.innerHTML = renderRecent(recent, labels);
             menu.hidden = false;
             items = Array.from(menu.querySelectorAll('[data-suggest-item]'));
             activeIndex = -1;
@@ -242,8 +250,8 @@
         observer.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
     }
 
-    function renderRecent(queries) {
-        const header = '<li class="ws-meilisearch-suggest__header text-muted small text-uppercase">Recent searches</li>';
+    function renderRecent(queries, labels) {
+        const header = '<li class="ws-meilisearch-suggest__header text-muted small text-uppercase">' + escapeText(labels.recent) + '</li>';
         const items = queries.map(function (q, i) {
             return [
                 '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
@@ -258,7 +266,7 @@
         return header + items;
     }
 
-    function renderMenu(hits, totalHits, query) {
+    function renderMenu(hits, totalHits, query, labels) {
         const items = hits.map(function (hit, i) {
             return [
                 '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
@@ -271,7 +279,7 @@
             ].join('');
         }).join('');
         const footer = (totalHits > hits.length)
-            ? '<li class="ws-meilisearch-suggest__footer text-muted small">+ ' + (totalHits - hits.length) + ' more — submit to see all</li>'
+            ? '<li class="ws-meilisearch-suggest__footer text-muted small">' + escapeText(labels.more.replace('%d', String(totalHits - hits.length))) + '</li>'
             : '';
         return items + footer;
     }

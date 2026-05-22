@@ -88,7 +88,7 @@ settings:
 
   meilisearch.embedder.source:
     label: 'Embedder source'
-    description: 'Vector embedder for hybrid (keyword + semantic) search. Leave empty to disable — queries fall back to pure keyword search. Supported: openAi, huggingFace, ollama, rest, userProvided.'
+    description: 'Vector embedder for hybrid (keyword + semantic) search. Leave empty to disable — queries fall back to pure keyword search. Supported: openAi, huggingFace, ollama, rest, userProvided, infomaniak (preset → resolves to openAi against the Infomaniak AI Tools endpoint; only needs apiKey + model + meilisearch.infomaniak.productId).'
     type: string
     default: ''
 
@@ -130,7 +130,13 @@ settings:
 
   meilisearch.rag.provider:
     label: 'RAG LLM provider'
-    description: 'Large-language-model provider for retrieval-augmented generation. Leave empty to disable the RAG plugin. Supported: openAi, anthropic, ollama, rest (any OpenAI-compatible chat completions endpoint).'
+    description: 'Large-language-model provider for retrieval-augmented generation. Leave empty to disable the RAG plugin. Supported: openAi, anthropic, ollama, rest (any OpenAI-compatible chat completions endpoint), infomaniak (Swiss sovereign AI Tools — only needs apiKey + model + meilisearch.infomaniak.productId).'
+    type: string
+    default: ''
+
+  meilisearch.infomaniak.productId:
+    label: 'Infomaniak AI product id'
+    description: 'Numeric product id of your Infomaniak AI Tools subscription. Visible in the Manager URL when opening the product (e.g. /manager/.../ai-tools/PRODUCT_ID). Used by both the "infomaniak" embedder preset and the "infomaniak" RAG provider to derive the OpenAI-compatible endpoint URL automatically.'
     type: string
     default: ''
 

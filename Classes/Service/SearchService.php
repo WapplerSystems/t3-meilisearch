@@ -3,10 +3,6 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service;
 
-use CmsIg\Seal\Search\Condition\EqualCondition;
-use CmsIg\Seal\Search\Condition\InCondition;
-use CmsIg\Seal\Search\Condition\SearchCondition;
-use CmsIg\Seal\Search\Facet\CountFacet;
 use Meilisearch\Contracts\HybridSearchOptions;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
@@ -18,15 +14,26 @@ use WapplerSystems\Meilisearch\Event\BeforeSearchEvent;
 /**
  * Frontend-facing search wrapper.
  *
- * Two execution paths:
- *  - keyword: SEAL search builder → adapter-agnostic, portable to other engines
- *  - hybrid:  raw Meilisearch SDK so we can pass `hybrid.semanticRatio`, which
- *             SEAL 0.12 does not yet expose. Activated when the caller passes
- *             `hybrid: true` *and* the site has an embedder configured.
+ * Both keyword and hybrid paths use the raw Meilisearch SDK directly. SEAL's
+ * highlight() returns through a `hitsToDocuments` generator that asserts every
+ * requested highlight field is present in `_formatted` on every hit — but
+ * Meilisearch only emits `_formatted` for fields the document actually has, so
+ * the assertion fires on heterogeneous indexes where e.g. `subtitle` is only
+ * set on pages. Going via the raw SDK sidesteps that and lets us use
+ * attributesToCrop for snippet previews on both paths.
  */
 final class SearchService implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
+
+    /**
+     * Fields the search engine should mark up with <mark>…</mark> around
+     * matches, exposed on `hit._formatted.<field>` for the template
+     * layer. Keep these in sync with the searchable fields declared by
+     * the schema providers — adding a field here that isn't actually
+     * searchable just bloats the response.
+     */
+    private const HIGHLIGHT_FIELDS = ['title', 'subtitle', 'description', 'abstract', 'keywords', 'teaser', 'bodytext'];
 
     public function __construct(
         private readonly SearchEngineFactory $engineFactory,
@@ -49,8 +56,7 @@ final class SearchService implements LoggerAwareInterface
         $before = new BeforeSearchEvent($query, $options);
         $this->eventDispatcher->dispatch($before);
 
-        $engine = $this->engineFactory->createForSite($site);
-        if ($engine === null) {
+        if ($this->engineFactory->createClientForSite($site) === null) {
             $empty = SearchResult::empty();
             $this->eventDispatcher->dispatch(new AfterSearchEvent($before->query, $before->options, $empty));
             return $empty;
@@ -83,59 +89,31 @@ final class SearchService implements LoggerAwareInterface
      */
     private function keywordSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
     {
-        $engine = $this->engineFactory->createForSite($site);
-        $indexName = $this->engineFactory->getIndexName($site);
-
-        $builder = $engine->createSearchBuilder($indexName)
-            ->limit($perPage)
-            ->offset(($page - 1) * $perPage);
-
-        if ($query !== '') {
-            $builder->addFilter(new SearchCondition($query));
-        }
-
-        foreach ((array)($options['filters'] ?? []) as $field => $value) {
-            if (is_array($value)) {
-                $value = array_values(array_filter($value, static fn ($v) => $v !== '' && $v !== null));
-                if ($value === []) {
-                    continue;
-                }
-                $builder->addFilter(new InCondition((string)$field, $value));
-                continue;
-            }
-            if ($value === '' || $value === null) {
-                continue;
-            }
-            $builder->addFilter(new EqualCondition((string)$field, $value));
-        }
-
-        foreach ((array)($options['facets'] ?? []) as $facetField) {
-            $field = (string)$facetField;
-            if ($field === '') {
-                continue;
-            }
-            $builder->addFacet(new CountFacet($field));
-        }
-
-        foreach ($this->normalizeSort($options['sort'] ?? null) as [$field, $direction]) {
-            $builder->addSortBy($field, $direction);
-        }
-
-        $sealResult = $builder->getResult();
-        $hits = iterator_to_array($sealResult, false);
-        return new SearchResult(
-            hits: $hits,
-            totalHits: $sealResult->total(),
-            facets: $this->mapSealFacets($sealResult->facets()),
-            page: $page,
-            perPage: $perPage,
-        );
+        return $this->directSearch($site, $query, $options, $page, $perPage, null);
     }
 
     /**
      * @param array<string,mixed> $options
      */
     private function hybridSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
+    {
+        $ratio = $this->resolveSemanticRatio($site, $options);
+        $hybridParams = (new HybridSearchOptions())
+            ->setEmbedder(EmbedderConfigurator::EMBEDDER_NAME)
+            ->setSemanticRatio($ratio)
+            ->toArray();
+        return $this->directSearch($site, $query, $options, $page, $perPage, $hybridParams);
+    }
+
+    /**
+     * Single execution path against the raw Meilisearch SDK. Used by both
+     * keyword and hybrid search. Pass `$hybridParams` from `HybridSearchOptions`
+     * to enable the semantic blend; pass `null` for plain keyword search.
+     *
+     * @param array<string,mixed> $options
+     * @param array<string,mixed>|null $hybridParams
+     */
+    private function directSearch(Site $site, string $query, array $options, int $page, int $perPage, ?array $hybridParams): SearchResult
     {
         $client = $this->engineFactory->createClientForSite($site);
         if ($client === null) {
@@ -164,11 +142,9 @@ final class SearchService implements LoggerAwareInterface
             $params['facets'] = $facets;
         }
 
-        $ratio = $this->resolveSemanticRatio($site, $options);
-        $params['hybrid'] = (new HybridSearchOptions())
-            ->setEmbedder(EmbedderConfigurator::EMBEDDER_NAME)
-            ->setSemanticRatio($ratio)
-            ->toArray();
+        if ($hybridParams !== null) {
+            $params['hybrid'] = $hybridParams;
+        }
 
         $sort = [];
         foreach ($this->normalizeSort($options['sort'] ?? null) as [$field, $direction]) {
@@ -177,6 +153,12 @@ final class SearchService implements LoggerAwareInterface
         if ($sort !== []) {
             $params['sort'] = $sort;
         }
+
+        $params['attributesToHighlight'] = self::HIGHLIGHT_FIELDS;
+        $params['highlightPreTag'] = '<mark>';
+        $params['highlightPostTag'] = '</mark>';
+        $params['attributesToCrop'] = ['bodytext:200', 'description:200', 'teaser:200'];
+        $params['cropMarker'] = '…';
 
         $response = $index->search($query, $params);
         $raw = $response->toArray();
@@ -289,31 +271,6 @@ final class SearchService implements LoggerAwareInterface
         }
         $string = (string)$value;
         return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $string) . '"';
-    }
-
-    /**
-     * SEAL returns CountFacet results nested under "count":
-     *   ['type' => ['count' => ['page' => 1, 'news' => 4]]]
-     *
-     * @param array<string,mixed> $facets
-     * @return array<string,array<string,int>>
-     */
-    private function mapSealFacets(array $facets): array
-    {
-        $out = [];
-        foreach ($facets as $field => $payload) {
-            if (!is_array($payload) || !isset($payload['count']) || !is_array($payload['count'])) {
-                continue;
-            }
-            $flattened = [];
-            foreach ($payload['count'] as $value => $count) {
-                $flattened[(string)$value] = (int)$count;
-            }
-            if ($flattened !== []) {
-                $out[(string)$field] = $flattened;
-            }
-        }
-        return $out;
     }
 
     /**
