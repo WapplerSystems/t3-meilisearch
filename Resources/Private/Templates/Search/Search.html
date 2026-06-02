@@ -37,9 +37,13 @@
                 </button>
                 <ul class="ws-meilisearch-suggest__menu" data-suggest-menu="data-suggest-menu" hidden="hidden"></ul>
             </div>
+            <a id="ws-meilisearch-results" tabindex="-1" class="visually-hidden">Results</a>
+            <div class="ws-meilisearch-result-region" data-ws-meilisearch-region aria-live="polite" aria-busy="false"></div>
         </form>
         <f:asset.script identifier="ws_meilisearch-suggest" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/suggest.js" defer="defer"/>
         <f:asset.css identifier="ws_meilisearch-suggest" href="EXT:ws_meilisearch/Resources/Public/CSS/suggest.css"/>
+        <f:asset.script identifier="ws_meilisearch-search-ajax" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/search-ajax.js" defer="defer"/>
+        <f:asset.css identifier="ws_meilisearch-search-ajax" href="EXT:ws_meilisearch/Resources/Public/CSS/search-ajax.css"/>
     </div>
 </f:section>
 
