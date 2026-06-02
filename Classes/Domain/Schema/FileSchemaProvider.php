@@ -137,11 +137,36 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
                 continue;
             }
 
-            $bodytext = $this->extractBody($file, $site);
-            $publicUrl = $file->getPublicUrl() ?? '';
+            // The full document build calls into FAL for mime / size /
+            // public URL, which probes the underlying storage. On environments
+            // forked from prod (S3 storage missing locally, files deleted out-
+            // of-band, broken sys_file rows with missing=0) this can throw —
+            // skip the file with a warning rather than failing the whole
+            // reindex. The DB `missing=0` filter at the SQL level catches the
+            // common case; this guard handles the rest.
+            try {
+                $bodytext = $this->extractBody($file, $site);
+                $publicUrl = $file->getPublicUrl() ?? '';
+            } catch (\Throwable $e) {
+                $this->logger?->warning('FileSchemaProvider skipped {uid} ({ident}): cannot read file: {message}', [
+                    'uid' => $file->getUid(),
+                    'ident' => $file->getIdentifier(),
+                    'message' => $e->getMessage(),
+                ]);
+                continue;
+            }
 
             foreach ($languages as $language) {
-                $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl);
+                try {
+                    $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl);
+                } catch (\Throwable $e) {
+                    $this->logger?->warning('FileSchemaProvider skipped {uid} for language {lang}: {message}', [
+                        'uid' => $file->getUid(),
+                        'lang' => $language->getLanguageId(),
+                        'message' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
                 if ($document !== null) {
                     yield $document;
                 }
