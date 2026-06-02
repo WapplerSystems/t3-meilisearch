@@ -173,18 +173,35 @@ final class EmbedderConfigurator implements LoggerAwareInterface
     {
         $settings = $site->getSettings();
         $productId = trim((string)$settings->get('meilisearch.infomaniak.productId', ''));
-        if ($productId === '') {
+        $model = trim((string)$settings->get('meilisearch.embedder.model', ''));
+        if ($productId === '' || $model === '') {
             $this->logger?->warning(
-                'Infomaniak embedder preset requires meilisearch.infomaniak.productId for site {id} — skipping embedder push',
+                'Infomaniak embedder preset requires meilisearch.infomaniak.productId AND meilisearch.embedder.model for site {id} — skipping embedder push',
                 ['id' => $site->getIdentifier()],
             );
             return [];
         }
+        // Meilisearch's `openAi` source validates the model name against
+        // OpenAI's own catalogue (text-embedding-3-*, ada-002, …) since
+        // v1.11, so OpenAI-compatible providers like Infomaniak need the
+        // generic `rest` source with explicit request/response templates.
+        // The templates use Meilisearch's batch placeholders so we get
+        // efficient batched embedder calls.
         $embedder = [
-            'source' => 'openAi',
+            'source' => 'rest',
             'url' => 'https://api.infomaniak.com/1/ai/' . rawurlencode($productId) . '/openai/embeddings',
+            'request' => [
+                'model' => $model,
+                'input' => ['{{text}}', '{{..}}'],
+            ],
+            'response' => [
+                'data' => [
+                    ['embedding' => '{{embedding}}'],
+                    '{{..}}',
+                ],
+            ],
         ];
-        foreach (['model', 'apiKey', 'documentTemplate'] as $field) {
+        foreach (['apiKey', 'documentTemplate'] as $field) {
             $value = trim((string)$settings->get('meilisearch.embedder.' . $field, ''));
             if ($value !== '') {
                 $embedder[$field] = $value;
@@ -225,7 +242,10 @@ final class EmbedderConfigurator implements LoggerAwareInterface
     {
         // Same list as buildDesiredEmbedders but with `source` included.
         // apiKey is excluded — Meilisearch redacts it on read-back.
-        $allowed = ['source', 'model', 'url', 'dimensions', 'documentTemplate'];
+        // `request`/`response` belong to the `rest` source and contain nested
+        // arrays — flattened via json_encode so they survive comparison.
+        $allowed = ['source', 'model', 'url', 'dimensions', 'documentTemplate', 'request', 'response'];
+        $arrayKeys = ['request', 'response'];
         $out = [];
         foreach ($embedders as $name => $config) {
             if (!is_array($config)) {
@@ -237,10 +257,16 @@ final class EmbedderConfigurator implements LoggerAwareInterface
                     continue;
                 }
                 $value = $config[$key];
-                if ($value === null || $value === '') {
+                if ($value === null || $value === '' || $value === []) {
                     continue;
                 }
-                $filtered[$key] = $key === 'dimensions' ? (int)$value : (string)$value;
+                if (in_array($key, $arrayKeys, true) && is_array($value)) {
+                    $filtered[$key] = (string)json_encode($value);
+                } elseif ($key === 'dimensions') {
+                    $filtered[$key] = (int)$value;
+                } else {
+                    $filtered[$key] = (string)$value;
+                }
             }
             ksort($filtered);
             $out[(string)$name] = $filtered;
