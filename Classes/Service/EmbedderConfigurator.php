@@ -88,7 +88,23 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         if ($taskUid === null) {
             return;
         }
-        $resolved = $client->waitForTask((int)$taskUid);
+        // Embedder settings updates trigger Meilisearch to embed every
+        // existing document — on a 40k-doc index that can take a couple of
+        // minutes at provider-side rate limits. Wait long enough to catch
+        // a quickly-failing config (bad URL, bad key, bad model) but cap so
+        // a slow background re-embed doesn't hang the reindex. If the task
+        // is still running when the cap hits, log + continue; Meilisearch
+        // finishes the work on its own and the new docs we're about to
+        // write will get vectors as they're saved.
+        try {
+            $resolved = $client->waitForTask((int)$taskUid, 30_000, 500);
+        } catch (\Meilisearch\Exceptions\TimeOutException) {
+            $this->logger?->info(
+                'Meilisearch embedder update task {uid} for site {id} is still running after 30s — proceeding with reindex; vectors fill in as the background task completes.',
+                ['uid' => (int)$taskUid, 'id' => $site->getIdentifier()],
+            );
+            return;
+        }
         if (($resolved['status'] ?? '') !== 'failed') {
             return;
         }
