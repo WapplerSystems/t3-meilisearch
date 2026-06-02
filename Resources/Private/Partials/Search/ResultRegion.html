@@ -1,0 +1,139 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+<f:comment>
+    Self-contained result region. Rendered both as part of the full Results
+    template AND on its own (no layout) as the Ajax fragment by ResultsFragment.html.
+
+    Everything that should refresh on facet click / pagination / sort change
+    must live INSIDE this partial. The form input field stays outside on
+    purpose — typing into it should not get blown away mid-search.
+
+    Required arguments:
+      query, page, result (SearchResult), filters, hybrid (int),
+      hybridAvailable (bool), sort (string),
+      sortOptions (list of {value, labelKey}), languageLabels (map).
+</f:comment>
+<f:if condition="{result.totalHits} > 0">
+    <f:then>
+        <div class="ws-meilisearch-controls d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
+            <p class="ws-meilisearch-meta text-muted small mb-0" data-ws-meilisearch-meta>
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.count"
+                    arguments="{0: result.totalHits, 1: query}"/>
+            </p>
+
+            <div class="ws-meilisearch-controls__inputs d-flex flex-wrap gap-2 align-items-center">
+                <label class="d-flex align-items-center gap-2 mb-0">
+                    <span class="text-muted small text-uppercase fw-semibold">
+                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.sort.label"/>
+                    </span>
+                    <select class="form-select form-select-sm" name="tx_wsmeilisearch_search[sort]" data-ws-meilisearch-sort>
+                        <f:for each="{sortOptions}" as="option">
+                            <option value="{option.value}"{f:if(condition: '{option.value} == {sort}', then: ' selected="selected"')}>
+                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:{option.labelKey}"/>
+                            </option>
+                        </f:for>
+                    </select>
+                </label>
+
+                <f:if condition="{hybridAvailable}">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input"
+                            type="checkbox"
+                            id="ws-meilisearch-hybrid"
+                            name="tx_wsmeilisearch_search[hybrid]"
+                            value="1"
+                            data-ws-meilisearch-hybrid
+                            {f:if(condition: '{hybrid} == 1', then: 'checked="checked"')}/>
+                        <label class="form-check-label small" for="ws-meilisearch-hybrid"
+                            title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.hybrid.help')}">
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.hybrid.label"/>
+                        </label>
+                    </div>
+                </f:if>
+            </div>
+        </div>
+
+        <div class="ws-meilisearch-layout row g-4">
+            <aside class="ws-meilisearch-facets col-lg-3">
+                <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters, languageLabels: languageLabels}"/>
+            </aside>
+            <main class="ws-meilisearch-hits col-lg-9">
+                <f:for each="{result.hits}" as="hit">
+                    <f:render partial="Search/Result" arguments="{hit: hit}"/>
+                </f:for>
+
+                <f:if condition="{result.totalPages} > 1">
+                    <nav class="ws-meilisearch-pagination mt-4"
+                        aria-label="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.label')}">
+                        <ul class="pagination justify-content-center mb-0">
+                            <li class="page-item {f:if(condition: '{result.hasPreviousPage}', else: 'disabled')}">
+                                <a class="page-link"
+                                    href="{f:uri.action(action: 'results', arguments: '{q: query, page: \'{result.page - 1}\', filters: filters, hybrid: hybrid, sort: sort}')}"
+                                    data-ws-meilisearch-page="{result.page - 1}"
+                                    rel="prev">
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.previous"/>
+                                </a>
+                            </li>
+
+                            <f:if condition="{paginationFirst} > 1">
+                                <li class="page-item">
+                                    <a class="page-link"
+                                        href="{f:uri.action(action: 'results', arguments: '{q: query, page: 1, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                        data-ws-meilisearch-page="1">1</a>
+                                </li>
+                                <f:if condition="{paginationFirst} > 2">
+                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                </f:if>
+                            </f:if>
+
+                            <f:for each="{paginationWindow}" as="n">
+                                <li class="page-item {f:if(condition: '{n} == {result.page}', then: 'active')}">
+                                    <f:if condition="{n} == {result.page}">
+                                        <f:then><span class="page-link" aria-current="page">{n}</span></f:then>
+                                        <f:else>
+                                            <a class="page-link"
+                                                href="{f:uri.action(action: 'results', arguments: '{q: query, page: n, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                                data-ws-meilisearch-page="{n}">{n}</a>
+                                        </f:else>
+                                    </f:if>
+                                </li>
+                            </f:for>
+
+                            <f:if condition="{paginationLast} < {result.totalPages}">
+                                <f:if condition="{paginationLast} < {result.totalPages - 1}">
+                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                </f:if>
+                                <li class="page-item">
+                                    <a class="page-link"
+                                        href="{f:uri.action(action: 'results', arguments: '{q: query, page: result.totalPages, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                        data-ws-meilisearch-page="{result.totalPages}">{result.totalPages}</a>
+                                </li>
+                            </f:if>
+
+                            <li class="page-item {f:if(condition: '{result.hasNextPage}', else: 'disabled')}">
+                                <a class="page-link"
+                                    href="{f:uri.action(action: 'results', arguments: '{q: query, page: \'{result.page + 1}\', filters: filters, hybrid: hybrid, sort: sort}')}"
+                                    data-ws-meilisearch-page="{result.page + 1}"
+                                    rel="next">
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.next"/>
+                                </a>
+                            </li>
+                        </ul>
+                        <p class="text-muted small text-center mt-2 mb-0">
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.position"
+                                arguments="{0: result.page, 1: result.totalPages}"/>
+                        </p>
+                    </nav>
+                </f:if>
+            </main>
+        </div>
+    </f:then>
+    <f:else>
+        <div class="alert alert-info ws-meilisearch-empty" role="status">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
+                arguments="{0: query}"/>
+        </div>
+    </f:else>
+</f:if>
+</html>

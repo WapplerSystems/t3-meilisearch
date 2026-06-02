@@ -134,8 +134,52 @@ final class SearchController extends ActionController
             // Pre-built links so templates don't have to compute them.
             'sortOptions' => $this->sortOptions(),
             'languageLabels' => $languageLabels,
-        ]);
+            // Sliding window of page numbers to render in the pager (Fluid
+            // has no range ViewHelper). Empty when there's only one page.
+            'paginationWindow' => $this->paginationWindow($result->page, $result->getTotalPages()),
+            'paginationFirst' => 0,
+            'paginationLast' => 0,
+        ] + $this->paginationBoundaries($result->page, $result->getTotalPages()));
+
         return $this->htmlResponse();
+    }
+
+    /**
+     * Five-wide sliding window of page numbers around the current page,
+     * clamped to [1, totalPages]. Empty when there's only one page.
+     *
+     * @return list<int>
+     */
+    private function paginationWindow(int $current, int $total): array
+    {
+        if ($total <= 1) {
+            return [];
+        }
+        [$start, $end] = $this->paginationBoundsTuple($current, $total);
+        return range($start, $end);
+    }
+
+    /**
+     * @return array{paginationFirst:int,paginationLast:int}
+     */
+    private function paginationBoundaries(int $current, int $total): array
+    {
+        if ($total <= 1) {
+            return ['paginationFirst' => 0, 'paginationLast' => 0];
+        }
+        [$start, $end] = $this->paginationBoundsTuple($current, $total);
+        return ['paginationFirst' => $start, 'paginationLast' => $end];
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private function paginationBoundsTuple(int $current, int $total): array
+    {
+        $start = max(1, $current - 2);
+        $end = min($total, $start + 4);
+        $start = max(1, $end - 4);
+        return [$start, $end];
     }
 
     private function resolveLanguageLabel(Site $site, int $languageId): string
@@ -148,21 +192,22 @@ final class SearchController extends ActionController
     }
 
     /**
-     * Sort presets exposed to the template. The default is empty
-     * (relevance ranking) — we surface the most commonly useful sort
-     * directions across the unified-index field set. Site packages can
-     * override / extend by replacing the partial that consumes this.
+     * Sort presets exposed to the template. `labelKey` is a translation key
+     * relative to this extension's locallang; templates render it through
+     * <f:translate>. The default empty value means relevance ranking. Site
+     * packages can override / extend by replacing the partial that consumes
+     * this list.
      *
-     * @return list<array{value:string,label:string}>
+     * @return list<array{value:string,labelKey:string}>
      */
     private function sortOptions(): array
     {
         return [
-            ['value' => '',                'label' => 'Relevance'],
-            ['value' => 'datetime:desc',   'label' => 'Newest first'],
-            ['value' => 'datetime:asc',    'label' => 'Oldest first'],
-            ['value' => 'fileSize:desc',   'label' => 'Largest file first'],
-            ['value' => 'fileSize:asc',    'label' => 'Smallest file first'],
+            ['value' => '',                'labelKey' => 'search.sort.relevance'],
+            ['value' => 'datetime:desc',   'labelKey' => 'search.sort.datetime.desc'],
+            ['value' => 'datetime:asc',    'labelKey' => 'search.sort.datetime.asc'],
+            ['value' => 'fileSize:desc',   'labelKey' => 'search.sort.fileSize.desc'],
+            ['value' => 'fileSize:asc',    'labelKey' => 'search.sort.fileSize.asc'],
         ];
     }
 }

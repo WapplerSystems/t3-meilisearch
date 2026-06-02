@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use WapplerSystems\Meilisearch\Middleware\RagStreamMiddleware;
+use WapplerSystems\Meilisearch\Middleware\SearchFragmentEndpoint;
 use WapplerSystems\Meilisearch\Middleware\SuggestEndpoint;
 
 return [
@@ -17,6 +18,11 @@ return [
         ],
         'wapplersystems/meilisearch/suggest' => [
             'target' => SuggestEndpoint::class,
+            'after' => ['typo3/cms-frontend/site'],
+            'before' => ['typo3/cms-frontend/page-resolver'],
+        ],
+        'wapplersystems/meilisearch/search-fragment' => [
+            'target' => SearchFragmentEndpoint::class,
             'after' => ['typo3/cms-frontend/site'],
             'before' => ['typo3/cms-frontend/page-resolver'],
         ],

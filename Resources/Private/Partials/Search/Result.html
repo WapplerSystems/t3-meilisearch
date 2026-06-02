@@ -35,11 +35,12 @@
                     <f:defaultCase>{titleHtml -> f:format.raw()}</f:defaultCase>
                 </f:switch>
             </h3>
+            <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.{hit.type}" default="{hit.type}"/></f:variable>
             <f:switch expression="{hit.type}">
-                <f:case value="page"><span class="badge text-bg-primary ws-meilisearch-hit__type">{hit.type}</span></f:case>
-                <f:case value="news"><span class="badge text-bg-info ws-meilisearch-hit__type">{hit.type}</span></f:case>
-                <f:case value="file"><span class="badge text-bg-warning ws-meilisearch-hit__type">{hit.type}</span></f:case>
-                <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">{hit.type}</span></f:defaultCase>
+                <f:case value="page"><span class="badge text-bg-primary ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:case>
+                <f:case value="news"><span class="badge text-bg-info ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:case>
+                <f:case value="file"><span class="badge text-bg-warning ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:case>
+                <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:defaultCase>
             </f:switch>
         </div>
 

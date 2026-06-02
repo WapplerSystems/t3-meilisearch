@@ -36,33 +36,13 @@
 
             <a id="ws-meilisearch-results" tabindex="-1" class="visually-hidden">Results</a>
 
-            <f:if condition="{result.totalHits} > 0">
-                <f:then>
-                    <p class="ws-meilisearch-meta text-muted small mb-3">
-                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.count"
-                            arguments="{0: result.totalHits, 1: query}"/>
-                    </p>
-
-                    <div class="ws-meilisearch-layout row g-4">
-                        <aside class="ws-meilisearch-facets col-lg-3">
-                            <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters, languageLabels: languageLabels}"/>
-                        </aside>
-                        <main class="ws-meilisearch-hits col-lg-9">
-                            <f:for each="{result.hits}" as="hit">
-                                <f:render partial="Search/Result" arguments="{hit: hit}"/>
-                            </f:for>
-                        </main>
-                    </div>
-                </f:then>
-                <f:else>
-                    <div class="alert alert-info ws-meilisearch-empty" role="status">
-                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
-                            arguments="{0: query}"/>
-                    </div>
-                </f:else>
-            </f:if>
+            <div class="ws-meilisearch-result-region" data-ws-meilisearch-region aria-live="polite" aria-busy="false">
+                <f:render partial="Search/ResultRegion" arguments="{_all}"/>
+            </div>
 
             <f:asset.script identifier="ws_meilisearch-scroll-to-results" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/scroll-to-results.js" defer="defer"/>
+            <f:asset.script identifier="ws_meilisearch-search-ajax" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/search-ajax.js" defer="defer"/>
+            <f:asset.css identifier="ws_meilisearch-search-ajax" href="EXT:ws_meilisearch/Resources/Public/CSS/search-ajax.css"/>
         </form>
     </div>
 </f:section>

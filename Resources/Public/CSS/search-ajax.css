@@ -1,0 +1,8 @@
+/* Visual cue while the Ajax fragment is loading. Pointer-events: none
+   blocks accidental double-clicks on facets/pagination during the
+   roundtrip. */
+.ws-meilisearch-result-region--loading {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 120ms ease-in-out;
+}

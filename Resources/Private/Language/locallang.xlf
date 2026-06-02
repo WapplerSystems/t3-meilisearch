@@ -81,6 +81,45 @@
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
             </trans-unit>
+            <trans-unit id="search.sort.label">
+                <source>Sort by</source>
+            </trans-unit>
+            <trans-unit id="search.sort.relevance">
+                <source>Relevance</source>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.desc">
+                <source>Newest first</source>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.asc">
+                <source>Oldest first</source>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.desc">
+                <source>Largest file first</source>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.asc">
+                <source>Smallest file first</source>
+            </trans-unit>
+            <trans-unit id="search.hybrid.label">
+                <source>Semantic search</source>
+            </trans-unit>
+            <trans-unit id="search.hybrid.help">
+                <source>Combine keyword and vector matching for fuzzy-meaning queries.</source>
+            </trans-unit>
+            <trans-unit id="search.pagination.label">
+                <source>Result pages</source>
+            </trans-unit>
+            <trans-unit id="search.pagination.previous">
+                <source>Previous</source>
+            </trans-unit>
+            <trans-unit id="search.pagination.next">
+                <source>Next</source>
+            </trans-unit>
+            <trans-unit id="search.pagination.position">
+                <source>Page %d of %d</source>
+            </trans-unit>
+            <trans-unit id="search.loading">
+                <source>Loading…</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

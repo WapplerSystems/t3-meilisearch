@@ -1,0 +1,215 @@
+<?php
+declare(strict_types=1);
+
+namespace WapplerSystems\Meilisearch\Middleware;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Http\HtmlResponse;
+use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\View\ViewFactoryData;
+use TYPO3\CMS\Core\View\ViewFactoryInterface;
+use TYPO3\CMS\Core\View\ViewInterface;
+use WapplerSystems\Meilisearch\Service\SearchResult;
+use WapplerSystems\Meilisearch\Service\SearchService;
+
+/**
+ * Server-side render of the search-result region for the frontend Ajax
+ * refresh path. Bypasses Extbase + page rendering — TYPO3's PAGEVIEW
+ * always wraps a plugin output in the full HTML envelope, which is the
+ * opposite of what we want when JS swaps innerHTML.
+ *
+ * Path:  /_ws_meilisearch/search-fragment?q=…&page=…&filters[type][]=page&hybrid=1&sort=…
+ *
+ * Mirrors SearchController::resultsAction in shape (same parameters,
+ * same SearchService call, same view variables) but renders just the
+ * Search/ResultRegion partial via StandaloneView.
+ */
+final class SearchFragmentEndpoint implements MiddlewareInterface
+{
+    private const PATH = '/_ws_meilisearch/search-fragment';
+    private const TEMPLATE_PATH = 'EXT:ws_meilisearch/Resources/Private/Templates/Search/ResultsFragment.html';
+    private const TEMPLATE_ROOT = 'EXT:ws_meilisearch/Resources/Private/Templates';
+    private const PARTIAL_ROOT = 'EXT:ws_meilisearch/Resources/Private/Partials';
+    private const LAYOUT_ROOT = 'EXT:ws_meilisearch/Resources/Private/Layouts';
+
+    public function __construct(
+        private readonly SearchService $searchService,
+        private readonly ViewFactoryInterface $viewFactory,
+    ) {}
+
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    {
+        if ($request->getUri()->getPath() !== self::PATH) {
+            return $handler->handle($request);
+        }
+
+        $site = $request->getAttribute('site');
+        if (!$site instanceof Site) {
+            return new HtmlResponse('', 404);
+        }
+
+        $params = $request->getQueryParams();
+        $q = trim((string)($params['q'] ?? ''));
+        $page = max(1, (int)($params['page'] ?? 1));
+        $rawFilters = $params['filters'] ?? [];
+        $filters = $this->sanitiseFilters(is_array($rawFilters) ? $rawFilters : []);
+        $sort = trim((string)($params['sort'] ?? ''));
+        $hybridRequested = (int)($params['hybrid'] ?? 0) === 1;
+
+        $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
+        $useHybrid = $hybridAvailable && $hybridRequested;
+
+        $perPage = (int)$site->getSettings()->get('meilisearch.perPage', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+        $facetList = $this->parseList((string)$site->getSettings()->get('meilisearch.facets', 'type,language'));
+
+        $result = $this->searchService->search($site, $q, [
+            'page' => $page,
+            'perPage' => $perPage,
+            'filters' => $filters,
+            'facets' => $facetList,
+            'hybrid' => $useHybrid,
+            'sort' => $sort,
+        ]);
+
+        $hits = [];
+        foreach ($result->hits as $hit) {
+            $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            $hits[] = $hit;
+        }
+        $result = new SearchResult(
+            hits: $hits,
+            totalHits: $result->totalHits,
+            facets: $result->facets,
+            page: $result->page,
+            perPage: $result->perPage,
+        );
+
+        $languageLabels = [];
+        foreach ($site->getAllLanguages() as $language) {
+            $languageLabels[(string)$language->getLanguageId()] = $language->getTitle();
+        }
+
+        $view = $this->createView($request);
+        $view->assignMultiple([
+            'query' => $q,
+            'page' => $page,
+            'result' => $result,
+            'filters' => $filters,
+            'hybrid' => $useHybrid ? 1 : 0,
+            'hybridAvailable' => $hybridAvailable,
+            'sort' => $sort,
+            'sortOptions' => $this->sortOptions(),
+            'languageLabels' => $languageLabels,
+            'paginationWindow' => $this->paginationWindow($result->page, $result->getTotalPages()),
+            'paginationFirst' => 0,
+            'paginationLast' => 0,
+        ] + $this->paginationBoundaries($result->page, $result->getTotalPages()));
+
+        return new HtmlResponse($view->render());
+    }
+
+    /**
+     * @param array<mixed> $raw
+     * @return array<string,list<string>>
+     */
+    private function sanitiseFilters(array $raw): array
+    {
+        $clean = [];
+        foreach ($raw as $attribute => $values) {
+            if (!is_string($attribute) || !is_array($values)) {
+                continue;
+            }
+            // attribute name is used as a Meilisearch facet identifier — only
+            // allow safe chars to keep the query well-formed.
+            if (preg_match('/^[a-zA-Z0-9_]+$/', $attribute) !== 1) {
+                continue;
+            }
+            $list = [];
+            foreach ($values as $v) {
+                if (is_string($v) || is_int($v)) {
+                    $list[] = (string)$v;
+                }
+            }
+            if ($list !== []) {
+                $clean[$attribute] = $list;
+            }
+        }
+        return $clean;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseList(string $raw): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', $raw))));
+    }
+
+    private function resolveLanguageLabel(Site $site, int $languageId): string
+    {
+        try {
+            return $site->getLanguageById($languageId)->getTitle();
+        } catch (\Throwable) {
+            return (string)$languageId;
+        }
+    }
+
+    /**
+     * @return list<array{value:string,labelKey:string}>
+     */
+    private function sortOptions(): array
+    {
+        return [
+            ['value' => '',                'labelKey' => 'search.sort.relevance'],
+            ['value' => 'datetime:desc',   'labelKey' => 'search.sort.datetime.desc'],
+            ['value' => 'datetime:asc',    'labelKey' => 'search.sort.datetime.asc'],
+            ['value' => 'fileSize:desc',   'labelKey' => 'search.sort.fileSize.desc'],
+            ['value' => 'fileSize:asc',    'labelKey' => 'search.sort.fileSize.asc'],
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function paginationWindow(int $current, int $total): array
+    {
+        if ($total <= 1) {
+            return [];
+        }
+        $start = max(1, $current - 2);
+        $end = min($total, $start + 4);
+        $start = max(1, $end - 4);
+        return range($start, $end);
+    }
+
+    /**
+     * @return array{paginationFirst:int,paginationLast:int}
+     */
+    private function paginationBoundaries(int $current, int $total): array
+    {
+        if ($total <= 1) {
+            return ['paginationFirst' => 0, 'paginationLast' => 0];
+        }
+        $start = max(1, $current - 2);
+        $end = min($total, $start + 4);
+        $start = max(1, $end - 4);
+        return ['paginationFirst' => $start, 'paginationLast' => $end];
+    }
+
+    private function createView(ServerRequestInterface $request): ViewInterface
+    {
+        return $this->viewFactory->create(new ViewFactoryData(
+            templateRootPaths: [self::TEMPLATE_ROOT],
+            partialRootPaths: [self::PARTIAL_ROOT],
+            layoutRootPaths: [self::LAYOUT_ROOT],
+            templatePathAndFilename: self::TEMPLATE_PATH,
+            request: $request,
+        ));
+    }
+}

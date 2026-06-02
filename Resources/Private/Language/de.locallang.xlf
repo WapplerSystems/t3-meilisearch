@@ -107,6 +107,58 @@
                 <source>Content element</source>
                 <target>Inhaltselement</target>
             </trans-unit>
+            <trans-unit id="search.sort.label">
+                <source>Sort by</source>
+                <target>Sortieren nach</target>
+            </trans-unit>
+            <trans-unit id="search.sort.relevance">
+                <source>Relevance</source>
+                <target>Relevanz</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.desc">
+                <source>Newest first</source>
+                <target>Neueste zuerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.asc">
+                <source>Oldest first</source>
+                <target>Älteste zuerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.desc">
+                <source>Largest file first</source>
+                <target>Größte Datei zuerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.asc">
+                <source>Smallest file first</source>
+                <target>Kleinste Datei zuerst</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.label">
+                <source>Semantic search</source>
+                <target>Semantische Suche</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.help">
+                <source>Combine keyword and vector matching for fuzzy-meaning queries.</source>
+                <target>Kombiniert Stichwort- und Vektorsuche für Treffer nach Bedeutung statt exakter Wortübereinstimmung.</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.label">
+                <source>Result pages</source>
+                <target>Ergebnisseiten</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.previous">
+                <source>Previous</source>
+                <target>Zurück</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.next">
+                <source>Next</source>
+                <target>Weiter</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.position">
+                <source>Page %d of %d</source>
+                <target>Seite %d von %d</target>
+            </trans-unit>
+            <trans-unit id="search.loading">
+                <source>Loading…</source>
+                <target>Wird geladen…</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>
