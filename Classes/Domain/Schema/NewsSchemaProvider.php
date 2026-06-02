@@ -91,6 +91,8 @@ final class NewsSchemaProvider implements SchemaProviderInterface
      */
     private function toDocument(array $row): array
     {
+        $teaser = (string)$row['teaser'];
+        $bodytext = strip_tags((string)$row['bodytext']);
         return [
             'id' => $this->buildDocumentId((int)$row['uid']),
             'type' => 'news',
@@ -98,8 +100,9 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             'pid' => (int)$row['pid'],
             'language' => (int)$row['sys_language_uid'],
             'title' => (string)$row['title'],
-            'teaser' => (string)$row['teaser'],
-            'bodytext' => strip_tags((string)$row['bodytext']),
+            'teaser' => $teaser,
+            'bodytext' => $bodytext,
+            'content' => trim($teaser . "\n\n" . $bodytext),
             'datetime' => (int)$row['datetime'],
         ];
     }

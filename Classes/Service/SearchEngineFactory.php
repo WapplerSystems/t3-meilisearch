@@ -124,6 +124,15 @@ final class SearchEngineFactory
             'description' => new TextField('description', searchable: true),
             'abstract'    => new TextField('abstract', searchable: true),
             'keywords'    => new TextField('keywords', searchable: true),
+            // Canonical full-text field. Pages get their content from the
+            // EXT:index bridge (rendered tt_content via the ContentType chain);
+            // NewsSchemaProvider and FileSchemaProvider populate it from their
+            // own row fields plus Tika output.
+            'content'     => new TextField('content', searchable: true),
+            // Resolved frontend URL. Not searchable (we don't want substring
+            // matches in URLs to drive ranking) but filterable so listeners
+            // can scope queries by path / domain.
+            'uri'         => new TextField('uri', searchable: false, filterable: true),
         ];
     }
 }

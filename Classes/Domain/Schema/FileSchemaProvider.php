@@ -202,6 +202,8 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             'description' => (string)($metadata['description'] ?? ''),
             'keywords' => (string)($metadata['keywords'] ?? ''),
             'bodytext' => $bodytext,
+            'content' => $bodytext,
+            'uri' => $publicUrl,
             'mimeType' => (string)$file->getMimeType(),
             'extension' => (string)$file->getExtension(),
             'fileSize' => (int)$file->getSize(),

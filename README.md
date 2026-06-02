@@ -18,7 +18,15 @@ with OpenAI, Anthropic, Ollama, and generic OpenAI-compatible REST
 providers selectable per site. A backend module under System →
 Meilisearch shows per-site index status, exposes Reindex / Rebuild
 buttons, and includes an ad-hoc Search + RAG test form. A scheduler
-task runs `indexAll` against one or all sites on a cron.
+task runs `indexAll` (news + files) against one or all sites on a
+cron.
+
+Page indexing is delegated to [`wapplersystems/meilisearch-bridge`](https://git.wappler.systems/WapplerSystems/meilisearch-bridge),
+which consumes `IndexPageEvent`/`IndexFileEvent` from `lochmueller/index`
+and writes through this extension's SEAL engine. Set up an EXT:index
+`Configuration` record per site (`technology=database`,
+`partial_indexing=datamap,cmdmap` for live updates) and queue page
+indexing with `vendor/bin/typo3 index:queue` + `messenger:consume index`.
 
 ## Installation
 
@@ -291,7 +299,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | Plugin registration | Extbase plugin `WsMeilisearch / Search` (CType `wsmeilisearch_search`) | `ext_localconf.php`, `Configuration/TCA/Overrides/tt_content.php` |
 | Site Set | `wapplersystems/ws-meilisearch` with typed settings + TypoScript | `Configuration/Sets/WsMeilisearch/*` |
 | Indexing extension point | `SchemaProviderInterface` (auto-tagged via `_instanceof`) | `Classes/Domain/Schema/` |
-| Default providers | Pages + tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay) | `PageSchemaProvider.php`, `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
+| Default providers | tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay). Pages are indexed via the `wapplersystems/meilisearch-bridge` extension on top of `lochmueller/index`. | `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
 | Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
 | Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
 | Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |

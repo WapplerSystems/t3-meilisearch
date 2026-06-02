@@ -73,6 +73,12 @@ final class RecordChangeListener
             }
             return;
         }
+        if ($table === 'pages') {
+            // Pages are indexed via EXT:index + meilisearch-bridge. Live
+            // updates flow through EXT:index's own DataHandlerUpdateHook into
+            // the index queue, so we do nothing here.
+            return;
+        }
 
         $site = $this->resolveSite($table, $uid, $fieldArray);
         if ($site === null) {
@@ -121,6 +127,10 @@ final class RecordChangeListener
                 $this->fileSchemaProvider->clearMembershipCache();
                 $this->fileLifecycle->reindex($fileUid);
             }
+            return;
+        }
+        if ($table === 'pages') {
+            // Pages flow through EXT:index — see processDatamap.
             return;
         }
 
