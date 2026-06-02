@@ -189,7 +189,13 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         // efficient batched embedder calls.
         $embedder = [
             'source' => 'rest',
-            'url' => 'https://api.infomaniak.com/1/ai/' . rawurlencode($productId) . '/openai/embeddings',
+            // Infomaniak's OpenAI-compatible embeddings endpoint sits at
+            // /openai/v1/embeddings — the v1 prefix is required (without it
+            // the API responds with HTTP 200 + method_not_found). Note the
+            // model names use underscores (bge_multilingual_gemma2,
+            // mini_lm_l12_v2), not the dashed style Infomaniak advertises in
+            // its docs for the chat endpoint.
+            'url' => 'https://api.infomaniak.com/1/ai/' . rawurlencode($productId) . '/openai/v1/embeddings',
             'request' => [
                 'model' => $model,
                 'input' => ['{{text}}', '{{..}}'],
