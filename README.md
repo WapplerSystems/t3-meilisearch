@@ -283,10 +283,22 @@ Typical cadences:
 ## CLI
 
 ```bash
+# Indexing (news + sys_file; pages flow through meilisearch-bridge — see below)
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex                        # all sites
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one site, incremental
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
+
+# Page indexing via meilisearch-bridge + EXT:index
+ddev exec vendor/bin/typo3 ws_meilisearch:setup-index-config main         # create/repair the EXT:index Configuration row
+ddev exec vendor/bin/typo3 index:queue --limitSiteIdentifiers=main        # seed the message queue
+ddev exec vendor/bin/typo3 messenger:consume index --limit=500            # drain the queue (bridge writes to Meilisearch)
+
+# Diagnostics
+ddev exec vendor/bin/typo3 ws_meilisearch:doctor                          # health-check all sites
+ddev exec vendor/bin/typo3 ws_meilisearch:doctor main                     # one site
+ddev exec vendor/bin/typo3 ws_meilisearch:document pages-42 main          # inspect one document
+ddev exec vendor/bin/typo3 ws_meilisearch:tika-probe 1:/some.pdf main     # run a file through Tika
 
 # RAG (Phase 4) — runs the configured LLM provider against the site index
 ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
@@ -310,6 +322,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | RAG plugin | Extbase plugin `WsMeilisearch / Rag` (CType `wsmeilisearch_rag`) with `form` + `ask` + `reset` actions | `Classes/Controller/RagController.php` |
 | RAG streaming | SSE endpoint at `/_ws_meilisearch/rag/stream`, drop-in JS client renders tokens incrementally | `Classes/Middleware/RagStreamMiddleware.php`, `Resources/Public/JavaScript/RagStream.js` |
 | RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
+| Diagnostics CLI | `ws_meilisearch:doctor` / `:setup-index-config` / `:document` / `:tika-probe` for operator triage | `Classes/Command/DoctorCommand.php`, `SetupIndexConfigCommand.php`, `DocumentCommand.php`, `TikaProbeCommand.php` |
 | Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms | `Classes/Controller/Backend/OverviewController.php` |
 | Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
 | Realtime sync (BE forms) | DataHandler hook → indexer (sys_file_metadata + sys_file_reference both translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
