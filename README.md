@@ -21,12 +21,14 @@ buttons, and includes an ad-hoc Search + RAG test form. A scheduler
 task runs `indexAll` (news + files) against one or all sites on a
 cron.
 
-Page indexing is delegated to [`wapplersystems/meilisearch-bridge`](https://git.wappler.systems/WapplerSystems/meilisearch-bridge),
-which consumes `IndexPageEvent`/`IndexFileEvent` from `lochmueller/index`
-and writes through this extension's SEAL engine. Set up an EXT:index
-`Configuration` record per site (`technology=database`,
-`partial_indexing=datamap,cmdmap` for live updates) and queue page
-indexing with `vendor/bin/typo3 index:queue` + `messenger:consume index`.
+Page indexing is delegated to `lochmueller/index` (hard composer
+dependency). The integration ships under `Classes/Integration/ExtIndex/`
+and consumes `IndexPageEvent`/`IndexFileEvent`, writing through this
+extension's SEAL engine. Set up an EXT:index `Configuration` record per
+site (`technology=database`, `partial_indexing=datamap,cmdmap` for live
+updates — `ws_meilisearch:setup-index-config <site>` does this for you)
+and queue page indexing with `vendor/bin/typo3 index:queue` +
+`messenger:consume index`.
 
 ## Installation
 
@@ -283,13 +285,13 @@ Typical cadences:
 ## CLI
 
 ```bash
-# Indexing (news + sys_file; pages flow through meilisearch-bridge — see below)
+# Indexing (news + sys_file; pages flow through Integration/ExtIndex — see below)
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex                        # all sites
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one site, incremental
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
 
-# Page indexing via meilisearch-bridge + EXT:index
+# Page indexing via Integration/ExtIndex (on top of EXT:index)
 ddev exec vendor/bin/typo3 ws_meilisearch:setup-index-config main         # create/repair the EXT:index Configuration row
 ddev exec vendor/bin/typo3 index:queue --limitSiteIdentifiers=main        # seed the message queue
 ddev exec vendor/bin/typo3 messenger:consume index --limit=500            # drain the queue (bridge writes to Meilisearch)
@@ -311,7 +313,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | Plugin registration | Extbase plugin `WsMeilisearch / Search` (CType `wsmeilisearch_search`) | `ext_localconf.php`, `Configuration/TCA/Overrides/tt_content.php` |
 | Site Set | `wapplersystems/ws-meilisearch` with typed settings + TypoScript | `Configuration/Sets/WsMeilisearch/*` |
 | Indexing extension point | `SchemaProviderInterface` (auto-tagged via `_instanceof`) | `Classes/Domain/Schema/` |
-| Default providers | tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay). Pages are indexed via the `wapplersystems/meilisearch-bridge` extension on top of `lochmueller/index`. | `NewsSchemaProvider.php`, `FileSchemaProvider.php` |
+| Default providers | tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay). Pages are indexed via the bundled `Integration/ExtIndex` on top of `lochmueller/index`. | `NewsSchemaProvider.php`, `FileSchemaProvider.php`, `Classes/Integration/ExtIndex/EventListener/IndexEventListener.php` |
 | Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
 | Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
 | Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |

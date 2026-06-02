@@ -19,7 +19,7 @@ use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
  * Per-site health check covering everything a fresh operator gets wrong:
  * Meilisearch URL/key, Tika URL, embedder settings (site vs. what's actually
  * pushed to the index), IndexConfiguration record for page indexing via the
- * meilisearch-bridge, and a doc-count breakdown by type.
+ * EXT:index integration, and a doc-count breakdown by type.
  *
  * Returns non-zero exit code if any site has a hard failure (no Meilisearch,
  * unreachable, etc.). Warnings (missing IndexConfiguration, no embedder) keep
@@ -194,11 +194,11 @@ final class DoctorCommand extends Command
             ));
         }
 
-        // 6. Bridge presence — pages flow through it
-        if (class_exists(\WapplerSystems\MeilisearchBridge\EventListener\IndexEventListener::class)) {
-            $this->ok($io, 'meilisearch-bridge loaded — page indexing wired');
+        // 6. EXT:index integration — pages flow through it
+        if (class_exists(\Lochmueller\Index\Event\IndexPageEvent::class)) {
+            $this->ok($io, 'EXT:index integration wired (lochmueller/index loaded)');
         } else {
-            $this->warn($io, 'wapplersystems/meilisearch-bridge NOT installed — pages will not flow into the index');
+            $this->warn($io, 'lochmueller/index NOT installed — pages will not flow into the index');
         }
 
         return $hardFailures;

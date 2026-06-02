@@ -13,6 +13,11 @@ services:
       - '../Classes/Service/Llm/LlmProviderInterface.php'
       - '../Classes/Service/Llm/LlmException.php'
       - '../Classes/Service/Rag/RagAnswer.php'
+      # ExtIndexOrigin is a per-event marker instantiated by the listener;
+      # registering it as a singleton service would also pull it into the
+      # schema_provider iterator via _instanceof, which is wrong (it returns
+      # empty iterators on purpose).
+      - '../Classes/Integration/ExtIndex/Schema/ExtIndexOrigin.php'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
@@ -43,3 +48,30 @@ services:
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:
     public: true
+
+  # --- EXT:index integration ---------------------------------------------
+  # Page + file indexing piggybacks on lochmueller/index's queue, content
+  # processors and DataHandler hook. Hard dependency on lochmueller/index ^2.0
+  # (see composer.json). Originally a separate `wapplersystems/meilisearch-
+  # bridge` package; folded back in once the API surface stabilised.
+
+  WapplerSystems\Meilisearch\Integration\ExtIndex\EventListener\IndexEventListener:
+    tags:
+      - name: monolog.logger
+        channel: ws_meilisearch_extindex
+
+  WapplerSystems\Meilisearch\Integration\ExtIndex\FileExtraction\TikaFileExtractor:
+    tags:
+      - name: monolog.logger
+        channel: ws_meilisearch_extindex
+      # priority > 0 so Tika beats EXT:index's bundled PDF/Office extractors
+      # (Smalot\PdfParser etc.) which would otherwise win by registration order.
+      - name: index.file_extractor
+        priority: 100
+
+  WapplerSystems\Meilisearch\Integration\ExtIndex\Messenger\IndexingContextMiddleware:
+    tags:
+      - name: monolog.logger
+        channel: ws_meilisearch_extindex
+      - name: messenger.middleware
+        before: 'Symfony\Component\Messenger\Middleware\HandleMessageMiddleware'

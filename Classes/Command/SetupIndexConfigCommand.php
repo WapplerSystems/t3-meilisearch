@@ -15,15 +15,15 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 
 /**
  * Idempotently creates or updates the EXT:index Configuration record that
- * the meilisearch-bridge needs for page indexing. Without this row, pages
- * never enter the queue and the bridge sees no IndexPageEvents.
+ * the integration needs for page indexing. Without this row, pages never
+ * enter the queue and the integration sees no IndexPageEvents.
  *
  * Operators can do this in the BE module too, but the CLI is the only
  * scriptable path for multi-site rollouts and CI provisioning.
  */
 #[AsCommand(
     name: 'ws_meilisearch:setup-index-config',
-    description: 'Create or update the EXT:index Configuration record for page indexing via meilisearch-bridge.'
+    description: 'Create or update the EXT:index Configuration record for page indexing.'
 )]
 final class SetupIndexConfigCommand extends Command
 {

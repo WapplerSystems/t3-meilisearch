@@ -74,9 +74,9 @@ final class RecordChangeListener
             return;
         }
         if ($table === 'pages') {
-            // Pages are indexed via EXT:index + meilisearch-bridge. Live
-            // updates flow through EXT:index's own DataHandlerUpdateHook into
-            // the index queue, so we do nothing here.
+            // Pages are indexed via the EXT:index integration. Live updates
+            // flow through EXT:index's own DataHandlerUpdateHook into the
+            // index queue, so we do nothing here.
             return;
         }
 

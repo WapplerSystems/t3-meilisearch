@@ -20,7 +20,8 @@
         "typo3/cms-scheduler": "^14.0",
         "cmsig/seal": "^0.12",
         "cmsig/seal-meilisearch-adapter": "^0.12",
-        "meilisearch/meilisearch-php": "^1.10"
+        "meilisearch/meilisearch-php": "^1.10",
+        "lochmueller/index": "^2.0"
     },
     "suggest": {
         "georgringer/news": "Enables Meilisearch indexing of tx_news records."
