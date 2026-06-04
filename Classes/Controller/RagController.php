@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Controller;
 
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
@@ -78,9 +79,22 @@ final class RagController extends ActionController
         }
 
         $conversation = $this->loadConversation($site);
-        $answer = $this->ragService->ask($site, $q, [
-            'conversation' => $conversation,
-        ]);
+        $options = ['conversation' => $conversation];
+
+        // Scope retrieval to the active site language. Without it, FileSchema-
+        // Provider's per-(file, language) documents flood the top-K context
+        // with N copies of the same record — same gotcha the CLI AskCommand
+        // has to address. Honour meilisearch.restrictToCurrentLanguage when
+        // explicitly set; otherwise default to the active language so the
+        // editor's UX is always the obvious one (the answer comes from
+        // documents matching the visitor's language).
+        $languageId = $this->resolveCurrentLanguageId();
+        $restrict = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', true);
+        if ($restrict && $languageId !== null) {
+            $options['filters'] = ['language' => [$languageId]];
+        }
+
+        $answer = $this->ragService->ask($site, $q, $options);
 
         if ($answer->status === 'ok' && $this->conversationEnabled($site)) {
             $turn = new Turn($q, $answer->answer, $answer->citedIds);
@@ -131,5 +145,26 @@ final class RagController extends ActionController
             return Conversation::empty();
         }
         return $this->conversationStore->load($this->request, $this->sessionKey($site));
+    }
+
+    /**
+     * Active site-language id. Extbase wraps the request and may strip
+     * the `language` attribute, so fall back to the global PSR-7 request
+     * (same pattern as SearchController::resolveCurrentLanguageId).
+     */
+    private function resolveCurrentLanguageId(): ?int
+    {
+        $language = $this->request->getAttribute('language');
+        if ($language instanceof SiteLanguage) {
+            return $language->getLanguageId();
+        }
+        $globalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        if ($globalRequest !== null) {
+            $language = $globalRequest->getAttribute('language');
+            if ($language instanceof SiteLanguage) {
+                return $language->getLanguageId();
+            }
+        }
+        return null;
     }
 }
