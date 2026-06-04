@@ -14,56 +14,84 @@
             (auto-submit on change is added below via inline JS so users do not
             need a separate apply button — the form itself stays GET, no proxy
             action required).
+
+            facetConfigs (optional) is a {attribute => FacetConfig} map built by
+            the controller from meilisearch.facets in Site Settings:
+              - .label      (full LLL: path or empty → fallback to "facet.attr.<attribute>")
+              - .maxItems   (positive int → truncate at N; 0/missing → no limit)
+              - .collapsed  (bool → adds "ws-meilisearch-facets__group--collapsed")
+              - .showCounts (bool → hides the count badge when false)
+              - .widget     (reserved — only "checkbox" is rendered today)
+            Missing entries keep the legacy default behaviour, so existing
+            site packages don't have to adopt facetConfigs at once.
         </f:comment>
 
         <f:for each="{facets}" as="buckets" key="attribute" iteration="facetIter">
-            <fieldset class="ws-meilisearch-facets__group {f:if(condition: '!{facetIter.isLast}', then: 'mb-3')}">
+            <f:variable name="cfg" value="{facetConfigs.{attribute}}"/>
+            <f:variable name="cfgLabel" value="{cfg.label}"/>
+            <f:variable name="cfgMax" value="{cfg.maxItems}"/>
+            <f:variable name="cfgCollapsed" value="{cfg.collapsed}"/>
+            <f:variable name="cfgShowCounts">
+                <f:if condition="{cfg}">
+                    <f:then>{cfg.showCounts}</f:then>
+                    <f:else>1</f:else>
+                </f:if>
+            </f:variable>
+
+            <fieldset class="ws-meilisearch-facets__group {f:if(condition: '!{facetIter.isLast}', then: 'mb-3')} {f:if(condition: cfgCollapsed, then: 'ws-meilisearch-facets__group--collapsed')}">
                 <legend class="ws-meilisearch-facets__legend h6 text-uppercase text-muted small mb-2">
-                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.attr.{attribute}" default="{attribute}"/>
+                    <f:if condition="{cfgLabel}">
+                        <f:then><f:translate key="{cfgLabel}" default="{attribute}"/></f:then>
+                        <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.attr.{attribute}" default="{attribute}"/></f:else>
+                    </f:if>
                 </legend>
-                <f:for each="{buckets}" as="count" key="value">
-                    <f:variable name="active" value="0"/>
-                    <f:for each="{filters.{attribute}}" as="active_value">
-                        <f:if condition="{active_value} == {value}">
-                            <f:variable name="active" value="1"/>
-                        </f:if>
-                    </f:for>
-                    <f:variable name="facetId" value="ws-meilisearch-{attribute}-{value}"/>
-                    <f:comment>
-                        Resolve the display label for this facet value.
-                        - For attribute "language" the value is the numeric language id —
-                          show the site-language title from the controller-provided map,
-                          falling back to the raw id when the site has no such language.
-                        - For all other attributes look up a translation key
-                          facet.value.{attribute}.{value} and fall back to the raw value
-                          so unknown values still render readably.
-                    </f:comment>
-                    <f:variable name="displayLabel">
-                        <f:if condition="{attribute} == 'language'">
-                            <f:then>
-                                <f:if condition="{languageLabels.{value}}">
-                                    <f:then>{languageLabels.{value}}</f:then>
-                                    <f:else>{value}</f:else>
+                <f:for each="{buckets}" as="count" key="value" iteration="bucketIter">
+                    <f:if condition="!{cfgMax} || {bucketIter.index} < {cfgMax}">
+                        <f:variable name="active" value="0"/>
+                        <f:for each="{filters.{attribute}}" as="active_value">
+                            <f:if condition="{active_value} == {value}">
+                                <f:variable name="active" value="1"/>
+                            </f:if>
+                        </f:for>
+                        <f:variable name="facetId" value="ws-meilisearch-{attribute}-{value}"/>
+                        <f:comment>
+                            Resolve the display label for this facet value.
+                            - For attribute "language" the value is the numeric language id —
+                              show the site-language title from the controller-provided map,
+                              falling back to the raw id when the site has no such language.
+                            - For all other attributes look up a translation key
+                              facet.value.{attribute}.{value} and fall back to the raw value
+                              so unknown values still render readably.
+                        </f:comment>
+                        <f:variable name="displayLabel">
+                            <f:if condition="{attribute} == 'language'">
+                                <f:then>
+                                    <f:if condition="{languageLabels.{value}}">
+                                        <f:then>{languageLabels.{value}}</f:then>
+                                        <f:else>{value}</f:else>
+                                    </f:if>
+                                </f:then>
+                                <f:else>
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.{attribute}.{value}" default="{value}"/>
+                                </f:else>
+                            </f:if>
+                        </f:variable>
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                type="checkbox"
+                                id="{facetId}"
+                                name="tx_wsmeilisearch_search[filters][{attribute}][]"
+                                value="{value}"
+                                onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"
+                                {f:if(condition: '{active} == 1', then: 'checked="checked"')}/>
+                            <label class="form-check-label d-flex justify-content-between align-items-center w-100" for="{facetId}">
+                                <span>{displayLabel -> f:format.trim()}</span>
+                                <f:if condition="{cfgShowCounts}">
+                                    <span class="badge text-bg-secondary ms-2">{count}</span>
                                 </f:if>
-                            </f:then>
-                            <f:else>
-                                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.{attribute}.{value}" default="{value}"/>
-                            </f:else>
-                        </f:if>
-                    </f:variable>
-                    <div class="form-check">
-                        <input class="form-check-input"
-                            type="checkbox"
-                            id="{facetId}"
-                            name="tx_wsmeilisearch_search[filters][{attribute}][]"
-                            value="{value}"
-                            onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"
-                            {f:if(condition: '{active} == 1', then: 'checked="checked"')}/>
-                        <label class="form-check-label d-flex justify-content-between align-items-center w-100" for="{facetId}">
-                            <span>{displayLabel -> f:format.trim()}</span>
-                            <span class="badge text-bg-secondary ms-2">{count}</span>
-                        </label>
-                    </div>
+                            </label>
+                        </div>
+                    </f:if>
                 </f:for>
             </fieldset>
         </f:for>

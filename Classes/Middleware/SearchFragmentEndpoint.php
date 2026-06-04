@@ -14,6 +14,7 @@ use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Core\View\ViewInterface;
 use TYPO3\CMS\Extbase\Mvc\ExtbaseRequestParameters;
+use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
 use WapplerSystems\Meilisearch\Service\SearchResult;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
@@ -40,6 +41,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
     public function __construct(
         private readonly SearchService $searchService,
         private readonly ViewFactoryInterface $viewFactory,
+        private readonly SearchConfigurationProvider $configProvider,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -71,11 +73,8 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
         $useHybrid = $hybridAvailable && $hybridRequested;
 
-        $perPage = (int)$site->getSettings()->get('meilisearch.perPage', 20);
-        if ($perPage <= 0) {
-            $perPage = 20;
-        }
-        $facetList = $this->parseList((string)$site->getSettings()->get('meilisearch.facets', 'type,language'));
+        $perPage = $this->configProvider->defaultPerPage($site);
+        $facetList = $this->configProvider->facetAttributes($site);
 
         // Same single-language-page UX switch the SearchController honors:
         // hide the language facet, force-filter to the active language so
@@ -103,6 +102,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         $hits = [];
         foreach ($result->hits as $hit) {
             $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }
         $result = new SearchResult(
@@ -127,7 +127,8 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             'hybrid' => $useHybrid ? 1 : 0,
             'hybridAvailable' => $hybridAvailable,
             'sort' => $sort,
-            'sortOptions' => $this->sortOptions(),
+            'sortOptions' => $this->configProvider->sortOptions($site) ?: $this->fallbackSortOptions(),
+            'facetConfigs' => $this->indexFacetConfigs($site),
             'languageLabels' => $languageLabels,
             'paginationWindow' => $this->paginationWindow($result->page, $result->getTotalPages()),
             'paginationFirst' => 0,
@@ -166,14 +167,6 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         return $clean;
     }
 
-    /**
-     * @return list<string>
-     */
-    private function parseList(string $raw): array
-    {
-        return array_values(array_filter(array_map('trim', explode(',', $raw))));
-    }
-
     private function resolveLanguageLabel(Site $site, int $languageId): string
     {
         try {
@@ -186,7 +179,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
     /**
      * @return list<array{value:string,labelKey:string}>
      */
-    private function sortOptions(): array
+    private function fallbackSortOptions(): array
     {
         return [
             ['value' => '',                'labelKey' => 'search.sort.relevance'],
@@ -195,6 +188,27 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             ['value' => 'fileSize:desc',   'labelKey' => 'search.sort.fileSize.desc'],
             ['value' => 'fileSize:asc',    'labelKey' => 'search.sort.fileSize.asc'],
         ];
+    }
+
+    /**
+     * @return array<string, array{attribute:string,label:string,widget:string,sort:string,maxItems:int,collapsed:bool,showCounts:bool,extra:array<string,mixed>}>
+     */
+    private function indexFacetConfigs(Site $site): array
+    {
+        $out = [];
+        foreach ($this->configProvider->facets($site) as $facet) {
+            $out[$facet->attribute] = [
+                'attribute'  => $facet->attribute,
+                'label'      => $facet->label,
+                'widget'     => $facet->widget,
+                'sort'       => $facet->sort,
+                'maxItems'   => $facet->maxItems,
+                'collapsed'  => $facet->collapsed,
+                'showCounts' => $facet->showCounts,
+                'extra'      => $facet->extra,
+            ];
+        }
+        return $out;
     }
 
     /**

@@ -8,6 +8,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
 use WapplerSystems\Meilisearch\Event\AfterSearchEvent;
 use WapplerSystems\Meilisearch\Event\BeforeSearchEvent;
 
@@ -21,23 +22,27 @@ use WapplerSystems\Meilisearch\Event\BeforeSearchEvent;
  * the assertion fires on heterogeneous indexes where e.g. `subtitle` is only
  * set on pages. Going via the raw SDK sidesteps that and lets us use
  * attributesToCrop for snippet previews on both paths.
+ *
+ * Highlight/crop/marker/tag values come from meilisearch.frontend.* and
+ * meilisearch.display.*.{highlight,crop} via SearchConfigurationProvider;
+ * see settings.definitions.yaml and settings.yaml in the Set.
  */
 final class SearchService implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
     /**
-     * Fields the search engine should mark up with <mark>…</mark> around
-     * matches, exposed on `hit._formatted.<field>` for the template
-     * layer. Keep these in sync with the searchable fields declared by
-     * the schema providers — adding a field here that isn't actually
-     * searchable just bloats the response.
+     * Hardcoded fallback for sites whose display config doesn't declare any
+     * highlight attributes — preserves the original SearchService behaviour
+     * if an integrator wipes meilisearch.display.* without replacing it.
      */
-    private const HIGHLIGHT_FIELDS = ['title', 'subtitle', 'description', 'abstract', 'keywords', 'teaser', 'bodytext'];
+    private const FALLBACK_HIGHLIGHT_FIELDS = ['title', 'subtitle', 'description', 'abstract', 'keywords', 'teaser', 'bodytext'];
+    private const FALLBACK_CROP_FIELDS = ['bodytext:200', 'description:200', 'teaser:200'];
 
     public function __construct(
         private readonly SearchEngineFactory $engineFactory,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly SearchConfigurationProvider $configProvider,
     ) {}
 
     /**
@@ -154,11 +159,13 @@ final class SearchService implements LoggerAwareInterface
             $params['sort'] = $sort;
         }
 
-        $params['attributesToHighlight'] = self::HIGHLIGHT_FIELDS;
-        $params['highlightPreTag'] = '<mark>';
-        $params['highlightPostTag'] = '</mark>';
-        $params['attributesToCrop'] = ['bodytext:200', 'description:200', 'teaser:200'];
-        $params['cropMarker'] = '…';
+        $highlightFields = $this->configProvider->highlightAttributes($site) ?: self::FALLBACK_HIGHLIGHT_FIELDS;
+        $cropFields = $this->configProvider->cropAttributes($site) ?: self::FALLBACK_CROP_FIELDS;
+        $params['attributesToHighlight'] = $highlightFields;
+        $params['highlightPreTag'] = $this->configProvider->highlightPreTag($site);
+        $params['highlightPostTag'] = $this->configProvider->highlightPostTag($site);
+        $params['attributesToCrop'] = $cropFields;
+        $params['cropMarker'] = $this->configProvider->cropMarker($site);
 
         $response = $index->search($query, $params);
         $raw = $response->toArray();

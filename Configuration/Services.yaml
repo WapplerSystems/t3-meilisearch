@@ -18,6 +18,9 @@ services:
       # schema_provider iterator via _instanceof, which is wrong (it returns
       # empty iterators on purpose).
       - '../Classes/Integration/ExtIndex/Schema/ExtIndexOrigin.php'
+      # Plain value objects: built by SearchConfigurationProvider /
+      # ApplyMeilisearchSettingsCommand from Site Settings, never injected.
+      - '../Classes/Configuration/Dto/*'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:

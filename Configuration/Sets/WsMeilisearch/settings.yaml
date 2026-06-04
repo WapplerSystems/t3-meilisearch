@@ -1,0 +1,95 @@
+# ---------------------------------------------------------------------
+# Structural defaults that don't fit the typed Site Settings shapes
+# (no first-class list-of-maps type), so they live here instead of in
+# settings.definitions.yaml. All keys are still reachable through
+# $site->getSettings()->get('meilisearch.<x>') and can be overridden
+# per site in config/sites/<id>/settings.yaml.
+# ---------------------------------------------------------------------
+
+meilisearch:
+  defaults:
+    # Synonym groups: each key is the canonical term, each value is a list
+    # of alternative phrasings that should match the canonical term.
+    # Pushed verbatim to Meilisearch as the `synonyms` index setting.
+    # Empty by default — site packages add their domain vocabulary.
+    synonyms: {}
+    # Examples (uncomment in site package settings.yaml):
+    # synonyms:
+    #   kfz: ['auto', 'fahrzeug', 'pkw']
+    #   ausbildung: ['studium', 'lehre']
+
+  # Facet panel rendered on the result page. The order of entries here is
+  # the render order in the template. Each `attribute` MUST resolve to a
+  # SEAL schema field declared with filterable: true (and ideally
+  # facet: true) — otherwise Meilisearch silently returns no
+  # facetDistribution for it.
+  #
+  # `label` is either a full LLL: path or empty. When empty, the template
+  # falls back to the legacy "facet.attr.<attribute>" key so existing
+  # translation files keep working.
+  #
+  # Widget vocabulary recognised by the default templates:
+  #   checkbox  – multi-select list (default, the only one the bundled
+  #               Facets.html currently renders — others are slots for
+  #               site-package extensions of the panel).
+  facets:
+    - attribute: type
+      label: ''
+      widget: checkbox
+      sort: count        # count | alpha
+      maxItems: 20
+      collapsed: false
+      showCounts: true
+    - attribute: language
+      label: ''
+      widget: checkbox
+      sort: alpha
+      maxItems: 10
+      collapsed: false
+      showCounts: true
+
+  # Per-document-type result rendering. The bundled Search/Result partial
+  # already handles page/news/file/other internally via inline switches;
+  # site packages override the dispatch by:
+  #
+  #   1. dropping their own partial under Partials/Search/Result/<Name>.html
+  #      in a partialRootPath ordered above this extension's,
+  #   2. setting `meilisearch.display.<type>.partial = 'Search/Result/<Name>'`
+  #      in their own settings.yaml.
+  #
+  # `fields` maps template-side names → hit field paths (dot-notation),
+  # `highlight` is fed to Meilisearch's attributesToHighlight, `crop` is
+  # fed to attributesToCrop. Lengths after the colon are word counts —
+  # entries without `:N` get the global cropLength appended at request
+  # time.
+  #
+  # Unknown types fall back to `_default`.
+  display:
+    _default:
+      partial: 'Search/Result'
+      fields:
+        title:   title
+        snippet: content
+        url:     uri
+      highlight: [title, subtitle, description, abstract, keywords, teaser, bodytext]
+      crop:
+        - 'bodytext:200'
+        - 'description:200'
+        - 'teaser:200'
+
+  # Sort presets exposed on the result page. `labelKey` is a key inside
+  # the bundled locallang.xlf — the template prepends the full LLL: path
+  # itself, so write bare keys here. Add custom presets with sortable
+  # SEAL fields, e.g. price:asc / popularity:desc, and ship a matching
+  # translation in your site package's locallang override.
+  sortOptions:
+    - value: ''
+      labelKey: 'search.sort.relevance'
+    - value: 'datetime:desc'
+      labelKey: 'search.sort.datetime.desc'
+    - value: 'datetime:asc'
+      labelKey: 'search.sort.datetime.asc'
+    - value: 'fileSize:desc'
+      labelKey: 'search.sort.fileSize.desc'
+    - value: 'fileSize:asc'
+      labelKey: 'search.sort.fileSize.asc'

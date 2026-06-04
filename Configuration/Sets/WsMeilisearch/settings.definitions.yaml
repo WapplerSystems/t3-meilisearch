@@ -211,3 +211,143 @@ settings:
     description: 'Storage key in the frontend session. Change if multiple RAG plugins on the same site should keep independent conversation states.'
     type: string
     default: 'ws_meilisearch_rag_conversation'
+
+  # ---------------------------------------------------------------------
+  # Relevance & index-level Meilisearch settings.
+  #
+  # These are pushed to the Meilisearch index by `ws_meilisearch:apply-settings`.
+  # SEAL itself only manages field declarations (searchable/filterable/sortable
+  # flags via SchemaProvider::getAdditionalFields). Everything below — ranking
+  # rules, typo tolerance, stop words, synonyms, distinctAttribute, pagination,
+  # faceting limits, searchCutoffMs — has to be configured separately.
+  #
+  # Structural defaults (synonyms map, facet panel definitions, per-type
+  # display config) live in settings.yaml in the same Set, because typed Site
+  # Settings have no shape for list-of-maps.
+  # ---------------------------------------------------------------------
+
+  meilisearch.defaults.rankingRules:
+    label: 'Ranking rules order'
+    description: 'Meilisearch ranking rules in priority order — earlier rules win ties. Standard set: words, typo, proximity, attribute, sort, exactness. Add custom rules as "<field>:asc" / "<field>:desc" (e.g. "datetime:desc" for newest-first as a tiebreaker).'
+    type: stringlist
+    default:
+      - words
+      - typo
+      - proximity
+      - attribute
+      - sort
+      - exactness
+
+  meilisearch.defaults.typoTolerance.enabled:
+    label: 'Typo tolerance: enabled'
+    description: 'When false, queries match only exact word forms.'
+    type: bool
+    default: true
+
+  meilisearch.defaults.typoTolerance.minWordSizeForOneTypo:
+    label: 'Typo tolerance: min word size for 1 typo'
+    description: 'Words shorter than this require an exact match. Default 5.'
+    type: int
+    default: 5
+
+  meilisearch.defaults.typoTolerance.minWordSizeForTwoTypos:
+    label: 'Typo tolerance: min word size for 2 typos'
+    description: 'Words shorter than this allow at most 1 typo. Default 9.'
+    type: int
+    default: 9
+
+  meilisearch.defaults.typoTolerance.disableOnAttributes:
+    label: 'Typo tolerance: disable on attributes'
+    description: 'Attributes where typo tolerance must be off (e.g. "sku", "isbn", "uri"). Empty = typo tolerance is active on every searchable attribute.'
+    type: stringlist
+    default: []
+
+  meilisearch.defaults.stopWords:
+    label: 'Stop words'
+    description: 'Words ignored during indexing and querying. Use the site language(s) — e.g. "der, die, das, und, oder, mit" for German.'
+    type: stringlist
+    default: []
+
+  meilisearch.defaults.distinctAttribute:
+    label: 'Distinct attribute'
+    description: 'Field used to deduplicate hits: only one document per distinct value is returned (e.g. "groupId" for product variants). Leave empty for no deduplication.'
+    type: string
+    default: ''
+
+  meilisearch.defaults.displayedAttributes:
+    label: 'Displayed attributes'
+    description: 'Fields returned in search hits. Use ["*"] for everything (default). Narrow only if you want to enforce a strict field projection across all clients.'
+    type: stringlist
+    default: ['*']
+
+  meilisearch.defaults.pagination.maxTotalHits:
+    label: 'Pagination: max total hits'
+    description: 'Upper cap on totalHits Meilisearch will report. Lowering this speeds up huge indexes at the cost of accurate deep-page counts. Default 1000.'
+    type: int
+    default: 1000
+
+  meilisearch.defaults.faceting.maxValuesPerFacet:
+    label: 'Faceting: max values per facet'
+    description: 'How many distinct facet values are returned per attribute. Default 100. Raise for high-cardinality attributes like brand catalogues.'
+    type: int
+    default: 100
+
+  meilisearch.defaults.faceting.sortFacetValuesBy:
+    label: 'Faceting: default sort'
+    description: 'Default value ordering across facets — "count" = by count descending (most common first), "alpha" = alphabetical ascending. Per-facet override via meilisearch.facets[*].sort in settings.yaml.'
+    type: string
+    default: 'count'
+
+  meilisearch.defaults.searchCutoffMs:
+    label: 'Search cutoff (ms)'
+    description: 'Hard cap on query execution time. Meilisearch returns partial results once the cutoff hits. 0 = unlimited (engine default).'
+    type: int
+    default: 0
+
+  # ---------------------------------------------------------------------
+  # Frontend defaults.
+  #
+  # Consumed by SearchController + SearchService when a per-plugin TypoScript
+  # override is absent. Changing these affects every site-level search box
+  # that doesn't override them in plugin.tx_wsmeilisearch_search.settings.
+  # ---------------------------------------------------------------------
+
+  meilisearch.frontend.perPage:
+    label: 'Default hits per page'
+    description: 'Default page size when the plugin TypoScript does not set settings.perPage. Per-plugin TS still wins.'
+    type: int
+    default: 20
+
+  meilisearch.frontend.highlightPreTag:
+    label: 'Highlight: pre tag'
+    description: 'HTML opening tag wrapped around matched substrings in snippets.'
+    type: string
+    default: '<mark>'
+
+  meilisearch.frontend.highlightPostTag:
+    label: 'Highlight: post tag'
+    description: 'HTML closing tag wrapped around matched substrings in snippets.'
+    type: string
+    default: '</mark>'
+
+  meilisearch.frontend.cropMarker:
+    label: 'Snippet: crop marker'
+    description: 'Marker inserted where snippet text is cut off (e.g. "…", "...").'
+    type: string
+    default: '…'
+
+  meilisearch.frontend.cropLength:
+    label: 'Snippet: crop length (words)'
+    description: 'Words around the match in cropped snippets. Default 200 (matches the previous hardcoded value in SearchService).'
+    type: int
+    default: 200
+
+  # ---------------------------------------------------------------------
+  # Apply-settings command behaviour.
+  # ---------------------------------------------------------------------
+
+  meilisearch.sync.waitForTasks:
+    label: 'Wait for Meilisearch tasks'
+    description: 'When true, ws_meilisearch:apply-settings blocks until every Meilisearch task completes (recommended in CI / deploy hooks). Disable for fire-and-forget operation.'
+    type: bool
+    default: true

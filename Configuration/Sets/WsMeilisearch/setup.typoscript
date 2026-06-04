@@ -18,10 +18,12 @@ plugin.tx_wsmeilisearch_search {
             indexPrefix = {$meilisearch.indexPrefix}
         }
 
-        # Number of hits per page in the result template.
-        perPage = 20
-
-        # Facet attributes exposed in the result template (comma-separated).
-        facets = type,language
+        # perPage and facets are read from Site Settings by default
+        # (meilisearch.frontend.perPage / meilisearch.facets, see
+        # settings.definitions.yaml + settings.yaml in this Set).
+        #
+        # Per-plugin TypoScript override is still honored — set
+        # `settings.perPage = …` or `settings.facets = type,language`
+        # here to scope the value to one plugin instance.
     }
 }

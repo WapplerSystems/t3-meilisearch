@@ -8,6 +8,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
 final class SearchController extends ActionController
@@ -15,6 +16,7 @@ final class SearchController extends ActionController
     public function __construct(
         private readonly SearchService $searchService,
         private readonly SiteFinder $siteFinder,
+        private readonly SearchConfigurationProvider $configProvider,
     ) {}
 
     /**
@@ -72,11 +74,18 @@ final class SearchController extends ActionController
         if (!$site instanceof Site) {
             return $this->htmlResponse();
         }
-        $perPage = (int)($this->settings['perPage'] ?? 20);
-        $facetList = array_values(array_filter(array_map(
-            'trim',
-            explode(',', (string)($this->settings['facets'] ?? ''))
-        )));
+        // Per-plugin TypoScript wins when explicitly set (preserves operator
+        // overrides on existing site packages); otherwise the new Site-Settings
+        // defaults from meilisearch.frontend.perPage / meilisearch.facets apply.
+        $perPage = isset($this->settings['perPage']) && (int)$this->settings['perPage'] > 0
+            ? (int)$this->settings['perPage']
+            : $this->configProvider->defaultPerPage($site);
+        $tsFacets = trim((string)($this->settings['facets'] ?? ''));
+        if ($tsFacets !== '') {
+            $facetList = array_values(array_filter(array_map('trim', explode(',', $tsFacets))));
+        } else {
+            $facetList = $this->configProvider->facetAttributes($site);
+        }
 
         // Integrator switch (per-site flag in settings.yaml /
         // settings.definitions.yaml): a single per-language search page
@@ -120,9 +129,14 @@ final class SearchController extends ActionController
         // for id 0, "English" for id 1). Doing it here keeps the
         // template trivial — `{hit.languageLabel}` instead of a
         // ViewHelper call per hit.
+        //
+        // displayPartial is pre-resolved from meilisearch.display.<type>
+        // so the result region just renders `<f:render partial="{hit.displayPartial}"/>`
+        // and dispatch happens by data instead of by template-side switch.
         $hits = [];
         foreach ($result->hits as $hit) {
             $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }
         // Rebuild SearchResult with the enriched hits — DTO is readonly,
@@ -153,7 +167,12 @@ final class SearchController extends ActionController
             'hybridAvailable' => $hybridAvailable,
             'sort' => $sortOption,
             // Pre-built links so templates don't have to compute them.
-            'sortOptions' => $this->sortOptions(),
+            'sortOptions' => $this->configProvider->sortOptions($site) ?: $this->fallbackSortOptions(),
+            // Indexed map for Facets.html to look up per-facet display
+            // settings (label, widget, maxItems, collapsed, showCounts).
+            // Keyed by attribute name to match the iteration variable in
+            // the partial.
+            'facetConfigs' => $this->indexFacetConfigs($site),
             'languageLabels' => $languageLabels,
             // Sliding window of page numbers to render in the pager (Fluid
             // has no range ViewHelper). Empty when there's only one page.
@@ -236,15 +255,14 @@ final class SearchController extends ActionController
     }
 
     /**
-     * Sort presets exposed to the template. `labelKey` is a translation key
-     * relative to this extension's locallang; templates render it through
-     * <f:translate>. The default empty value means relevance ranking. Site
-     * packages can override / extend by replacing the partial that consumes
-     * this list.
+     * Sort presets used only when meilisearch.sortOptions is unset or wiped
+     * by an integrator — keeps the result page functional rather than rendering
+     * an empty <select>. The shipped settings.yaml provides the same list, so
+     * this branch isn't reached in default installs.
      *
      * @return list<array{value:string,labelKey:string}>
      */
-    private function sortOptions(): array
+    private function fallbackSortOptions(): array
     {
         return [
             ['value' => '',                'labelKey' => 'search.sort.relevance'],
@@ -253,5 +271,26 @@ final class SearchController extends ActionController
             ['value' => 'fileSize:desc',   'labelKey' => 'search.sort.fileSize.desc'],
             ['value' => 'fileSize:asc',    'labelKey' => 'search.sort.fileSize.asc'],
         ];
+    }
+
+    /**
+     * @return array<string, array{attribute:string,label:string,widget:string,sort:string,maxItems:int,collapsed:bool,showCounts:bool,extra:array<string,mixed>}>
+     */
+    private function indexFacetConfigs(Site $site): array
+    {
+        $out = [];
+        foreach ($this->configProvider->facets($site) as $facet) {
+            $out[$facet->attribute] = [
+                'attribute'  => $facet->attribute,
+                'label'      => $facet->label,
+                'widget'     => $facet->widget,
+                'sort'       => $facet->sort,
+                'maxItems'   => $facet->maxItems,
+                'collapsed'  => $facet->collapsed,
+                'showCounts' => $facet->showCounts,
+                'extra'      => $facet->extra,
+            ];
+        }
+        return $out;
     }
 }

@@ -56,11 +56,20 @@
 
         <div class="ws-meilisearch-layout row g-4">
             <aside class="ws-meilisearch-facets col-lg-3">
-                <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters, languageLabels: languageLabels}"/>
+                <f:render partial="Search/Facets" arguments="{facets: result.facets, filters: filters, languageLabels: languageLabels, facetConfigs: facetConfigs}"/>
             </aside>
             <main class="ws-meilisearch-hits col-lg-9">
+                <f:comment>
+                    hit.displayPartial is pre-resolved by SearchController /
+                    SearchFragmentEndpoint from meilisearch.display.&lt;type&gt;.partial
+                    in Site Settings, with `_default` fallback. Site packages
+                    override per-type rendering by dropping their own partial
+                    under Partials/Search/Result/&lt;Name&gt;.html in a
+                    partialRootPath above this extension's and pointing the
+                    type's `partial:` setting at it.
+                </f:comment>
                 <f:for each="{result.hits}" as="hit">
-                    <f:render partial="Search/Result" arguments="{hit: hit}"/>
+                    <f:render partial="{hit.displayPartial}" arguments="{hit: hit, facetConfigs: facetConfigs}"/>
                 </f:for>
 
                 <f:if condition="{result.totalPages} > 1">
