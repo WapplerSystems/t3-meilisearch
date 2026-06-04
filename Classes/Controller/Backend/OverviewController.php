@@ -312,14 +312,25 @@ final class OverviewController
      * diagnoseUrl on every action; pulling them out keeps each action
      * method's assignMultiple readable.
      *
+     * Also extracts the CSRF token as a separate value. The Test.html GET
+     * forms need it as a hidden <input> because HTML5 spec discards the
+     * action URL's query string on form GET submit — the token would never
+     * reach the server otherwise, triggering an unauthenticated redirect
+     * through /typo3/main and the well-known "doubled BE chrome" bug.
+     *
      * @return array<string,string>
      */
     private function commonTabUrls(): array
     {
+        $indexUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch');
+        $testUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'test']);
+        $diagnoseUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'diagnose']);
+        parse_str((string)parse_url($testUrl, PHP_URL_QUERY), $query);
         return [
-            'indexUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch'),
-            'testUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'test']),
-            'diagnoseUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'diagnose']),
+            'indexUrl' => $indexUrl,
+            'testUrl' => $testUrl,
+            'diagnoseUrl' => $diagnoseUrl,
+            'token' => (string)($query['token'] ?? ''),
         ];
     }
 

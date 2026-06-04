@@ -17,6 +17,7 @@
                 <div class="card-header"><strong>Search</strong></div>
                 <div class="card-body">
                     <form action="{testUrl}" method="get">
+                        <input type="hidden" name="token" value="{token}" />
                         <input type="hidden" name="action" value="test" />
                         <input type="hidden" name="ask" value="{askQuery}" />
 
@@ -74,6 +75,7 @@
                 <div class="card-header"><strong>RAG</strong> <span class="text-muted">(Ask the site)</span></div>
                 <div class="card-body">
                     <form action="{testUrl}" method="get">
+                        <input type="hidden" name="token" value="{token}" />
                         <input type="hidden" name="action" value="test" />
                         <input type="hidden" name="site" value="{selectedSite}" />
                         <input type="hidden" name="q" value="{query}" />
