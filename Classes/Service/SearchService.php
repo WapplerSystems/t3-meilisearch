@@ -167,6 +167,50 @@ final class SearchService implements LoggerAwareInterface
         $total = (int)($raw['estimatedTotalHits'] ?? $raw['totalHits'] ?? count($hits));
         $facetDistribution = is_array($raw['facetDistribution'] ?? null) ? $raw['facetDistribution'] : [];
 
+        // Disjunctive faceting: when the user has an active filter on a facet
+        // attribute, the main query's facetDistribution for that attribute only
+        // lists the values matching the filter — i.e. the OTHER checkboxes
+        // disappear from the panel and the visitor can't switch within the
+        // attribute without first clearing it. Fetch the un-filtered
+        // distribution for each user-filtered attribute via side queries
+        // (same query, all OTHER filters, no hits requested) and merge them in.
+        $userFilters = (array)($options['filters'] ?? []);
+        foreach ($facets as $facetField) {
+            if (!array_key_exists($facetField, $userFilters)) {
+                continue;
+            }
+            $sideFilters = $userFilters;
+            unset($sideFilters[$facetField]);
+            $sideParams = [
+                'limit' => 0,
+                'facets' => [$facetField],
+            ];
+            $sideFilter = $this->buildMeilisearchFilter($sideFilters);
+            if ($sideFilter !== '') {
+                $sideParams['filter'] = $sideFilter;
+            }
+            if ($hybridParams !== null) {
+                $sideParams['hybrid'] = $hybridParams;
+            }
+            try {
+                $sideRaw = $index->search($query, $sideParams)->toArray();
+                $sideDistribution = is_array($sideRaw['facetDistribution'] ?? null)
+                    ? $sideRaw['facetDistribution']
+                    : [];
+                if (isset($sideDistribution[$facetField]) && is_array($sideDistribution[$facetField])) {
+                    $facetDistribution[$facetField] = $sideDistribution[$facetField];
+                }
+            } catch (\Throwable $e) {
+                // Side-query failure (rare — same engine, same index) is
+                // non-fatal: the panel just falls back to the filtered
+                // distribution for this attribute. Log and continue.
+                $this->logger?->warning('Disjunctive facet side-query failed for {field}: {message}', [
+                    'field' => $facetField,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $total,

@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Controller;
 
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use WapplerSystems\Meilisearch\Service\SearchService;
@@ -76,6 +77,26 @@ final class SearchController extends ActionController
             'trim',
             explode(',', (string)($this->settings['facets'] ?? ''))
         )));
+
+        // Integrator switch (per-site flag in settings.yaml /
+        // settings.definitions.yaml): a single per-language search page
+        // hides the language facet and force-filters results to the
+        // active site language. Any incoming `filters[language]` from the
+        // URL is discarded — the visitor must not be able to escape the
+        // scope by hand-crafting the query string. Read directly from the
+        // site settings so the fragment middleware (which has no Extbase
+        // plugin context) can apply the same flag identically.
+        $restrictToLanguage = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false);
+        if ($restrictToLanguage) {
+            $currentLanguageId = $this->resolveCurrentLanguageId();
+            if ($currentLanguageId !== null) {
+                $filters['language'] = [$currentLanguageId];
+            }
+            $facetList = array_values(array_filter(
+                $facetList,
+                static fn (string $f): bool => $f !== 'language',
+            ));
+        }
 
         $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
         $useHybrid = $hybridAvailable && $hybrid === 1;
@@ -180,6 +201,29 @@ final class SearchController extends ActionController
         $end = min($total, $start + 4);
         $start = max(1, $end - 4);
         return [$start, $end];
+    }
+
+    /**
+     * Active site language id, resolved the same way as `resolveSite()`:
+     * Extbase wraps the request and may strip the `language` attribute, so
+     * fall back to the global PSR-7 request. Returns `null` only when the
+     * frontend has no language context at all (which shouldn't happen in a
+     * normal page rendering).
+     */
+    private function resolveCurrentLanguageId(): ?int
+    {
+        $language = $this->request->getAttribute('language');
+        if ($language instanceof SiteLanguage) {
+            return $language->getLanguageId();
+        }
+        $globalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        if ($globalRequest !== null) {
+            $language = $globalRequest->getAttribute('language');
+            if ($language instanceof SiteLanguage) {
+                return $language->getLanguageId();
+            }
+        }
+        return null;
     }
 
     private function resolveLanguageLabel(Site $site, int $languageId): string

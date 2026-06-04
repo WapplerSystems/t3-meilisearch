@@ -95,7 +95,20 @@
      * snippets, etc.).
      */
     function fragmentUrlFor(targetUrl) {
-        const out = new URL(FRAGMENT_ENDPOINT, window.location.origin);
+        // Prepend the same language-base segment the search page lives on
+        // (e.g. "/de/_ws_meilisearch/search-fragment" when form.action is
+        // "/de/suche/"). The SiteResolver middleware uses that prefix to
+        // assign the `language` attribute to the request, which the
+        // fragment middleware needs to honor restrictToCurrentLanguage.
+        // Bare /_ws_meilisearch/search-fragment still resolves on sites
+        // without language bases.
+        const formPath = new URL(form.action, window.location.origin).pathname;
+        const segments = formPath.split('/').filter(Boolean);
+        const langSegment = segments[0] ?? '';
+        const fragmentPath = langSegment !== '' && !langSegment.startsWith('_ws_meilisearch')
+            ? `/${langSegment}${FRAGMENT_ENDPOINT}`
+            : FRAGMENT_ENDPOINT;
+        const out = new URL(fragmentPath, window.location.origin);
         for (const [rawKey, value] of targetUrl.searchParams.entries()) {
             if (!rawKey.startsWith(EXTBASE_PREFIX)) continue;
             // "tx_wsmeilisearch_search[a][b][c]" → "a[b][c]"

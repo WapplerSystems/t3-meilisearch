@@ -9,9 +9,11 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Core\View\ViewInterface;
+use TYPO3\CMS\Extbase\Mvc\ExtbaseRequestParameters;
 use WapplerSystems\Meilisearch\Service\SearchResult;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
@@ -42,7 +44,14 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if ($request->getUri()->getPath() !== self::PATH) {
+        // Match the endpoint as a suffix so the JS can prepend the active
+        // language base (e.g. /de/_ws_meilisearch/search-fragment). That
+        // way the SiteResolver also assigns a `language` attribute to the
+        // request, which we need for the restrictToCurrentLanguage filter.
+        // Bare /_ws_meilisearch/search-fragment still works as a fallback
+        // for tests / curl, just without language scoping.
+        $path = $request->getUri()->getPath();
+        if ($path !== self::PATH && !str_ends_with(rtrim($path, '/'), self::PATH)) {
             return $handler->handle($request);
         }
 
@@ -67,6 +76,20 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             $perPage = 20;
         }
         $facetList = $this->parseList((string)$site->getSettings()->get('meilisearch.facets', 'type,language'));
+
+        // Same single-language-page UX switch the SearchController honors:
+        // hide the language facet, force-filter to the active language so
+        // visitors can't escape the scope via URL params.
+        if ((bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false)) {
+            $language = $request->getAttribute('language');
+            if ($language instanceof SiteLanguage) {
+                $filters['language'] = [(string)$language->getLanguageId()];
+            }
+            $facetList = array_values(array_filter(
+                $facetList,
+                static fn (string $f): bool => $f !== 'language',
+            ));
+        }
 
         $result = $this->searchService->search($site, $q, [
             'page' => $page,
@@ -204,12 +227,25 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
 
     private function createView(ServerRequestInterface $request): ViewInterface
     {
+        // The fragment template re-uses Search/ResultRegion, which calls
+        // f:uri.action(…) on its pagination links. f:uri.action needs an
+        // Extbase request attribute on the PSR-7 request to know which
+        // plugin/controller/action to link to. The middleware runs outside
+        // the Extbase request lifecycle, so we attach the parameters by
+        // hand — same plugin metadata as ext_localconf::configurePlugin().
+        $extbase = new ExtbaseRequestParameters();
+        $extbase->setPluginName('Search');
+        $extbase->setControllerExtensionName('WsMeilisearch');
+        $extbase->setControllerName('Search');
+        $extbase->setControllerActionName('results');
+        $requestWithExtbase = $request->withAttribute('extbase', $extbase);
+
         return $this->viewFactory->create(new ViewFactoryData(
             templateRootPaths: [self::TEMPLATE_ROOT],
             partialRootPaths: [self::PARTIAL_ROOT],
             layoutRootPaths: [self::LAYOUT_ROOT],
             templatePathAndFilename: self::TEMPLATE_PATH,
-            request: $request,
+            request: $requestWithExtbase,
         ));
     }
 }

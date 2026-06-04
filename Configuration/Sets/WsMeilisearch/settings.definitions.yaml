@@ -17,6 +17,12 @@ settings:
     type: string
     default: ''
 
+  meilisearch.restrictToCurrentLanguage:
+    label: 'Restrict results to current language'
+    description: 'When enabled, the search plugin force-filters results to the active site language and hides the language facet from the visitor. Use this on per-language search pages where the language choice would just be noise.'
+    type: bool
+    default: false
+
   meilisearch.indexedTables:
     label: 'Indexed record types'
     description: 'Comma-separated list of TCA tables to index. Pages and tx_news are wired by default.'
