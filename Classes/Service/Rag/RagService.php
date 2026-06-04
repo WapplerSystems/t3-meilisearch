@@ -34,13 +34,22 @@ final class RagService implements LoggerAwareInterface
     use LoggerAwareTrait;
 
     /**
-     * Citation pattern. Matches `[id=pages-42]`, `[id=news-7]`, etc.
-     * Anchored to the closing bracket so prose like "[id=foo and id=bar]"
-     * (which the LLM occasionally produces despite instructions) still
-     * extracts the first id only — we'd rather miss a citation than
-     * fabricate one.
+     * Citation patterns. We grab every `[...]` block (excluding nested
+     * brackets) and then pick id-shaped tokens out of the inner text — the
+     * final filter against $validIds keeps random brackets (markdown links,
+     * regex literals, …) from leaking through.
+     *
+     * Forms the LLM has been observed to emit despite the prompt asking for
+     * plain `[id]`:
+     *   [pages-42]                    (the intended form)
+     *   [id=pages-42]                 (LLM treated "id" in the prompt as a key)
+     *   [id=pages-42, id=news-7]      (multiple grouped in one bracket)
+     *   [pages-42, news-7]            (bare, comma-separated)
+     *   [pages-42][news-7]            (chained)
+     * The block+token approach catches all of these.
      */
-    private const CITATION_PATTERN = '/\[id=([A-Za-z0-9_:\-\.]+)\]/';
+    private const CITATION_BLOCK_PATTERN = '/\[([^\[\]]+)\]/';
+    private const CITATION_TOKEN_PATTERN = '/[A-Za-z0-9_:.\-]+/';
 
     public function __construct(
         private readonly SearchService $searchService,
@@ -304,12 +313,20 @@ final class RagService implements LoggerAwareInterface
                 $validIds[(string)$hit['id']] = true;
             }
         }
+        if ($validIds === []) {
+            return [];
+        }
 
         $found = [];
-        if (preg_match_all(self::CITATION_PATTERN, $responseText, $m) && isset($m[1])) {
-            foreach ($m[1] as $id) {
-                if (isset($validIds[$id]) && !in_array($id, $found, true)) {
-                    $found[] = $id;
+        if (preg_match_all(self::CITATION_BLOCK_PATTERN, $responseText, $blocks) && isset($blocks[1])) {
+            foreach ($blocks[1] as $inner) {
+                if (!preg_match_all(self::CITATION_TOKEN_PATTERN, $inner, $tokens) || !isset($tokens[0])) {
+                    continue;
+                }
+                foreach ($tokens[0] as $token) {
+                    if (isset($validIds[$token]) && !in_array($token, $found, true)) {
+                        $found[] = $token;
+                    }
                 }
             }
         }
