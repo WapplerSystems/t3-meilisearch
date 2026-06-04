@@ -7,6 +7,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -32,7 +33,17 @@ final class AskCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('question', InputArgument::REQUIRED, 'The question to ask.')
-            ->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (defaults to the first configured site).');
+            ->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (defaults to the first configured site).')
+            ->addOption(
+                'language',
+                'l',
+                InputOption::VALUE_REQUIRED,
+                'Restrict retrieval to a specific site language id (e.g. 0 for default). '
+                . 'Without this, RAG retrieval scans every language — files indexed in N '
+                . 'languages then crowd the top-K context with N copies of the same record. '
+                . 'Default: 0 (the site default language).',
+                '0',
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -52,7 +63,13 @@ final class AskCommand extends Command
         $io->section('Site: ' . $site->getIdentifier());
         $io->writeln('<comment>Q:</comment> ' . $question);
 
-        $answer = $this->ragService->ask($site, $question);
+        $options = [];
+        $languageOption = $input->getOption('language');
+        if ($languageOption !== '' && $languageOption !== null) {
+            $options['filters'] = ['language' => [(int)$languageOption]];
+        }
+
+        $answer = $this->ragService->ask($site, $question, $options);
         if ($answer->status !== 'ok') {
             $io->warning('Status: ' . $answer->status . ($answer->error !== null ? ' — ' . $answer->error : ''));
             return $answer->status === 'failed' ? Command::FAILURE : Command::SUCCESS;
