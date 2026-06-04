@@ -146,6 +146,28 @@ final class SearchConfigurationProvider
     }
 
     /**
+     * Per-type multiplier from meilisearch.boosts.types. Returns 1.0
+     * (neutral) when the type isn't listed — that's also the indexer
+     * fallback for sites that never configured the map.
+     */
+    public function typeBoost(Site $site, string $type): float
+    {
+        if ($type === '') {
+            return 1.0;
+        }
+        $types = $this->getNested($site, 'meilisearch.boosts.types');
+        if (!is_array($types) || !isset($types[$type]) || !is_numeric($types[$type])) {
+            return 1.0;
+        }
+        return (float)$types[$type];
+    }
+
+    public function isRecordBoostEnabled(Site $site): bool
+    {
+        return (bool)$site->getSettings()->get('meilisearch.boosts.recordOverrideEnabled', true);
+    }
+
+    /**
      * Pre-resolves the partial used to render a hit of the given type.
      * Always returns a non-empty string — the bundled Search/Result
      * partial is the ultimate fallback.

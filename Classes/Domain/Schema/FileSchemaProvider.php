@@ -11,6 +11,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 
@@ -56,6 +57,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         private readonly ResourceFactory $resourceFactory,
         private readonly TextExtractor $textExtractor,
         private readonly SiteFinder $siteFinder,
+        private readonly BoostCalculator $boostCalculator,
     ) {}
 
     public function getTable(): string
@@ -104,7 +106,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         $publicUrl = $file->getPublicUrl() ?? '';
 
         foreach ($site->getLanguages() as $language) {
-            $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl);
+            $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
             if ($document !== null) {
                 yield $document;
             }
@@ -158,7 +160,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
 
             foreach ($languages as $language) {
                 try {
-                    $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl);
+                    $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
                 } catch (\Throwable $e) {
                     $this->logger?->warning('FileSchemaProvider skipped {uid} for language {lang}: {message}', [
                         'uid' => $file->getUid(),
@@ -203,6 +205,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         int $languageId,
         string $bodytext,
         string $publicUrl,
+        Site $site,
     ): ?array {
         $metadata = $this->metadataForLanguage((int)$file->getUid(), $languageId);
         // No default-language record either — sys_file with zero metadata
@@ -233,6 +236,8 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             'extension' => (string)$file->getExtension(),
             'fileSize' => (int)$file->getSize(),
             'publicUrl' => $publicUrl,
+            // sys_file has no editor-curated boost TCA — type-level only.
+            'boost' => $this->boostCalculator->compositeFor($site, 'file', null),
         ];
     }
 

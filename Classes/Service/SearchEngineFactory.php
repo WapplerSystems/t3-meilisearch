@@ -6,6 +6,7 @@ namespace WapplerSystems\Meilisearch\Service;
 use CmsIg\Seal\Adapter\Meilisearch\MeilisearchAdapter;
 use CmsIg\Seal\Engine;
 use CmsIg\Seal\Schema\Field\AbstractField;
+use CmsIg\Seal\Schema\Field\FloatField;
 use CmsIg\Seal\Schema\Field\IdentifierField;
 use CmsIg\Seal\Schema\Field\IntegerField;
 use CmsIg\Seal\Schema\Field\TextField;
@@ -88,6 +89,19 @@ final class SearchEngineFactory
         return $prefix . 'search';
     }
 
+    /**
+     * SEAL schema for a site. ApplyMeilisearchSettingsCommand uses this to
+     * push the field-flag-derived attributes (searchable/filterable/sortable)
+     * alongside the integrator-configured index settings — SEAL itself only
+     * pushes them during initial createIndex(), so adding a new sortable
+     * field to baseFields() needs an explicit re-push to reach existing
+     * indexes.
+     */
+    public function getSchemaForSite(Site $site): Schema
+    {
+        return $this->buildSchema($site);
+    }
+
     private function buildSchema(Site $site): Schema
     {
         $indexName = $this->getIndexName($site);
@@ -133,6 +147,15 @@ final class SearchEngineFactory
             // matches in URLs to drive ranking) but filterable so listeners
             // can scope queries by path / domain.
             'uri'         => new TextField('uri', searchable: false, filterable: true),
+            // Editor-controlled relevance multiplier. Composite of the
+            // per-type Site-Settings boost (meilisearch.boosts.types.<type>)
+            // and the per-record TCA field tx_wsmeilisearch_boost on the
+            // source row. Sortable so the apply-settings command can declare
+            // it in sortableAttributes — that's the prerequisite for using
+            // "boost:desc" as a custom ranking rule. Integrators turn the
+            // boost into actual ranking influence by adding "boost:desc" to
+            // meilisearch.defaults.rankingRules (between attribute and sort).
+            'boost'       => new FloatField('boost', searchable: false, sortable: true),
         ];
     }
 }

@@ -10,6 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
@@ -77,6 +78,7 @@ final class ApplyMeilisearchSettingsCommand extends Command
             }
             $indexUid = $this->engineFactory->getIndexName($site);
             $payload  = $this->configProvider->indexSettings($site)->toMeilisearchPayload();
+            $payload  = $this->mergeSchemaAttributes($payload, $site, $indexUid);
             $wait     = !$noWaitFlag && (bool)$site->getSettings()->get('meilisearch.sync.waitForTasks', true);
 
             $io->section(sprintf('%s → %s', $site->getIdentifier(), $indexUid));
@@ -126,5 +128,38 @@ final class ApplyMeilisearchSettingsCommand extends Command
             return Command::SUCCESS;
         }
         return $hadError ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * SEAL pushes searchable/filterable/sortable attributes only on initial
+     * createIndex(). For existing indexes a new field added to baseFields()
+     * (e.g. `boost`) never reaches Meilisearch unless we re-push them — so
+     * derive them from the SEAL schema here and merge into the payload.
+     *
+     * Distinct + facet fields fold into filterable, mirroring how
+     * MeilisearchSchemaManager::createIndex() composes the list.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function mergeSchemaAttributes(array $payload, Site $site, string $indexUid): array
+    {
+        $schema = $this->engineFactory->getSchemaForSite($site);
+        $index = $schema->indexes[$indexUid] ?? null;
+        if ($index === null) {
+            return $payload;
+        }
+
+        $filterable = array_values(array_unique(array_merge(
+            $index->filterableFields,
+            $index->distinctFields,
+            $index->facetFields,
+        )));
+
+        $payload['searchableAttributes'] = $index->searchableFields;
+        $payload['filterableAttributes'] = $filterable;
+        $payload['sortableAttributes']   = $index->sortableFields;
+
+        return $payload;
     }
 }

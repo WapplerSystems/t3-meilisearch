@@ -351,3 +351,20 @@ settings:
     description: 'When true, ws_meilisearch:apply-settings blocks until every Meilisearch task completes (recommended in CI / deploy hooks). Disable for fire-and-forget operation.'
     type: bool
     default: true
+
+  # ---------------------------------------------------------------------
+  # Editor-controlled relevance boost.
+  #
+  # Documents carry a `boost` float field that composites the per-type
+  # multiplier (meilisearch.boosts.types.<type> in settings.yaml) with the
+  # per-record TCA enum tx_wsmeilisearch_boost on pages / tx_news. The
+  # boost is always written; it only influences ranking once an integrator
+  # adds "boost:desc" to meilisearch.defaults.rankingRules (between
+  # "attribute" and "sort" is the natural slot).
+  # ---------------------------------------------------------------------
+
+  meilisearch.boosts.recordOverrideEnabled:
+    label: 'Honor per-record boost (TCA tx_wsmeilisearch_boost)'
+    description: 'When true, indexers read the editor-set boost field on pages and news records and multiply it into the document boost. Disable to ignore the BE control and rely on per-type defaults only.'
+    type: bool
+    default: true

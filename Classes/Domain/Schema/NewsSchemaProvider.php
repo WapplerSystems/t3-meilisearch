@@ -8,11 +8,13 @@ use CmsIg\Seal\Schema\Field\TextField;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use WapplerSystems\Meilisearch\Service\BoostCalculator;
 
 final class NewsSchemaProvider implements SchemaProviderInterface
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,
+        private readonly BoostCalculator $boostCalculator,
     ) {}
 
     public function getTable(): string
@@ -44,7 +46,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             return;
         }
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_news_domain_model_news');
-        $row = $qb->select('uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid')
+        $row = $qb->select(...$this->columnsToSelect())
             ->from('tx_news_domain_model_news')
             ->where(
                 $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)),
@@ -54,7 +56,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             ->executeQuery()
             ->fetchAssociative();
         if ($row !== false) {
-            yield $this->toDocument($row);
+            yield $this->toDocument($row, $site);
         }
     }
 
@@ -64,7 +66,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             return;
         }
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_news_domain_model_news');
-        $result = $qb->select('uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid')
+        $result = $qb->select(...$this->columnsToSelect())
             ->from('tx_news_domain_model_news')
             ->where(
                 $qb->expr()->eq('deleted', 0),
@@ -72,8 +74,19 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             )
             ->executeQuery();
         while ($row = $result->fetchAssociative()) {
-            yield $this->toDocument($row);
+            yield $this->toDocument($row, $site);
         }
+    }
+
+    /**
+     * Column list shared by both fetch paths. Kept in one spot so the
+     * boost column can be added/removed in one place.
+     *
+     * @return list<string>
+     */
+    private function columnsToSelect(): array
+    {
+        return ['uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'tx_wsmeilisearch_boost'];
     }
 
     public function getAdditionalFields(): array
@@ -89,10 +102,16 @@ final class NewsSchemaProvider implements SchemaProviderInterface
      * @param array<string,mixed> $row
      * @return array<string,mixed>
      */
-    private function toDocument(array $row): array
+    private function toDocument(array $row, Site $site): array
     {
         $teaser = (string)$row['teaser'];
         $bodytext = strip_tags((string)$row['bodytext']);
+        // tx_wsmeilisearch_boost may legitimately be absent during the
+        // first deploy before database:updateschema runs — treat that
+        // as null so the calculator defaults to neutral.
+        $recordBoost = isset($row['tx_wsmeilisearch_boost'])
+            ? (int)$row['tx_wsmeilisearch_boost']
+            : null;
         return [
             'id' => $this->buildDocumentId((int)$row['uid']),
             'type' => 'news',
@@ -104,6 +123,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             'bodytext' => $bodytext,
             'content' => trim($teaser . "\n\n" . $bodytext),
             'datetime' => (int)$row['datetime'],
+            'boost' => $this->boostCalculator->compositeFor($site, 'news', $recordBoost),
         ];
     }
 }

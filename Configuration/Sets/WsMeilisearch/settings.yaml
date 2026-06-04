@@ -18,6 +18,22 @@ meilisearch:
     #   kfz: ['auto', 'fahrzeug', 'pkw']
     #   ausbildung: ['studium', 'lehre']
 
+  # Per-type relevance multipliers — one float per document type. The
+  # indexer multiplies these onto the editor-set per-record boost
+  # (TCA tx_wsmeilisearch_boost). 1.0 = neutral, > 1 = ranks higher,
+  # < 1 = ranks lower. Document types not listed default to 1.0.
+  #
+  # Has no effect on its own — turn it into actual ranking influence by
+  # adding "boost:desc" to meilisearch.defaults.rankingRules (between
+  # "attribute" and "sort" is the natural insertion point).
+  boosts:
+    types: {}
+    # Example (uncomment in site package settings.yaml to push news to the
+    # top while pushing files down):
+    # types:
+    #   news: 1.5
+    #   file: 0.5
+
   # Facet panel rendered on the result page. The order of entries here is
   # the render order in the template. Each `attribute` MUST resolve to a
   # SEAL schema field declared with filterable: true (and ideally

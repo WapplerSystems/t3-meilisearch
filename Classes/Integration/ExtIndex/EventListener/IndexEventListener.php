@@ -15,6 +15,7 @@ use TYPO3\CMS\Core\Resource\ResourceFactory;
 use WapplerSystems\Meilisearch\Event\AfterDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
+use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
@@ -41,6 +42,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ResourceFactory $resourceFactory,
         private readonly ConnectionPool $connectionPool,
+        private readonly BoostCalculator $boostCalculator,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -72,6 +74,7 @@ final class IndexEventListener implements LoggerAwareInterface
             'keywords' => $pageMeta['keywords'],
             'content' => $this->normalize($event->content),
             'uri' => $event->uri,
+            'boost' => $this->boostCalculator->compositeFor($event->site, 'page', $pageMeta['boost']),
             'site' => $event->site->getIdentifier(),
             'indexProcessId' => $event->indexProcessId,
             'accessGroups' => $event->accessGroups,
@@ -110,6 +113,9 @@ final class IndexEventListener implements LoggerAwareInterface
             'keywords' => '',
             'content' => $this->normalize($event->content),
             'uri' => $event->uri,
+            // Files have no per-record TCA boost (sys_file isn't editor-
+            // curated for ranking purposes) — type-level multiplier only.
+            'boost' => $this->boostCalculator->compositeFor($event->site, 'file', null),
             'fileIdentifier' => $event->fileIdentifier,
             'site' => $event->site->getIdentifier(),
             'indexProcessId' => $event->indexProcessId,
@@ -162,17 +168,17 @@ final class IndexEventListener implements LoggerAwareInterface
     }
 
     /**
-     * @return array{pid:int,subtitle:string,description:string,abstract:string,keywords:string}
+     * @return array{pid:int,subtitle:string,description:string,abstract:string,keywords:string,boost:int|null}
      */
     private function fetchPageMeta(int $pageUid): array
     {
-        $empty = ['pid' => 0, 'subtitle' => '', 'description' => '', 'abstract' => '', 'keywords' => ''];
+        $empty = ['pid' => 0, 'subtitle' => '', 'description' => '', 'abstract' => '', 'keywords' => '', 'boost' => null];
         if ($pageUid <= 0) {
             return $empty;
         }
         try {
             $qb = $this->connectionPool->getQueryBuilderForTable('pages');
-            $row = $qb->select('pid', 'subtitle', 'description', 'abstract', 'keywords')
+            $row = $qb->select('pid', 'subtitle', 'description', 'abstract', 'keywords', 'tx_wsmeilisearch_boost')
                 ->from('pages')
                 ->where($qb->expr()->eq('uid', $qb->createNamedParameter($pageUid, \Doctrine\DBAL\ParameterType::INTEGER)))
                 ->executeQuery()
@@ -186,6 +192,10 @@ final class IndexEventListener implements LoggerAwareInterface
                 'description' => (string)$row['description'],
                 'abstract' => (string)$row['abstract'],
                 'keywords' => (string)$row['keywords'],
+                // Column may legitimately be absent during the first deploy
+                // before database:updateschema has run — treat that as
+                // "normal" (= no boost) so the indexer keeps working.
+                'boost' => isset($row['tx_wsmeilisearch_boost']) ? (int)$row['tx_wsmeilisearch_boost'] : null,
             ];
         } catch (\Throwable $e) {
             $this->logger?->debug('EXT:index-integration could not fetch page meta for {uid}: {message}', [
