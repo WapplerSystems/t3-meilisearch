@@ -58,7 +58,7 @@ final class SearchService implements LoggerAwareInterface
      */
     public function search(Site $site, string $query, array $options = []): SearchResult
     {
-        $before = new BeforeSearchEvent($query, $options);
+        $before = new BeforeSearchEvent($query, $options, $site);
         $this->eventDispatcher->dispatch($before);
 
         if ($this->engineFactory->createClientForSite($site) === null) {
