@@ -36,6 +36,9 @@
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
             </trans-unit>
+            <trans-unit id="rag.answer.lowConfidence">
+                <source>&lt;strong&gt;Heads up:&lt;/strong&gt; the assistant didn&apos;t cite any of the retrieved documents — the answer above may not be directly grounded in the indexed content. Try rephrasing with more specific terms.</source>
+            </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
             </trans-unit>

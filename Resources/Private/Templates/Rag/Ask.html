@@ -35,6 +35,25 @@
                             </div>
 
                             <f:comment>
+                                Low-confidence hint: status='ok' means the LLM
+                                produced text, but an empty citedIds list means
+                                it didn't reference any of the retrieved
+                                documents. That's a strong signal the answer
+                                wasn't grounded — either the LLM refused
+                                because the context didn't match, or the
+                                citation parser missed an unusual format. Show
+                                a soft notice so the visitor knows the answer
+                                may be less reliable and can rephrase.
+                            </f:comment>
+                            <f:if condition="{answer.sources} && !{answer.citedIds}">
+                                <div class="alert alert-warning small ws-meilisearch-rag-lowconfidence mb-3" role="status">
+                                    <f:format.raw>
+                                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.lowConfidence"/>
+                                    </f:format.raw>
+                                </div>
+                            </f:if>
+
+                            <f:comment>
                                 Sources fed into the LLM context window. Cited
                                 rows (those whose id appears in answer.citedIds)
                                 are highlighted; the parser only detects the
