@@ -138,6 +138,62 @@
         </div>
     </div>
 
+    <!-- ============== SINGLE-FILE UPLOAD ============== -->
+    <section class="mt-4">
+        <div class="card border-success">
+            <div class="card-header text-success"><strong>Upload single document</strong> <span class="text-muted ms-2">PDF / DOCX / HTML / Markdown / Office</span></div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Drop a single curated document into the knowledge base — useful for one-off uploads (FAQ PDF, internal handbook, customer brief) that don't fit the DITA-OT import workflow. Tika extracts the body text from the uploaded file (PDF / DOCX / Office / HTML / EPUB / TXT etc., per <code>meilisearch.tika.allowedMimeTypes</code>); the editor-supplied title + abstract drive how the entry appears in search results.
+                </p>
+                <form action="{uploadUrl}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="token" value="{token}" />
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">File</label>
+                        <input type="file" name="document" class="form-control form-control-sm" required="required" />
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted">Title <span class="text-muted">(empty = file name)</span></label>
+                            <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Onboarding Guide 2026" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Language</label>
+                            <select name="language" class="form-select form-select-sm">
+                                <f:for each="{knownLanguages}" as="label" key="langId">
+                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
+                                </f:for>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted">Abstract <span class="text-muted">(optional, shown as the result snippet)</span></label>
+                            <textarea name="abstract" class="form-control form-control-sm" rows="2" placeholder="One-paragraph summary so search results don't fall back to the first 200 chars of the body."></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Document kind</label>
+                            <select name="help_type" class="form-select form-select-sm">
+                                <option value="upload" selected="selected">upload</option>
+                                <option value="concept">concept</option>
+                                <option value="task">task</option>
+                                <option value="reference">reference</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Upload &amp; create helpdoc</button>
+                    <p class="text-muted small mt-2 mb-0">
+                        After upload the new entry is visible in the List module immediately. Run <code>ws_meilisearch:reindex</code> (or the Overview tab) to push it to Meilisearch.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <!-- ============== EDITOR ENTRY POINT ============== -->
     <section class="mt-4">
         <h2 class="h5">Editor edits</h2>

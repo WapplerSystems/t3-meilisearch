@@ -5,13 +5,19 @@ namespace WapplerSystems\Meilisearch\Service;
 
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
+use Psr\Http\Message\UploadedFileInterface;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\Exception\FolderDoesNotExistException;
+use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
+use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\PathUtility;
+use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
+use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 
 /**
  * Reads a DITA-OT XHTML drop into tx_wsmeilisearch_helpdoc.
@@ -31,11 +37,14 @@ final class HelpDocImporter
 {
     public const HELPDOC_TABLE = 'tx_wsmeilisearch_helpdoc';
     public const FILEADMIN_FOLDER = 'chatbot-hilfe';
+    public const UPLOADS_SUBFOLDER = 'uploads';
     public const STORAGE_UID = 1;
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly StorageRepository $storageRepository,
+        private readonly TextExtractor $textExtractor,
+        private readonly SiteFinder $siteFinder,
     ) {}
 
     /**
@@ -79,6 +88,139 @@ final class HelpDocImporter
                 ->executeStatement();
         }
         return (int)$conn->delete(self::HELPDOC_TABLE, ['sys_language_uid' => $languageId]);
+    }
+
+    /**
+     * Persist a single uploaded document (PDF / DOCX / HTML / MD / TXT /
+     * Office) into the corpus. The file lands in fileadmin/<FOLDER>/
+     * uploads/, Tika extracts its text into the body column, a helpdoc
+     * row goes in with help_type='upload' so the BE list can distinguish
+     * uploaded documents from importer-generated DITA topics.
+     *
+     * Editor-controlled fields ($title / $abstract / $helpType) override
+     * whatever the file's metadata would suggest, so this is the path
+     * for curated knowledge entries rather than a bulk DITA dump.
+     *
+     * @param UploadedFileInterface $upload The PSR-7 uploaded file (from $request->getUploadedFiles())
+     * @param string $title Display title shown in search results
+     * @param int    $languageId TYPO3 sys_language_uid
+     * @param string|null $abstract Optional curated abstract; null = empty
+     * @param string $helpType  'upload' (default), or one of concept/task/reference
+     * @return array{uid:int, falUid:int, extractStatus:string, extractedChars:int}
+     */
+    public function importUpload(
+        UploadedFileInterface $upload,
+        string $title,
+        int $languageId,
+        ?string $abstract = null,
+        string $helpType = 'upload',
+    ): array {
+        if ($upload->getError() !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Upload failed with PHP error code ' . $upload->getError());
+        }
+        $clientFilename = (string)$upload->getClientFilename();
+        if ($clientFilename === '') {
+            throw new \RuntimeException('Uploaded file has no name.');
+        }
+        if (trim($title) === '') {
+            $title = pathinfo($clientFilename, PATHINFO_FILENAME);
+        }
+
+        // Materialise upload to a temp file so storage->addFile can move it.
+        // The PSR-7 stream may be in php://memory and FAL's addFile wants a
+        // path on disk it can copy from. Don't use tempnam() + moveTo():
+        // tempnam already creates the file, and TYPO3's UploadedFile rejects
+        // moveTo() targets that already exist ("target path is empty or
+        // invalid"). Build a unique path manually and write the stream into it.
+        $tmpPath = sys_get_temp_dir() . '/wsmsupload_' . bin2hex(random_bytes(8));
+        $bytes = (string)$upload->getStream()->getContents();
+        if ($bytes === '') {
+            throw new \RuntimeException('Uploaded file is empty');
+        }
+        if (file_put_contents($tmpPath, $bytes) === false) {
+            throw new \RuntimeException('Cannot stage upload to temp file ' . $tmpPath);
+        }
+
+        try {
+            $storage = $this->storageRepository->findByUid(self::STORAGE_UID);
+            $uploadFolder = $this->ensureUploadFolder($storage);
+            $falFile = $storage->addFile(
+                $tmpPath,
+                $uploadFolder,
+                $this->sanitiseFilename($clientFilename),
+                \TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior::RENAME,
+                true, // removeOriginal=true: tempnam path no longer needed
+            );
+
+            // Tika extraction. Needs a Site for config (tika.url, mime
+            // allowlist, OCR). Pick the first available — Tika config is
+            // typically uniform across a TYPO3 install.
+            $body = '';
+            $extractStatus = ExtractionResult::SKIPPED;
+            $site = $this->resolveTikaSite();
+            if ($site !== null) {
+                $result = $this->textExtractor->extract($falFile, $site);
+                $extractStatus = $result->status;
+                if ($result->status === ExtractionResult::SUCCESS) {
+                    $body = $result->text;
+                }
+            }
+
+            // Build a unique identifier. Filename alone collides on
+            // duplicate uploads ("report.pdf" twice → both want
+            // identifier=report). Append the FAL uid for stable
+            // uniqueness; nice side effect is the identifier maps 1:1
+            // to the sys_file row.
+            $identifier = $this->sanitiseIdentifier(pathinfo($clientFilename, PATHINFO_FILENAME))
+                . '-f' . $falFile->getUid();
+
+            $conn = $this->connectionPool->getConnectionForTable(self::HELPDOC_TABLE);
+            $now = time();
+            $conn->insert(self::HELPDOC_TABLE, [
+                'pid' => 0,
+                'sys_language_uid' => $languageId,
+                'tstamp' => $now,
+                'crdate' => $now,
+                'identifier' => substr($identifier, 0, 190),
+                'title' => substr(trim($title), 0, 512),
+                'abstract' => (string)($abstract ?? ''),
+                'body' => $body,
+                'help_type' => $helpType,
+                'parent_identifier' => '',
+                'source_path' => 'fileadmin/' . self::FILEADMIN_FOLDER . '/' . self::UPLOADS_SUBFOLDER . '/' . $falFile->getName(),
+                'media' => 0,
+            ]);
+            $helpdocUid = (int)$conn->lastInsertId();
+
+            // sys_file_reference linking helpdoc.media → uploaded FAL file
+            $refConn = $this->connectionPool->getConnectionForTable('sys_file_reference');
+            $refConn->insert('sys_file_reference', [
+                'pid' => 0,
+                'tstamp' => $now,
+                'crdate' => $now,
+                'sys_language_uid' => $languageId,
+                'uid_local' => $falFile->getUid(),
+                'uid_foreign' => $helpdocUid,
+                'tablenames' => self::HELPDOC_TABLE,
+                'fieldname' => 'media',
+                'table_local' => 'sys_file',
+                'sorting_foreign' => 1,
+            ]);
+            $conn->update(self::HELPDOC_TABLE, ['media' => 1], ['uid' => $helpdocUid]);
+
+            return [
+                'uid' => $helpdocUid,
+                'falUid' => $falFile->getUid(),
+                'extractStatus' => $extractStatus,
+                'extractedChars' => mb_strlen($body),
+            ];
+        } finally {
+            // moveTo() consumed tmpPath; if it failed mid-flow tempnam may
+            // still be on disk → defensive unlink.
+            if (is_file($tmpPath)) {
+                @unlink($tmpPath);
+            }
+        }
     }
 
     /**
@@ -414,5 +556,53 @@ final class HelpDocImporter
         $this->connectionPool->getConnectionForTable(self::HELPDOC_TABLE)
             ->update(self::HELPDOC_TABLE, ['media' => 1], ['uid' => $helpdocUid]);
         return 1;
+    }
+
+    private function ensureUploadFolder(ResourceStorage $storage): Folder
+    {
+        $root = $this->ensureFolder($storage);
+        try {
+            return $root->getSubfolder(self::UPLOADS_SUBFOLDER);
+        } catch (FolderDoesNotExistException) {
+            return $storage->createFolder(self::UPLOADS_SUBFOLDER, $root);
+        }
+    }
+
+    /**
+     * Returns the first site that has a non-empty meilisearch.tika.url
+     * configured. Used for upload-time Tika extraction since the upload
+     * itself isn't bound to a site — Tika config is typically uniform
+     * across a TYPO3 install. Falls back to the first site overall, then
+     * null when no site exists.
+     */
+    private function resolveTikaSite(): ?Site
+    {
+        $sites = $this->siteFinder->getAllSites();
+        foreach ($sites as $site) {
+            if (trim((string)$site->getSettings()->get('meilisearch.tika.url', '')) !== '') {
+                return $site;
+            }
+        }
+        return $sites !== [] ? reset($sites) : null;
+    }
+
+    /**
+     * Strip non-portable characters from a user-supplied filename so it
+     * survives FAL storage + filesystem encoding without surprise. We
+     * trust addFile()'s collision handling (RENAME) to disambiguate
+     * duplicate names; this is just a hygiene pass.
+     */
+    private function sanitiseFilename(string $name): string
+    {
+        $name = (string)preg_replace('/[^\p{L}\p{N}._-]+/u', '_', $name);
+        $name = trim($name, '._');
+        return $name !== '' ? $name : 'upload';
+    }
+
+    private function sanitiseIdentifier(string $name): string
+    {
+        $name = (string)preg_replace('/[^A-Za-z0-9_-]+/', '_', $name);
+        $name = trim($name, '_-');
+        return $name !== '' ? $name : 'upload';
     }
 }

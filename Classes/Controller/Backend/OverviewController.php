@@ -62,6 +62,7 @@ final class OverviewController
             'helpdocs'        => $this->helpdocsAction($request),
             'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
             'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
+            'uploadHelpdoc'   => $this->uploadHelpdocAction($request),
             default           => $this->indexAction($request),
         };
     }
@@ -386,6 +387,7 @@ final class OverviewController
             'listEditUrl' => $listEditUrl,
             'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
             'purgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'purgeHelpdocs']),
+            'uploadUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'uploadHelpdoc']),
             ...$this->commonTabUrls(),
         ]);
         return $moduleTemplate->renderResponse('Backend/Overview/HelpDocs');
@@ -454,6 +456,57 @@ final class OverviewController
             );
         } catch (\Throwable $e) {
             $this->addFlash('Purge failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function uploadHelpdocAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $uploadedFiles = $request->getUploadedFiles();
+        $upload = $uploadedFiles['document'] ?? null;
+        if (!$upload instanceof \Psr\Http\Message\UploadedFileInterface) {
+            $this->addFlash('No file uploaded.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        $title = trim((string)($body['title'] ?? ''));
+        $abstract = trim((string)($body['abstract'] ?? ''));
+        $languageId = (int)($body['language'] ?? 0);
+        $helpType = trim((string)($body['help_type'] ?? 'upload'));
+        // Whitelist the helpType to the values List/SearchUI know about.
+        if (!in_array($helpType, ['upload', 'concept', 'task', 'reference'], true)) {
+            $helpType = 'upload';
+        }
+
+        try {
+            $result = $this->helpDocImporter->importUpload(
+                upload: $upload,
+                title: $title,
+                languageId: $languageId,
+                abstract: $abstract !== '' ? $abstract : null,
+                helpType: $helpType,
+            );
+            $extractNote = match ($result['extractStatus']) {
+                'success' => sprintf('Tika extracted %d chars', $result['extractedChars']),
+                'skipped' => 'Tika skipped (no extraction — title-only doc)',
+                'failed'  => 'Tika failed — document indexed without body text',
+                default   => 'No Tika configured',
+            };
+            $this->addFlash(
+                sprintf(
+                    'Uploaded "%s" (helpdoc #%d, FAL file #%d). %s. Run reindex to push it to Meilisearch.',
+                    $upload->getClientFilename(),
+                    $result['uid'],
+                    $result['falUid'],
+                    $extractNote,
+                ),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (\Throwable $e) {
+            $this->addFlash('Upload failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }
