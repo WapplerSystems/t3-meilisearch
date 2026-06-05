@@ -1,0 +1,153 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Help docs</h1>
+    <f:render partial="Backend/TabNav" arguments="{active: 'helpdocs', indexUrl: indexUrl, testUrl: testUrl, diagnoseUrl: diagnoseUrl, helpdocsUrl: helpdocsUrl}" />
+
+    <p class="text-muted">
+        DITA-OT XHTML help topics live in <code>tx_wsmeilisearch_helpdoc</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Re-imports purge and rebuild the language scope so the table tracks whatever the docs team last regenerated. Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
+    </p>
+
+    <!-- ============== STATS ============== -->
+    <div class="card mb-4">
+        <div class="card-header"><strong>Current state</strong> <span class="text-muted ms-2">total {stats.grandTotal} record(s)</span></div>
+        <div class="card-body p-0">
+            <f:if condition="{stats.languages}">
+                <f:then>
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Language</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">With media</th>
+                                <th class="text-end">concept</th>
+                                <th class="text-end">task</th>
+                                <th class="text-end">reference</th>
+                                <th>Last imported</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <f:for each="{stats.languages}" as="row" key="langId">
+                                <tr>
+                                    <td><code>{langId}</code> {row.label -> f:format.htmlspecialchars()}</td>
+                                    <td class="text-end">{row.total}</td>
+                                    <td class="text-end">{row.withMedia}</td>
+                                    <td class="text-end">{row.types.concept}</td>
+                                    <td class="text-end">{row.types.task}</td>
+                                    <td class="text-end">{row.types.reference}</td>
+                                    <td>
+                                        <f:if condition="{row.lastImported}">
+                                            <f:then><f:format.date date="@{row.lastImported}" format="Y-m-d H:i"/></f:then>
+                                            <f:else>—</f:else>
+                                        </f:if>
+                                    </td>
+                                </tr>
+                            </f:for>
+                        </tbody>
+                    </table>
+                </f:then>
+                <f:else>
+                    <div class="p-3 text-muted">No help docs imported yet.</div>
+                </f:else>
+            </f:if>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- ============== IMPORT FORM ============== -->
+        <div class="col-md-7">
+            <div class="card h-100">
+                <div class="card-header"><strong>Run import</strong></div>
+                <div class="card-body">
+                    <form action="{runImportUrl}" method="post">
+                        <input type="hidden" name="token" value="{token}" />
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Source path</label>
+                            <input type="text" name="path" value="{defaultSourceRoot}" class="form-control form-control-sm" placeholder="chatbot/ChatbotHilfe/DE_xhtml" required="required" />
+                            <div class="form-text small">Absolute path or relative to the project root. Must contain <code>index.html</code> and a <code>&lt;langDir&gt;/topics/</code> subfolder.</div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Language directory</label>
+                                <input type="text" name="langDir" value="{defaultLangDir}" class="form-control form-control-sm" placeholder="de" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Target sys_language_uid</label>
+                                <select name="language" class="form-select form-select-sm">
+                                    <f:for each="{knownLanguages}" as="label" key="langId">
+                                        <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
+                                    </f:for>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="purge" value="1" id="hd-purge" class="form-check-input" checked="checked" />
+                            <label for="hd-purge" class="form-check-label">
+                                Purge before importing
+                                <span class="text-muted small">(recommended — wipes existing rows for the chosen language so re-runs are idempotent)</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Start import</button>
+                        <p class="text-muted small mt-2 mb-0">
+                            Reindex is NOT triggered automatically — run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards to push the freshly imported docs to Meilisearch.
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============== PURGE FORM ============== -->
+        <div class="col-md-5">
+            <div class="card h-100 border-danger">
+                <div class="card-header text-danger"><strong>Purge by language</strong></div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        Hard-deletes every helpdoc row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
+                    </p>
+                    <form action="{purgeUrl}" method="post">
+                        <input type="hidden" name="token" value="{token}" />
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Language</label>
+                            <select name="language" class="form-select form-select-sm">
+                                <f:for each="{knownLanguages}" as="label" key="langId">
+                                    <option value="{langId}">{label}</option>
+                                </f:for>
+                            </select>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="confirm" value="1" id="hd-confirm" class="form-check-input" />
+                            <label for="hd-confirm" class="form-check-label small">
+                                I understand this drops <strong>all</strong> helpdoc rows for the selected language.
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-outline-danger">Purge</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============== EDITOR ENTRY POINT ============== -->
+    <section class="mt-4">
+        <h2 class="h5">Editor edits</h2>
+        <p class="text-muted small mb-2">
+            Individual records (boost field, hidden flag, manual overrides) are managed in the standard List module:
+        </p>
+        <a href="{listEditUrl}" class="btn btn-secondary btn-sm">
+            Open helpdocs in the List module
+        </a>
+    </section>
+</f:section>
+
+</html>

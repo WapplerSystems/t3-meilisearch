@@ -14,6 +14,7 @@ use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
+use WapplerSystems\Meilisearch\Service\HelpDocImporter;
 use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
 use WapplerSystems\Meilisearch\Service\IndexerService;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
@@ -46,6 +47,7 @@ final class OverviewController
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly EmbedderConfigurator $embedderConfigurator,
         private readonly FlashMessageService $flashMessageService,
+        private readonly HelpDocImporter $helpDocImporter,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -57,6 +59,9 @@ final class OverviewController
             'diagnose'        => $this->diagnoseAction($request),
             'repushEmbedder'  => $this->repushEmbedderAction($request),
             'pingRag'         => $this->pingRagAction($request),
+            'helpdocs'        => $this->helpdocsAction($request),
+            'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
+            'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
             default           => $this->indexAction($request),
         };
     }
@@ -325,13 +330,139 @@ final class OverviewController
         $indexUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch');
         $testUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'test']);
         $diagnoseUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'diagnose']);
+        $helpdocsUrl = (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'helpdocs']);
         parse_str((string)parse_url($testUrl, PHP_URL_QUERY), $query);
         return [
             'indexUrl' => $indexUrl,
             'testUrl' => $testUrl,
             'diagnoseUrl' => $diagnoseUrl,
+            'helpdocsUrl' => $helpdocsUrl,
             'token' => (string)($query['token'] ?? ''),
         ];
+    }
+
+    private function helpdocsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $moduleTemplate = $this->moduleTemplateFactory->create($request);
+
+        // Aggregate the configured sourceRoot across sites so the import
+        // form starts with a sensible path the operator usually wants.
+        // First non-empty wins; falls back to the package default.
+        $defaultSourceRoot = 'chatbot/ChatbotHilfe/DE_xhtml';
+        $knownLanguages = [];
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.sourceRoot', ''));
+            if ($configured !== '' && $defaultSourceRoot === 'chatbot/ChatbotHilfe/DE_xhtml') {
+                $defaultSourceRoot = $configured;
+            }
+            foreach ($site->getAllLanguages() as $lang) {
+                $id = $lang->getLanguageId();
+                $knownLanguages[$id] = $knownLanguages[$id] ?? sprintf('%d — %s', $id, $lang->getTitle());
+            }
+        }
+        ksort($knownLanguages);
+
+        $stats = $this->helpDocImporter->stats();
+        // Augment each language row with its TYPO3 label (uses the first
+        // site that has the language declared) so the template can
+        // show "0 — Deutsch" instead of just "0".
+        foreach ($stats['languages'] as $langId => &$row) {
+            $row['label'] = $knownLanguages[$langId] ?? (string)$langId;
+        }
+        unset($row);
+
+        // Deep-link into the standard List module for browse/edit, pid=0
+        // since the importer writes helpdocs at root.
+        $listEditUrl = (string)$this->backendUriBuilder->buildUriFromRoute('web_list', [
+            'id' => 0,
+            'table' => HelpDocImporter::HELPDOC_TABLE,
+        ]);
+
+        $moduleTemplate->assignMultiple([
+            'stats' => $stats,
+            'knownLanguages' => $knownLanguages,
+            'defaultSourceRoot' => $defaultSourceRoot,
+            'defaultLangDir' => 'de',
+            'listEditUrl' => $listEditUrl,
+            'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
+            'purgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'purgeHelpdocs']),
+            ...$this->commonTabUrls(),
+        ]);
+        return $moduleTemplate->renderResponse('Backend/Overview/HelpDocs');
+    }
+
+    private function runImportHelpdocsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $path = trim((string)($body['path'] ?? ''));
+        if ($path === '') {
+            $this->addFlash('Path is required.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        $langDir = trim((string)($body['langDir'] ?? 'de'));
+        $languageId = (int)($body['language'] ?? 0);
+        $purge = isset($body['purge']) && (string)$body['purge'] === '1';
+        try {
+            $result = $this->helpDocImporter->import(
+                path: $path,
+                langDir: $langDir,
+                languageId: $languageId,
+                pid: 0,
+                purge: $purge,
+                limit: 0,
+            );
+            $this->addFlash(
+                sprintf(
+                    'Imported %d topic(s) into language %d (%d skipped, %d media attached). Run reindex to push them to Meilisearch.',
+                    $result['imported'],
+                    $languageId,
+                    $result['skipped'],
+                    $result['mediaCopied'],
+                ),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (\Throwable $e) {
+            $this->addFlash('Import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function purgeHelpdocsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $languageId = (int)($body['language'] ?? -1);
+        if ($languageId < 0) {
+            $this->addFlash('Language is required.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        $confirmed = isset($body['confirm']) && (string)$body['confirm'] === '1';
+        if (!$confirmed) {
+            $this->addFlash('Purge skipped — confirmation checkbox was not ticked.', ContextualFeedbackSeverity::WARNING);
+            return $this->redirectToHelpdocs();
+        }
+        try {
+            $deleted = $this->helpDocImporter->purgeLanguage($languageId);
+            $this->addFlash(
+                sprintf('Purged %d helpdoc row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.', $deleted, $languageId),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (\Throwable $e) {
+            $this->addFlash('Purge failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function redirectToHelpdocs(): ResponseInterface
+    {
+        return new RedirectResponse(
+            (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'helpdocs']),
+        );
     }
 
     private function repushEmbedderAction(ServerRequestInterface $request): ResponseInterface

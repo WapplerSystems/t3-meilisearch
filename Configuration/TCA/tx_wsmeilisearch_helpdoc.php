@@ -19,10 +19,13 @@ return [
         'origUid' => 't3_origuid',
         'searchFields' => 'identifier,title,abstract,body',
         'iconfile' => 'EXT:ws_meilisearch/Resources/Public/Icons/Extension.svg',
-        // Records are managed by the import CLI, not BE editors. Hide from
-        // the "Create new record" UI so editors don't try to author them
-        // by hand — the next import would overwrite their work.
-        'hideTable' => true,
+        // Records ARE editable in the BE List module — editors typically
+        // tweak the boost field or toggle hidden=1 to suppress an outdated
+        // topic from search results. They should NOT create new rows by
+        // hand (the next importer run purges + rebuilds the row's language
+        // scope, throwing away the entry). The BE "Help docs" module tab
+        // shows the importer-triggered workflow and the deep-link into
+        // List for individual edits.
         'security' => [
             'ignorePageTypeRestriction' => true,
         ],
