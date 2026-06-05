@@ -93,6 +93,20 @@ meilisearch:
         - 'description:200'
         - 'teaser:200'
 
+    help:
+      partial: 'Search/Result/Help'
+      fields:
+        title:    title
+        snippet:  abstract
+        url:      uri
+        image:    imageUrl
+        breadcrumb: parentTitle
+        helpType: helpType
+      highlight: [title, abstract, body, parentTitle]
+      crop:
+        - 'abstract:200'
+        - 'body:200'
+
   # Sort presets exposed on the result page. `labelKey` is a key inside
   # the bundled locallang.xlf — the template prepends the full LLL: path
   # itself, so write bare keys here. Add custom presets with sortable

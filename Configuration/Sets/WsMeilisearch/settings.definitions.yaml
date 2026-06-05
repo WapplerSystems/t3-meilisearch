@@ -25,9 +25,15 @@ settings:
 
   meilisearch.indexedTables:
     label: 'Indexed record types'
-    description: 'Comma-separated list of TCA tables to index. Pages and tx_news are wired by default.'
+    description: 'Comma-separated list of TCA tables to index. Pages, tx_news and tx_wsmeilisearch_helpdoc (DITA help topics imported via ws_meilisearch:import-chatbot-hilfe) are wired by default.'
     type: string
-    default: 'pages,tx_news_domain_model_news'
+    default: 'pages,tx_news_domain_model_news,tx_wsmeilisearch_helpdoc'
+
+  meilisearch.helpdoc.sourceRoot:
+    label: 'Help topic source root'
+    description: 'On-disk path (absolute or relative to the project root) of the DITA-OT XHTML corpus served under /hilfe/. Files outside this root are not reachable. Default is chatbot/ChatbotHilfe/DE_xhtml.'
+    type: string
+    default: 'chatbot/ChatbotHilfe/DE_xhtml'
 
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'

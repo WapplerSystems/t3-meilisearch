@@ -1,0 +1,70 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+<f:comment>
+    Result card for DITA help topics (type=help). The hit carries the
+    extra fields HelpDocSchemaProvider writes: helpType (concept|task|
+    reference), helpSourcePath, imageUrl (FAL public URL, may be empty),
+    parentTitle (breadcrumb to the parent topic in the TOC).
+</f:comment>
+<article class="ws-meilisearch-hit ws-meilisearch-hit--help card mb-3">
+    <div class="row g-0">
+        <f:if condition="{hit.imageUrl}">
+            <div class="col-md-3">
+                <a href="{hit.uri}" class="d-block h-100 ws-meilisearch-hit__media" target="_blank" rel="noopener">
+                    <img src="{hit.imageUrl}"
+                         alt="{hit.title}"
+                         loading="lazy"
+                         class="img-fluid rounded-start ws-meilisearch-hit__thumb"/>
+                </a>
+            </div>
+        </f:if>
+        <div class="{f:if(condition: '{hit.imageUrl}', then: 'col-md-9', else: 'col-12')}">
+            <div class="card-body">
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <h3 class="card-title h5 mb-0 flex-grow-1">
+                        <f:variable name="titleHtml">
+                            <f:if condition="{hit._formatted.title}">
+                                <f:then><f:format.raw>{hit._formatted.title}</f:format.raw></f:then>
+                                <f:else>{hit.title}</f:else>
+                            </f:if>
+                        </f:variable>
+                        <a href="{hit.uri}" class="text-decoration-none" target="_blank" rel="noopener">{titleHtml -> f:format.raw()}</a>
+                    </h3>
+                    <f:switch expression="{hit.helpType}">
+                        <f:case value="task"><span class="badge text-bg-success ws-meilisearch-hit__type">Anleitung</span></f:case>
+                        <f:case value="reference"><span class="badge text-bg-info ws-meilisearch-hit__type">Details</span></f:case>
+                        <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">Hilfe</span></f:defaultCase>
+                    </f:switch>
+                </div>
+
+                <f:if condition="{hit.parentTitle}">
+                    <p class="card-text text-muted small mb-1 ws-meilisearch-hit__breadcrumb">
+                        <f:format.raw>&rsaquo;</f:format.raw> {hit.parentTitle}
+                    </p>
+                </f:if>
+
+                <f:if condition="{hit._formatted.abstract} || {hit.abstract}">
+                    <p class="card-text mb-1">
+                        <f:if condition="{hit._formatted.abstract}">
+                            <f:then><f:format.raw>{hit._formatted.abstract}</f:format.raw></f:then>
+                            <f:else>{hit.abstract -> f:format.crop(maxCharacters: 250, append: '…')}</f:else>
+                        </f:if>
+                    </p>
+                </f:if>
+                <f:if condition="{hit._formatted.body}">
+                    <p class="card-text text-muted small mb-1">
+                        <f:format.raw>{hit._formatted.body}</f:format.raw>
+                    </p>
+                </f:if>
+
+                <f:if condition="{hit.languageLabel}">
+                    <p class="card-text mb-0">
+                        <small class="text-muted">{hit.languageLabel}</small>
+                    </p>
+                </f:if>
+            </div>
+        </div>
+    </div>
+</article>
+</html>
