@@ -119,6 +119,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         $dedupe = $this->shouldDeduplicate($site);
         $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
         $excludeExtensions = $this->excludeExtensions($site);
+        $minImageBytes = $this->minImageBytes($site);
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
         $result = $qb->select('uid')
@@ -145,6 +146,17 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             // for. Comparison is lowercase since site setting + FAL
             // extension are normalised the same way.
             if ($excludeExtensions !== [] && in_array(strtolower((string)$file->getExtension()), $excludeExtensions, true)) {
+                continue;
+            }
+            // Tiny icons / flags / decoration pollute the corpus
+            // without being useful as results — skip any image
+            // under the operator-chosen byte threshold. Checking
+            // the mime prefix scopes the filter so legitimate
+            // small text files (a 200-byte README) still index.
+            if ($minImageBytes > 0
+                && (int)$file->getSize() < $minImageBytes
+                && str_starts_with((string)$file->getMimeType(), 'image/')
+            ) {
                 continue;
             }
 
@@ -325,6 +337,16 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             }
         }
         return $out;
+    }
+
+    /**
+     * Returns the minimum image size in bytes (operator configures the
+     * value in KB). 0 means the filter is disabled.
+     */
+    private function minImageBytes(Site $site): int
+    {
+        $kb = (int)$site->getSettings()->get('meilisearch.indexing.minImageSizeKb', 0);
+        return max(0, $kb) * 1024;
     }
 
     /**

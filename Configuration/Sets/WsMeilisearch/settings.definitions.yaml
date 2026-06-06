@@ -89,6 +89,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.indexing.minImageSizeKb:
+    label: 'Minimum image size (KB)'
+    description: 'Skip image files (mime starts with image/) smaller than this. Filters out icons / flags / decorative graphics that pollute the search corpus without being useful as results. 10 catches most icons; 50 also catches small previews. Default 0 = no size filter.'
+    type: int
+    default: 0
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
