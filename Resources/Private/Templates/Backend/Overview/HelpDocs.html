@@ -194,6 +194,63 @@
         </div>
     </section>
 
+    <!-- ============== FOLDER BATCH IMPORT ============== -->
+    <section class="mt-4">
+        <div class="card border-info">
+            <div class="card-header text-info"><strong>Batch-import from FAL folder</strong> <span class="text-muted ms-2">PDF / DOCX / HTML / Markdown / …</span></div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Walk a fileadmin folder and create one helpdoc per file in it. Existing <code>sys_file</code> rows are reused — files are not copied. Good for dropping a stack of PDFs into <code>fileadmin/handbooks/</code> via FileList and then turning them into searchable entries in one shot.
+                </p>
+                <form action="{folderImportUrl}" method="post">
+                    <input type="hidden" name="token" value="{token}" />
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">Source folder</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="folder" id="folderImportFolder" class="form-control" placeholder="1:/handbooks/" required="required" />
+                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="folderImportFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
+                                Browse…
+                            </button>
+                        </div>
+                        <div class="form-text small">FAL combined identifier (storage:path). Use the picker to pick visually.</div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Language</label>
+                            <select name="language" class="form-select form-select-sm">
+                                <f:for each="{knownLanguages}" as="label" key="langId">
+                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
+                                </f:for>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Document kind</label>
+                            <select name="help_type" class="form-select form-select-sm">
+                                <option value="reference" selected="selected">reference</option>
+                                <option value="concept">concept</option>
+                                <option value="task">task</option>
+                                <option value="upload">upload</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check">
+                                <input type="checkbox" name="recursive" value="1" id="fi-recursive" class="form-check-input" />
+                                <label for="fi-recursive" class="form-check-label small">Include subfolders</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-info">Batch-import folder</button>
+                    <p class="text-muted small mt-2 mb-0">
+                        Run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards. The folder importer is also available via <code>ws_meilisearch:import-help-docs --importer=folder -f folder=1:/handbooks/</code>.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <!-- ============== EDITOR ENTRY POINT ============== -->
     <section class="mt-4">
         <h2 class="h5">Editor edits</h2>

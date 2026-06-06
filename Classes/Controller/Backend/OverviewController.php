@@ -11,6 +11,8 @@ use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
+use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
+use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
@@ -50,6 +52,7 @@ final class OverviewController
         private readonly FlashMessageService $flashMessageService,
         private readonly SourceImporterRegistry $importerRegistry,
         private readonly HelpDocRepository $helpDocRepository,
+        private readonly PageRenderer $pageRenderer,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -63,6 +66,7 @@ final class OverviewController
             'pingRag'         => $this->pingRagAction($request),
             'helpdocs'        => $this->helpdocsAction($request),
             'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
+            'runFolderImport' => $this->runFolderImportAction($request),
             'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
             'uploadHelpdoc'   => $this->uploadHelpdocAction($request),
             default           => $this->indexAction($request),
@@ -347,6 +351,11 @@ final class OverviewController
     private function helpdocsAction(ServerRequestInterface $request): ResponseInterface
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
+        // The folder-importer form uses TYPO3's element-browser modal;
+        // our small handler wires the postMessage back into the input.
+        $this->pageRenderer->getJavaScriptRenderer()->addJavaScriptModuleInstruction(
+            JavaScriptModuleInstruction::create('@wapplersystems/meilisearch/folder-picker.js'),
+        );
 
         // Aggregate the configured sourceRoot across sites so the import
         // form starts with a sensible path the operator usually wants.
@@ -402,6 +411,11 @@ final class OverviewController
             'listEditUrl' => $listEditUrl,
             'importers' => $importers,
             'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
+            'folderImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runFolderImport']),
+            // CSRF-tokened URL for TYPO3's standard folder element-browser.
+            // Built server-side because the BE route is token-protected;
+            // the JS module just opens this URL as an iframe modal.
+            'folderBrowserUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
             'purgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'purgeHelpdocs']),
             'uploadUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'uploadHelpdoc']),
             ...$this->commonTabUrls(),
@@ -442,6 +456,41 @@ final class OverviewController
             );
         } catch (\Throwable $e) {
             $this->addFlash('Import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function runFolderImportAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $folder = trim((string)($body['folder'] ?? ''));
+        if ($folder === '') {
+            $this->addFlash('Folder identifier is required.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        try {
+            $result = $this->importerRegistry->get('folder')->import([
+                'folder' => $folder,
+                'recursive' => isset($body['recursive']) && (string)$body['recursive'] === '1',
+                'language' => (int)($body['language'] ?? 0),
+                'pid' => 0,
+                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
+            ]);
+            $this->addFlash(
+                sprintf(
+                    'Folder import from "%s": imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
+                    $folder,
+                    $result->imported,
+                    $result->skipped,
+                    $result->mediaCopied,
+                ),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (\Throwable $e) {
+            $this->addFlash('Folder import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }

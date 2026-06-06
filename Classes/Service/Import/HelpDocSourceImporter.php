@@ -40,12 +40,23 @@ interface HelpDocSourceImporter
      *   [
      *     'name'     => 'path',                   // required, used as $config key
      *     'label'    => 'Source path',            // shown to the operator
-     *     'type'     => 'text'|'file'|'select'|'checkbox'|'textarea'|'language',
+     *     'type'     => 'text'|'file'|'select'|'checkbox'|'textarea'|'language'|'folder',
      *     'required' => true,                     // default false
      *     'default'  => '...',                    // optional pre-fill
      *     'options'  => ['de' => 'Deutsch', …],   // for type=select
      *     'help'     => 'Free-form hint…',        // optional
      *   ]
+     *
+     * Field types:
+     *   - text:      <input type="text">
+     *   - file:      <input type="file"> (single PSR-7 UploadedFileInterface)
+     *   - select:    <select>; supply `options` map
+     *   - checkbox:  <input type="checkbox"> (boolean)
+     *   - textarea:  multi-line text
+     *   - language:  <select> populated from the active site's languages
+     *   - folder:    FAL combined identifier (e.g. "1:/helpdocs/"), rendered
+     *                with TYPO3's folder picker on the BE side; the value is
+     *                resolved to a Folder via HelpDocRepository::resolveFolder().
      *
      * @return list<array{name:string,label:string,type:string,required?:bool,default?:mixed,options?:array<string,string>,help?:string}>
      */

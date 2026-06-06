@@ -139,6 +139,54 @@ final class HelpDocRepository
         );
     }
 
+    /**
+     * Resolve a FAL folder from a user-supplied identifier. Accepted forms:
+     *   - "1:/helpdocs/"       — combined identifier (FAL standard)
+     *   - "/helpdocs/"         — assumes default storage uid 1
+     *   - "fileadmin/helpdocs" — legacy path-style; we strip "fileadmin/"
+     *                            and resolve against the default storage
+     *
+     * Throws when the storage is unknown or the folder doesn't exist —
+     * the importer should let the exception bubble up so the operator
+     * gets a clear flash message.
+     */
+    public function resolveFolder(string $identifier): Folder
+    {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            throw new \InvalidArgumentException('Folder identifier is empty.');
+        }
+        // "<storageUid>:<path>" → use that storage directly.
+        if (preg_match('/^(\d+):(.+)$/', $identifier, $m) === 1) {
+            $storage = $this->storageRepository->findByUid((int)$m[1]);
+            if ($storage === null) {
+                throw new \InvalidArgumentException(sprintf('Unknown storage uid %d in folder identifier "%s".', (int)$m[1], $identifier));
+            }
+            return $storage->getFolder($m[2]);
+        }
+        // Default storage; strip "fileadmin/" if pasted from URL.
+        $path = ltrim($identifier, '/');
+        if (str_starts_with($path, 'fileadmin/')) {
+            $path = substr($path, strlen('fileadmin/'));
+        }
+        return $this->getStorage()->getFolder('/' . trim($path, '/'));
+    }
+
+    /**
+     * Copy a file from $sourceAbs into the given FAL folder. The caller is
+     * expected to have validated the folder via {@see resolveFolder()}.
+     */
+    public function addFileToFolder(string $sourceAbs, Folder $folder, string $targetFilename, bool $removeOriginal = false): FalFile
+    {
+        return $folder->getStorage()->addFile(
+            $sourceAbs,
+            $folder,
+            $targetFilename,
+            DuplicationBehavior::RENAME,
+            $removeOriginal,
+        );
+    }
+
     public function extractText(FalFile $file): ExtractionResult
     {
         $site = $this->resolveTikaSite();
