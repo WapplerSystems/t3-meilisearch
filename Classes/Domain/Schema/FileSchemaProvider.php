@@ -118,7 +118,12 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         $languages = $site->getLanguages();
         $dedupe = $this->shouldDeduplicate($site);
         $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
-        $excludeExtensions = $this->excludeExtensions($site);
+        // Whitelist wins when non-empty (only these extensions index);
+        // otherwise fall back to blacklist (everything except these).
+        $allowedExtensions = $this->normaliseExtensionList($site, 'meilisearch.indexing.allowedExtensions');
+        $excludeExtensions = $allowedExtensions === []
+            ? $this->normaliseExtensionList($site, 'meilisearch.indexing.excludeExtensions')
+            : [];
         $minImageBytes = $this->minImageBytes($site);
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
@@ -140,12 +145,17 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             if ($file->isMissing()) {
                 continue;
             }
-            // Drop config / log / backup junk before doing any FAL or
-            // Tika work — keeps re-indexes fast and stops the search
-            // corpus from accumulating files no visitor will ever look
-            // for. Comparison is lowercase since site setting + FAL
-            // extension are normalised the same way.
-            if ($excludeExtensions !== [] && in_array(strtolower((string)$file->getExtension()), $excludeExtensions, true)) {
+            // Extension filter: whitelist wins (only listed extensions
+            // pass) when non-empty, otherwise blacklist (skip listed
+            // extensions). Both lists are lowercase since site setting
+            // + FAL extension normalise the same way. Keep this before
+            // the FAL probes below — bad sys_file rows shouldn't even
+            // make it to the size check.
+            $ext = strtolower((string)$file->getExtension());
+            if ($allowedExtensions !== [] && !in_array($ext, $allowedExtensions, true)) {
+                continue;
+            }
+            if ($excludeExtensions !== [] && in_array($ext, $excludeExtensions, true)) {
                 continue;
             }
             // The full document build calls into FAL for mime / size /
@@ -324,11 +334,16 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     }
 
     /**
-     * @return list<string> lower-case file extensions that should be skipped
+     * Read a stringlist site setting holding file extensions and
+     * normalise it: lowercase, strip leading dots, drop empties.
+     * Used for both the allowed-extensions whitelist and the
+     * excluded-extensions blacklist.
+     *
+     * @return list<string>
      */
-    private function excludeExtensions(Site $site): array
+    private function normaliseExtensionList(Site $site, string $settingKey): array
     {
-        $raw = $site->getSettings()->get('meilisearch.indexing.excludeExtensions', []);
+        $raw = $site->getSettings()->get($settingKey, []);
         if (!is_array($raw)) {
             return [];
         }

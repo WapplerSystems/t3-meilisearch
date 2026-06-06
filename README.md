@@ -101,6 +101,34 @@ referenced from at least one page of the current site. Files
 referenced only from non-page records (e.g. `be_users.avatar`) are
 skipped entirely.
 
+### Index filtering
+
+Three optional settings under `meilisearch.indexing` keep junk files
+(icons, configs, backups) out of the corpus. They run at the iterator
+level in `FileSchemaProvider`, so filtered files never become docs —
+no wasted Tika roundtrips, faster reindex.
+
+```yaml
+meilisearch:
+  indexing:
+    # Whitelist — when non-empty, ONLY these extensions index. The
+    # blacklist below is ignored. Recommended for new sites: explicit,
+    # no surprises when an unexpected file type sneaks into fileadmin.
+    allowedExtensions: [pdf, docx, doc, html, htm, md, txt, rtf, odt, epub, pptx, xlsx, ppt, xls]
+    # Blacklist — applied only when allowedExtensions is empty.
+    # Backward-compatible fallback for sites that already use this.
+    excludeExtensions: [yaml, yml, log, bak, tmp]
+    # Image size floor — drops icons / flags / decoration. Files with
+    # mime starting with image/ and size < this threshold are skipped.
+    # 0 (default) disables the filter; 10 KB catches most icons.
+    minImageSizeKb: 10
+```
+
+The three filters compose: a file must pass the extension gate
+(whitelist if set, otherwise blacklist) AND the image-size gate
+before being eligible for indexing. Comparison is case-insensitive
+and leading dots are stripped (`.YAML` matches `yaml`).
+
 Definitions live in `Configuration/Sets/WsMeilisearch/settings.definitions.yaml`
 so settings are typed and editable through the Backend Sites module.
 

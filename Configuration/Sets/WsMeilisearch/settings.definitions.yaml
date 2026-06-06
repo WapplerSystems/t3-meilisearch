@@ -83,9 +83,15 @@ settings:
     type: string
     default: 'auto'
 
+  meilisearch.indexing.allowedExtensions:
+    label: 'Allowed file extensions'
+    description: 'Whitelist of lower-case file extensions to include in the index. When non-empty, ONLY these extensions are indexed and excludeExtensions is ignored. Example: [pdf, docx, doc, html, htm, md, txt, rtf, odt, epub]. Empty by default — falls back to the excludeExtensions blacklist.'
+    type: stringlist
+    default: []
+
   meilisearch.indexing.excludeExtensions:
     label: 'Excluded file extensions'
-    description: 'Lower-case file extensions to keep out of the index entirely (not just out of Tika extraction). Use for config / log / backup files that pollute the search corpus. Example: [yaml, yml, log, bak, tmp]. Empty by default — backward compatible.'
+    description: 'Blacklist applied when allowedExtensions is empty. Use for config / log / backup files that pollute the search corpus. Example: [yaml, yml, log, bak, tmp]. Ignored when allowedExtensions is non-empty.'
     type: stringlist
     default: []
 
