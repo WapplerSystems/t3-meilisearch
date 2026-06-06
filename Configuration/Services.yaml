@@ -21,12 +21,18 @@ services:
       # Plain value objects: built by SearchConfigurationProvider /
       # ApplyMeilisearchSettingsCommand from Site Settings, never injected.
       - '../Classes/Configuration/Dto/*'
+      # ImportResult is a readonly DTO built by HelpDocSourceImporter
+      # implementations; the interface itself stays out of the container.
+      - '../Classes/Service/Import/ImportResult.php'
+      - '../Classes/Service/Import/HelpDocSourceImporter.php'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
       tags: ['ws_meilisearch.schema_provider']
     WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface:
       tags: ['ws_meilisearch.llm_provider']
+    WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter:
+      tags: ['ws_meilisearch.source_importer']
 
   WapplerSystems\Meilisearch\Service\SearchEngineFactory:
     public: true
@@ -47,6 +53,11 @@ services:
   WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry:
     arguments:
       $providers: !tagged_iterator ws_meilisearch.llm_provider
+
+  WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry:
+    public: true
+    arguments:
+      $importers: !tagged_iterator ws_meilisearch.source_importer
 
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:

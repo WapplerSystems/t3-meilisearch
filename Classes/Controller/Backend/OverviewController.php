@@ -14,8 +14,9 @@ use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
-use WapplerSystems\Meilisearch\Service\HelpDocImporter;
 use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
+use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
+use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
 use WapplerSystems\Meilisearch\Service\IndexerService;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
@@ -47,7 +48,8 @@ final class OverviewController
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly EmbedderConfigurator $embedderConfigurator,
         private readonly FlashMessageService $flashMessageService,
-        private readonly HelpDocImporter $helpDocImporter,
+        private readonly SourceImporterRegistry $importerRegistry,
+        private readonly HelpDocRepository $helpDocRepository,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -363,7 +365,7 @@ final class OverviewController
         }
         ksort($knownLanguages);
 
-        $stats = $this->helpDocImporter->stats();
+        $stats = $this->helpDocRepository->stats();
         // Augment each language row with its TYPO3 label (uses the first
         // site that has the language declared) so the template can
         // show "0 — Deutsch" instead of just "0".
@@ -376,8 +378,21 @@ final class OverviewController
         // since the importer writes helpdocs at root.
         $listEditUrl = (string)$this->backendUriBuilder->buildUriFromRoute('web_list', [
             'id' => 0,
-            'table' => HelpDocImporter::HELPDOC_TABLE,
+            'table' => HelpDocRepository::HELPDOC_TABLE,
         ]);
+
+        // List registered importers so the template can show a sidebar
+        // of "what can I import here" — and so adding a new importer is
+        // visible to operators without a template change.
+        $importers = [];
+        foreach ($this->importerRegistry->all() as $importer) {
+            $importers[] = [
+                'name' => $importer->name(),
+                'label' => $importer->label(),
+                'description' => $importer->description(),
+                'fields' => $importer->describeFields(),
+            ];
+        }
 
         $moduleTemplate->assignMultiple([
             'stats' => $stats,
@@ -385,6 +400,7 @@ final class OverviewController
             'defaultSourceRoot' => $defaultSourceRoot,
             'defaultLangDir' => 'de',
             'listEditUrl' => $listEditUrl,
+            'importers' => $importers,
             'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
             'purgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'purgeHelpdocs']),
             'uploadUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'uploadHelpdoc']),
@@ -404,25 +420,23 @@ final class OverviewController
             $this->addFlash('Path is required.', ContextualFeedbackSeverity::ERROR);
             return $this->redirectToHelpdocs();
         }
-        $langDir = trim((string)($body['langDir'] ?? 'de'));
         $languageId = (int)($body['language'] ?? 0);
-        $purge = isset($body['purge']) && (string)$body['purge'] === '1';
         try {
-            $result = $this->helpDocImporter->import(
-                path: $path,
-                langDir: $langDir,
-                languageId: $languageId,
-                pid: 0,
-                purge: $purge,
-                limit: 0,
-            );
+            $result = $this->importerRegistry->get('dita-ot')->import([
+                'path' => $path,
+                'langDir' => trim((string)($body['langDir'] ?? 'de')),
+                'language' => $languageId,
+                'pid' => 0,
+                'purge' => isset($body['purge']) && (string)$body['purge'] === '1',
+                'limit' => 0,
+            ]);
             $this->addFlash(
                 sprintf(
                     'Imported %d topic(s) into language %d (%d skipped, %d media attached). Run reindex to push them to Meilisearch.',
-                    $result['imported'],
+                    $result->imported,
                     $languageId,
-                    $result['skipped'],
-                    $result['mediaCopied'],
+                    $result->skipped,
+                    $result->mediaCopied,
                 ),
                 ContextualFeedbackSeverity::OK,
             );
@@ -449,7 +463,7 @@ final class OverviewController
             return $this->redirectToHelpdocs();
         }
         try {
-            $deleted = $this->helpDocImporter->purgeLanguage($languageId);
+            $deleted = $this->helpDocRepository->purgeLanguage($languageId);
             $this->addFlash(
                 sprintf('Purged %d helpdoc row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.', $deleted, $languageId),
                 ContextualFeedbackSeverity::OK,
@@ -472,25 +486,17 @@ final class OverviewController
             $this->addFlash('No file uploaded.', ContextualFeedbackSeverity::ERROR);
             return $this->redirectToHelpdocs();
         }
-        $title = trim((string)($body['title'] ?? ''));
-        $abstract = trim((string)($body['abstract'] ?? ''));
-        $languageId = (int)($body['language'] ?? 0);
-        $helpType = trim((string)($body['help_type'] ?? 'upload'));
-        // Whitelist the helpType to the values List/SearchUI know about.
-        if (!in_array($helpType, ['upload', 'concept', 'task', 'reference'], true)) {
-            $helpType = 'upload';
-        }
-
         try {
-            $result = $this->helpDocImporter->importUpload(
-                upload: $upload,
-                title: $title,
-                languageId: $languageId,
-                abstract: $abstract !== '' ? $abstract : null,
-                helpType: $helpType,
-            );
-            $extractNote = match ($result['extractStatus']) {
-                'success' => sprintf('Tika extracted %d chars', $result['extractedChars']),
+            $result = $this->importerRegistry->get('single-file')->import([
+                'upload' => $upload,
+                'title' => trim((string)($body['title'] ?? '')),
+                'abstract' => trim((string)($body['abstract'] ?? '')),
+                'language' => (int)($body['language'] ?? 0),
+                'help_type' => trim((string)($body['help_type'] ?? 'upload')),
+            ]);
+            $extras = $result->extras;
+            $extractNote = match ($extras['extractStatus'] ?? '') {
+                'success' => sprintf('Tika extracted %d chars', (int)($extras['extractedChars'] ?? 0)),
                 'skipped' => 'Tika skipped (no extraction — title-only doc)',
                 'failed'  => 'Tika failed — document indexed without body text',
                 default   => 'No Tika configured',
@@ -499,8 +505,8 @@ final class OverviewController
                 sprintf(
                     'Uploaded "%s" (helpdoc #%d, FAL file #%d). %s. Run reindex to push it to Meilisearch.',
                     $upload->getClientFilename(),
-                    $result['uid'],
-                    $result['falUid'],
+                    (int)($extras['uid'] ?? 0),
+                    (int)($extras['falUid'] ?? 0),
                     $extractNote,
                 ),
                 ContextualFeedbackSeverity::OK,
