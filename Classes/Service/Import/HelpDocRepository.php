@@ -292,7 +292,7 @@ final class HelpDocRepository
      * this so first-time setups don't need an operator to pre-create
      * the helpdocs folder in the file list.
      */
-    private function resolveOrCreateFolder(string $identifier): Folder
+    public function resolveOrCreateFolder(string $identifier): Folder
     {
         [$storage, $path] = $this->parseFolderIdentifier($identifier);
         try {

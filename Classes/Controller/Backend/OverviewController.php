@@ -67,6 +67,7 @@ final class OverviewController
             'helpdocs'        => $this->helpdocsAction($request),
             'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
             'runFolderImport' => $this->runFolderImportAction($request),
+            'runZipImport'    => $this->runZipImportAction($request),
             'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
             'uploadHelpdoc'   => $this->uploadHelpdocAction($request),
             default           => $this->indexAction($request),
@@ -425,6 +426,7 @@ final class OverviewController
             'importers' => $importers,
             'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
             'folderImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runFolderImport']),
+            'zipImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runZipImport']),
             // CSRF-tokened URL for TYPO3's standard folder element-browser.
             // Built server-side because the BE route is token-protected;
             // the JS module just opens this URL as an iframe modal.
@@ -469,6 +471,43 @@ final class OverviewController
             );
         } catch (\Throwable $e) {
             $this->addFlash('Import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function runZipImportAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $uploadedFiles = $request->getUploadedFiles();
+        $upload = $uploadedFiles['archive'] ?? null;
+        if (!$upload instanceof \Psr\Http\Message\UploadedFileInterface) {
+            $this->addFlash('No zip uploaded.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        try {
+            $result = $this->importerRegistry->get('zip-bundle')->import([
+                'upload' => $upload,
+                'language' => (int)($body['language'] ?? 0),
+                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
+                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
+                'preserveSubfolders' => isset($body['preserveSubfolders']) && (string)$body['preserveSubfolders'] === '1',
+                'titleFromFilename' => !isset($body['titleFromFilename']) || (string)$body['titleFromFilename'] === '1',
+            ]);
+            $this->addFlash(
+                sprintf(
+                    'Zip "%s": imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
+                    $upload->getClientFilename(),
+                    $result->imported,
+                    $result->skipped,
+                    $result->mediaCopied,
+                ),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (\Throwable $e) {
+            $this->addFlash('Zip import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }
