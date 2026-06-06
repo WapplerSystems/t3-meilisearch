@@ -10,6 +10,8 @@
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
         </h2>
 
+        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled}"/>
+
         <f:comment>
             With conversation memory enabled, the controller has already
             appended the just-asked turn to {conversation}, so the thread
@@ -116,8 +118,6 @@
                 </f:if>
             </f:else>
         </f:if>
-
-        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled}"/>
     </div>
 </f:section>
 

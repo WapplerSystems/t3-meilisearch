@@ -2,7 +2,9 @@
 <f:comment>
     Renders a conversation history list (one card per (question, answer)
     turn). Empty when conversation memory is off or this is the first
-    question — the form below the thread does the heavy lifting then.
+    question — the form above the thread does the heavy lifting then.
+    Order is chronological (oldest first); the latest turn lands at
+    the bottom of the page.
 </f:comment>
 <f:if condition="{conversation}">
     <ol class="ws-meilisearch-rag-thread list-unstyled mb-4">
