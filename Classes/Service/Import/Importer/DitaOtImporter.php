@@ -57,6 +57,8 @@ final class DitaOtImporter implements HelpDocSourceImporter
              'help' => 'Recommended — wipes existing rows for the chosen language so re-runs are idempotent.'],
             ['name' => 'limit', 'label' => 'Limit', 'type' => 'text', 'default' => '0',
              'help' => 'Only import the first N topics. 0 = no limit.'],
+            ['name' => 'targetFolder', 'label' => 'Target media folder', 'type' => 'folder',
+             'help' => 'Where the topic-specific media subfolders are created in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder).'],
         ];
     }
 
@@ -68,6 +70,8 @@ final class DitaOtImporter implements HelpDocSourceImporter
         $pid = (int)($config['pid'] ?? 0);
         $limit = max(0, (int)($config['limit'] ?? 0));
         $purge = (bool)($config['purge'] ?? true);
+        $targetRoot = trim((string)($config['targetFolder'] ?? ''));
+        $targetRootOrNull = $targetRoot !== '' ? $targetRoot : null;
 
         if ($rootPath === '') {
             throw new \RuntimeException('path is required');
@@ -122,7 +126,7 @@ final class DitaOtImporter implements HelpDocSourceImporter
             $imported++;
 
             if ($mediaSourceAbs !== null && is_file($mediaSourceAbs)) {
-                $falFile = $this->repository->addFileFromPath($mediaSourceAbs, $row['identifier']);
+                $falFile = $this->repository->addFileFromPath($mediaSourceAbs, $row['identifier'], $targetRootOrNull);
                 $this->repository->attachMedia($falFile, $uid, $languageId, $pid);
                 $mediaCopied++;
             }

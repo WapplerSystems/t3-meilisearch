@@ -403,10 +403,23 @@ final class OverviewController
             ];
         }
 
+        // The default FAL target folder for uploaded files — informational
+        // placeholder in the BE forms so operators see what they get when
+        // they leave the picker empty.
+        $defaultTargetFolder = HelpDocRepository::DEFAULT_TARGET_FOLDER;
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.fileadminFolder', ''));
+            if ($configured !== '') {
+                $defaultTargetFolder = $configured;
+                break;
+            }
+        }
+
         $moduleTemplate->assignMultiple([
             'stats' => $stats,
             'knownLanguages' => $knownLanguages,
             'defaultSourceRoot' => $defaultSourceRoot,
+            'defaultTargetFolder' => $defaultTargetFolder,
             'defaultLangDir' => 'de',
             'listEditUrl' => $listEditUrl,
             'importers' => $importers,
@@ -542,6 +555,7 @@ final class OverviewController
                 'abstract' => trim((string)($body['abstract'] ?? '')),
                 'language' => (int)($body['language'] ?? 0),
                 'help_type' => trim((string)($body['help_type'] ?? 'upload')),
+                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
             ]);
             $extras = $result->extras;
             $extractNote = match ($extras['extractStatus'] ?? '') {

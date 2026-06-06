@@ -60,6 +60,8 @@ final class SingleFileImporter implements HelpDocSourceImporter
             ['name' => 'language', 'label' => 'Language', 'type' => 'language', 'default' => 0],
             ['name' => 'help_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'upload',
              'options' => ['upload' => 'upload', 'concept' => 'concept', 'task' => 'task', 'reference' => 'reference']],
+            ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
+             'help' => 'Where the uploaded file lands in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder). The "uploads/" subfolder is added automatically.'],
         ];
     }
 
@@ -100,9 +102,11 @@ final class SingleFileImporter implements HelpDocSourceImporter
             throw new \RuntimeException('Cannot stage upload to temp file ' . $tmpPath);
         }
 
+        $targetRoot = trim((string)($config['targetFolder'] ?? ''));
+
         try {
             $targetName = $this->repository->sanitiseFilename($clientFilename);
-            $falFile = $this->repository->addFileToUploads($tmpPath, $targetName);
+            $falFile = $this->repository->addFileToUploads($tmpPath, $targetName, $targetRoot !== '' ? $targetRoot : null);
 
             $extracted = $this->repository->extractText($falFile);
             $body = $extracted->status === ExtractionResult::SUCCESS ? $extracted->text : '';
@@ -119,7 +123,10 @@ final class SingleFileImporter implements HelpDocSourceImporter
                 'body' => $body,
                 'help_type' => $helpType,
                 'parent_identifier' => '',
-                'source_path' => 'fileadmin/' . HelpDocRepository::FILEADMIN_FOLDER . '/' . HelpDocRepository::UPLOADS_SUBFOLDER . '/' . $falFile->getName(),
+                // FAL gives us the public URL post-creation; this avoids
+                // hardcoding "fileadmin/..." which would break for other
+                // storages.
+                'source_path' => (string)$falFile->getPublicUrl(),
                 'media' => 0,
             ]);
             $this->repository->attachMedia($falFile, $helpdocUid, $languageId, 0);

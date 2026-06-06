@@ -34,9 +34,13 @@ use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 final class HelpDocRepository
 {
     public const HELPDOC_TABLE = 'tx_wsmeilisearch_helpdoc';
-    public const FILEADMIN_FOLDER = 'helpdocs';
     public const UPLOADS_SUBFOLDER = 'uploads';
-    public const STORAGE_UID = 1;
+    /**
+     * Final fallback when no site is configured and the operator hasn't
+     * picked a target folder. Combined identifier so importers can
+     * accept the same syntax as the BE picker.
+     */
+    public const DEFAULT_TARGET_FOLDER = '1:/helpdocs/';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -45,9 +49,23 @@ final class HelpDocRepository
         private readonly SiteFinder $siteFinder,
     ) {}
 
-    public function getStorage(): ResourceStorage
+    /**
+     * Resolve the default FAL target folder. Picks the first site that
+     * has `meilisearch.helpdoc.fileadminFolder` set and falls back to
+     * {@see DEFAULT_TARGET_FOLDER}. The folder is auto-created on first
+     * use so first imports work without manual fileadmin prep.
+     */
+    public function getDefaultTargetFolder(): Folder
     {
-        return $this->storageRepository->findByUid(self::STORAGE_UID);
+        $identifier = self::DEFAULT_TARGET_FOLDER;
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.fileadminFolder', ''));
+            if ($configured !== '') {
+                $identifier = $configured;
+                break;
+            }
+        }
+        return $this->resolveOrCreateFolder($identifier);
     }
 
     public function resolvePath(string $raw): string
@@ -99,14 +117,18 @@ final class HelpDocRepository
     }
 
     /**
-     * Copy a file from $sourceAbs into fileadmin/<root>/<identifier>/
-     * (folder name sanitised). Used by the DITA importer for per-topic
-     * media folders.
+     * Copy a file from $sourceAbs into <root>/<identifier>/<filename>
+     * (folder name sanitised). The root defaults to the site-configured
+     * `meilisearch.helpdoc.fileadminFolder`; pass `$rootIdentifier` to
+     * override per-call (e.g. operator picked a different folder in the
+     * BE form). Used by the DITA importer for per-topic media folders.
      */
-    public function addFileFromPath(string $sourceAbs, string $identifier): FalFile
+    public function addFileFromPath(string $sourceAbs, string $identifier, ?string $rootIdentifier = null): FalFile
     {
-        $storage = $this->getStorage();
-        $root = $this->ensureRootFolder($storage);
+        $root = $rootIdentifier !== null && $rootIdentifier !== ''
+            ? $this->resolveOrCreateFolder($rootIdentifier)
+            : $this->getDefaultTargetFolder();
+        $storage = $root->getStorage();
         $folderName = $this->sanitiseFolderName($identifier);
         try {
             $sub = $root->getSubfolder($folderName);
@@ -123,14 +145,18 @@ final class HelpDocRepository
     }
 
     /**
-     * Copy a file from $sourceAbs into fileadmin/<root>/uploads/.
-     * Used by the SingleFileImporter for editor BE uploads.
+     * Copy a file from $sourceAbs into <root>/uploads/. The root
+     * defaults to the site-configured `meilisearch.helpdoc.fileadminFolder`;
+     * pass `$rootIdentifier` to override per-call. Used by the
+     * SingleFileImporter for editor BE uploads.
      */
-    public function addFileToUploads(string $sourceAbs, string $targetFilename): FalFile
+    public function addFileToUploads(string $sourceAbs, string $targetFilename, ?string $rootIdentifier = null): FalFile
     {
-        $storage = $this->getStorage();
-        $folder = $this->ensureUploadsFolder($storage);
-        return $storage->addFile(
+        $root = $rootIdentifier !== null && $rootIdentifier !== ''
+            ? $this->resolveOrCreateFolder($rootIdentifier)
+            : $this->getDefaultTargetFolder();
+        $folder = $this->ensureUploadsSubfolder($root);
+        return $folder->getStorage()->addFile(
             $sourceAbs,
             $folder,
             $targetFilename,
@@ -152,24 +178,8 @@ final class HelpDocRepository
      */
     public function resolveFolder(string $identifier): Folder
     {
-        $identifier = trim($identifier);
-        if ($identifier === '') {
-            throw new \InvalidArgumentException('Folder identifier is empty.');
-        }
-        // "<storageUid>:<path>" → use that storage directly.
-        if (preg_match('/^(\d+):(.+)$/', $identifier, $m) === 1) {
-            $storage = $this->storageRepository->findByUid((int)$m[1]);
-            if ($storage === null) {
-                throw new \InvalidArgumentException(sprintf('Unknown storage uid %d in folder identifier "%s".', (int)$m[1], $identifier));
-            }
-            return $storage->getFolder($m[2]);
-        }
-        // Default storage; strip "fileadmin/" if pasted from URL.
-        $path = ltrim($identifier, '/');
-        if (str_starts_with($path, 'fileadmin/')) {
-            $path = substr($path, strlen('fileadmin/'));
-        }
-        return $this->getStorage()->getFolder('/' . trim($path, '/'));
+        [$storage, $path] = $this->parseFolderIdentifier($identifier);
+        return $storage->getFolder($path);
     }
 
     /**
@@ -276,22 +286,73 @@ final class HelpDocRepository
         return $name !== '' ? $name : 'upload';
     }
 
-    private function ensureRootFolder(ResourceStorage $storage): Folder
+    /**
+     * Like {@see resolveFolder()} but auto-creates the target if it
+     * doesn't exist yet. Importers + the default-target resolver use
+     * this so first-time setups don't need an operator to pre-create
+     * the helpdocs folder in the file list.
+     */
+    private function resolveOrCreateFolder(string $identifier): Folder
     {
+        [$storage, $path] = $this->parseFolderIdentifier($identifier);
         try {
-            return $storage->getFolder(self::FILEADMIN_FOLDER);
+            return $storage->getFolder($path);
         } catch (FolderDoesNotExistException) {
-            return $storage->createFolder(self::FILEADMIN_FOLDER);
+            // Walk the path segments, creating each missing folder. Done
+            // segment-by-segment so createFolder() always gets a parent
+            // that already exists.
+            $current = $storage->getRootLevelFolder();
+            foreach (explode('/', trim($path, '/')) as $segment) {
+                if ($segment === '') {
+                    continue;
+                }
+                try {
+                    $current = $current->getSubfolder($segment);
+                } catch (FolderDoesNotExistException) {
+                    $current = $storage->createFolder($segment, $current);
+                }
+            }
+            return $current;
         }
     }
 
-    private function ensureUploadsFolder(ResourceStorage $storage): Folder
+    /**
+     * Parse a folder identifier in any of the accepted forms:
+     *   - "1:/helpdocs/"       — combined identifier (FAL standard)
+     *   - "/helpdocs/"         — assumes default storage uid 1
+     *   - "fileadmin/helpdocs" — legacy path-style; stripped of "fileadmin/"
+     *                            and resolved against the default storage
+     *
+     * @return array{0: ResourceStorage, 1: string} storage + leading-slash path
+     */
+    private function parseFolderIdentifier(string $identifier): array
     {
-        $root = $this->ensureRootFolder($storage);
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            throw new \InvalidArgumentException('Folder identifier is empty.');
+        }
+        if (str_starts_with($identifier, 'fileadmin/')) {
+            $identifier = '1:/' . ltrim(substr($identifier, strlen('fileadmin/')), '/');
+        }
+        if (str_starts_with($identifier, '/')) {
+            $identifier = '1:' . $identifier;
+        }
+        if (preg_match('/^(\d+):(.+)$/', $identifier, $m) !== 1) {
+            throw new \InvalidArgumentException(sprintf('Invalid folder identifier "%s". Expected "<storage>:/path/".', $identifier));
+        }
+        $storage = $this->storageRepository->findByUid((int)$m[1]);
+        if ($storage === null) {
+            throw new \InvalidArgumentException(sprintf('Unknown storage uid %d in folder identifier "%s".', (int)$m[1], $identifier));
+        }
+        return [$storage, '/' . trim($m[2], '/')];
+    }
+
+    private function ensureUploadsSubfolder(Folder $root): Folder
+    {
         try {
             return $root->getSubfolder(self::UPLOADS_SUBFOLDER);
         } catch (FolderDoesNotExistException) {
-            return $storage->createFolder(self::UPLOADS_SUBFOLDER, $root);
+            return $root->getStorage()->createFolder(self::UPLOADS_SUBFOLDER, $root);
         }
     }
 

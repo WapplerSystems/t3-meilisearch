@@ -185,6 +185,17 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Target folder <span class="text-muted">(empty = site default <code>{defaultTargetFolder}</code>)</span></label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="targetFolder" id="uploadTargetFolder" class="form-control" placeholder="{defaultTargetFolder}" />
+                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="uploadTargetFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
+                                Browse…
+                            </button>
+                        </div>
+                        <div class="form-text small">FAL combined identifier (storage:path). The <code>uploads/</code> subfolder is added automatically.</div>
+                    </div>
+
                     <button type="submit" class="btn btn-success">Upload &amp; create helpdoc</button>
                     <p class="text-muted small mt-2 mb-0">
                         After upload the new entry is visible in the List module immediately. Run <code>ws_meilisearch:reindex</code> (or the Overview tab) to push it to Meilisearch.
