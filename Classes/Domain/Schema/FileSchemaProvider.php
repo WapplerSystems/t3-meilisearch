@@ -118,6 +118,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         $languages = $site->getLanguages();
         $dedupe = $this->shouldDeduplicate($site);
         $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
+        $excludeExtensions = $this->excludeExtensions($site);
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
         $result = $qb->select('uid')
@@ -136,6 +137,14 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
                 continue;
             }
             if ($file->isMissing()) {
+                continue;
+            }
+            // Drop config / log / backup junk before doing any FAL or
+            // Tika work — keeps re-indexes fast and stops the search
+            // corpus from accumulating files no visitor will ever look
+            // for. Comparison is lowercase since site setting + FAL
+            // extension are normalised the same way.
+            if ($excludeExtensions !== [] && in_array(strtolower((string)$file->getExtension()), $excludeExtensions, true)) {
                 continue;
             }
 
@@ -297,6 +306,25 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     private function shouldDeduplicate(Site $site): bool
     {
         return (bool)$site->getSettings()->get('meilisearch.deduplicateFiles', false);
+    }
+
+    /**
+     * @return list<string> lower-case file extensions that should be skipped
+     */
+    private function excludeExtensions(Site $site): array
+    {
+        $raw = $site->getSettings()->get('meilisearch.indexing.excludeExtensions', []);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $ext) {
+            $ext = ltrim(strtolower((string)$ext), '.');
+            if ($ext !== '') {
+                $out[] = $ext;
+            }
+        }
+        return $out;
     }
 
     /**

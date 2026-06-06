@@ -83,6 +83,12 @@ settings:
     type: string
     default: 'auto'
 
+  meilisearch.indexing.excludeExtensions:
+    label: 'Excluded file extensions'
+    description: 'Lower-case file extensions to keep out of the index entirely (not just out of Tika extraction). Use for config / log / backup files that pollute the search corpus. Example: [yaml, yml, log, bak, tmp]. Empty by default — backward compatible.'
+    type: stringlist
+    default: []
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
