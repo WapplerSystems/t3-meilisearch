@@ -101,9 +101,19 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             return;
         }
 
-        // Body text extracts once per file — same content across languages.
-        $bodytext = $this->extractBody($file, $site);
+        // URL + metadata first (cheap, can't really fail). Body
+        // extraction is best-effort — see the long comment in
+        // iterateDocuments() for the rationale.
         $publicUrl = $this->normalisePublicUrl((string)$file->getPublicUrl());
+        try {
+            $bodytext = $this->extractBody($file, $site);
+        } catch (\Throwable $e) {
+            $this->logger?->info('FileSchemaProvider body extraction skipped for {uid}: {message}', [
+                'uid' => $file->getUid(),
+                'message' => $e->getMessage(),
+            ]);
+            $bodytext = '';
+        }
 
         foreach ($site->getLanguages() as $language) {
             $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
@@ -159,16 +169,16 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
                 continue;
             }
             // The full document build calls into FAL for mime / size /
-            // public URL, which probes the underlying storage. On environments
-            // forked from prod (S3 storage missing locally, files deleted out-
-            // of-band, broken sys_file rows with missing=0) this can throw —
-            // skip the file with a warning rather than failing the whole
-            // reindex. The DB `missing=0` filter at the SQL level catches the
-            // common case; this guard handles the rest.
-            //
-            // The size+mime check shares this try block: getSize() /
-            // getMimeType() on a broken sys_file row reach into the
-            // storage driver too, so any of those calls can throw.
+            // public URL. Metadata calls (getSize / getMimeType /
+            // getPublicUrl) come from the sys_file row + storage config
+            // and stay cheap. Body extraction by contrast reads the
+            // actual bytes through Tika — on environments forked from
+            // prod where files don't exist locally yet, this is the
+            // call that throws. Order the work so URL + metadata land
+            // first; body becomes optional. The DB `missing=0` filter
+            // at the SQL level catches the obvious case; this guard
+            // handles broken sys_file rows where missing=0 but the
+            // file isn't on the storage anyway.
             try {
                 // Tiny icons / flags / decoration pollute the corpus
                 // without being useful as results — skip any image
@@ -181,15 +191,28 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
                 ) {
                     continue;
                 }
-                $bodytext = $this->extractBody($file, $site);
                 $publicUrl = $this->normalisePublicUrl((string)$file->getPublicUrl());
             } catch (\Throwable $e) {
-                $this->logger?->warning('FileSchemaProvider skipped {uid} ({ident}): cannot read file: {message}', [
+                $this->logger?->warning('FileSchemaProvider skipped {uid} ({ident}): cannot read metadata: {message}', [
                     'uid' => $file->getUid(),
                     'ident' => $file->getIdentifier(),
                     'message' => $e->getMessage(),
                 ]);
                 continue;
+            }
+            // Body extraction is best-effort. A failure here (Tika
+            // unreachable, file content missing on a forked
+            // environment, OCR timeout) leaves the doc indexable as
+            // title + metadata only — the operator can still find
+            // it by name without losing the entry entirely.
+            try {
+                $bodytext = $this->extractBody($file, $site);
+            } catch (\Throwable $e) {
+                $this->logger?->info('FileSchemaProvider body extraction skipped for {uid}: {message}', [
+                    'uid' => $file->getUid(),
+                    'message' => $e->getMessage(),
+                ]);
+                $bodytext = '';
             }
 
             foreach ($languages as $language) {
