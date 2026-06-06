@@ -104,6 +104,14 @@ final class ImportHelpDocsCommand extends Command
             $progressBar->finish();
             $io->newLine(2);
         }
+        // Surface per-item errors so the operator sees which inputs failed.
+        // The BE controller bubbles these up via the flash message; the CLI
+        // gets a dedicated table because the list can be long.
+        $errors = (array)($result->extras['errors'] ?? []);
+        if ($errors !== []) {
+            $io->warning(sprintf('%d item(s) failed:', count($errors)));
+            $io->listing(array_map(static fn ($e) => (string)$e, $errors));
+        }
         $io->success($result->summary() . '. Run `ws_meilisearch:reindex` to push the records to Meilisearch.');
         return Command::SUCCESS;
     }

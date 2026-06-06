@@ -47,7 +47,7 @@ final class UrlListImporter implements HelpDocSourceImporter
      */
     private const MIME_TO_EXT = [
         'text/html' => 'html',
-        'application/xhtml+xml' => 'html',
+        'application/xhtml+xml' => 'xml',
         'application/pdf' => 'pdf',
         'text/plain' => 'txt',
         'text/markdown' => 'md',
@@ -159,10 +159,11 @@ final class UrlListImporter implements HelpDocSourceImporter
 
                 $extracted = $this->repository->extractText($falFile);
                 $body = $extracted->status === ExtractionResult::SUCCESS ? $extracted->text : '';
-                // For text/html responses where Tika returned nothing
-                // (mime not in allowlist), pull plain text from the
-                // HTML directly so the entry is still searchable.
-                if ($body === '' && str_starts_with($download['mime'], 'text/html')) {
+                // When Tika returned nothing (mime not in its
+                // allowlist, e.g. text/html or text/xml), pull plain
+                // text from the markup directly so the entry stays
+                // searchable.
+                if ($body === '' && (str_starts_with($download['mime'], 'text/') || $download['mime'] === 'application/xhtml+xml')) {
                     $body = $this->htmlToText($download['body']);
                 }
 
@@ -258,25 +259,39 @@ final class UrlListImporter implements HelpDocSourceImporter
         if ($body === '') {
             throw new \RuntimeException('Empty response body');
         }
-        // Content-Type may be "text/html; charset=utf-8" — take only the mime.
-        $mime = strtolower(trim((string)strtok((string)$response->getHeaderLine('content-type'), ';')));
-        $ext = self::MIME_TO_EXT[$mime] ?? null;
+        // Header Content-Type ("text/html; charset=utf-8") is the
+        // remote server's claim. We prefer PHP's finfo over the bytes
+        // because TYPO3 v14's resource consistency check uses content-
+        // based detection too — saving a file as .html when finfo sees
+        // text/xml (e.g. XHTML 1.0 Transitional with an <?xml prolog)
+        // makes addFile() reject the upload. We detect from the body,
+        // pick the matching extension, then trust the result.
+        $headerMime = strtolower(trim((string)strtok((string)$response->getHeaderLine('content-type'), ';')));
+        $detectedMime = (string)(new \finfo(FILEINFO_MIME_TYPE))->buffer($body);
+        $mime = $detectedMime !== '' ? $detectedMime : $headerMime;
+        $ext = self::MIME_TO_EXT[$mime] ?? self::MIME_TO_EXT[$headerMime] ?? null;
 
-        // Derive a sensible filename from the URL path; fall back to mime extension.
+        // Derive a filename from the URL path; if the path tail has no
+        // extension, append the one we resolved. If the path tail HAS
+        // an extension but the detected mime maps to a different one
+        // (server lies / actual content differs), swap to the detected
+        // ext so TYPO3's consistency check passes.
         $path = (string)parse_url($url, PHP_URL_PATH);
         $base = basename($path);
         if ($base === '' || $base === '/') {
             $base = 'index';
         }
         $pathExt = strtolower(pathinfo($base, PATHINFO_EXTENSION));
-        if ($pathExt === '' && $ext !== null) {
-            $base .= '.' . $ext;
+        if ($ext !== null && $pathExt !== $ext) {
+            $base = ($pathExt !== '' ? pathinfo($base, PATHINFO_FILENAME) : $base) . '.' . $ext;
         } elseif ($ext === null) {
             $ext = $pathExt !== '' ? $pathExt : 'bin';
         }
 
+        // Extract <title> even when the response is served as
+        // text/xml (DITA-OT XHTML) — the tag layout is identical.
         $title = '';
-        if (str_starts_with($mime, 'text/html')) {
+        if (str_starts_with($mime, 'text/') || $mime === 'application/xhtml+xml') {
             $title = $this->extractHtmlTitle($body);
         }
 
