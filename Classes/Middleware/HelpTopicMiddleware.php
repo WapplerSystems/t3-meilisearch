@@ -23,8 +23,11 @@ use TYPO3\CMS\Core\Http\Stream;
  *   /hilfe/de/figures/X.png
  *   /hilfe/commonltr.css  etc.
  *
- * Configured via the site setting `meilisearch.helpdoc.sourceRoot`
- * (relative to project root). Falls back to chatbot/ChatbotHilfe/DE_xhtml.
+ * Configured per site via `meilisearch.helpdoc.sourceRoot` (absolute or
+ * relative to project root). Without configuration the middleware
+ * short-circuits and lets normal TYPO3 routing handle the request — the
+ * extension ships no default path on purpose so a fresh install never
+ * exposes filesystem locations from any host project.
  * Path traversal is rejected at request time; only the configured root
  * + its descendants can be reached.
  *
@@ -34,7 +37,6 @@ use TYPO3\CMS\Core\Http\Stream;
 final class HelpTopicMiddleware implements MiddlewareInterface
 {
     private const URL_PREFIX = '/hilfe';
-    private const DEFAULT_SOURCE_ROOT = 'chatbot/ChatbotHilfe/DE_xhtml';
 
     /** @var array<string, string> Whitelisted file extensions → Content-Type */
     private const MIME_MAP = [
@@ -111,18 +113,19 @@ final class HelpTopicMiddleware implements MiddlewareInterface
 
     /**
      * Resolve the on-disk root of the DITA corpus from the active site's
-     * settings (`meilisearch.helpdoc.sourceRoot`), falling back to the
-     * package-default path under the project root.
+     * settings (`meilisearch.helpdoc.sourceRoot`). Returns an empty
+     * string when nothing is configured — caller treats that as
+     * "feature disabled" and passes the request through.
      */
     private function resolveSourceRoot(ServerRequestInterface $request): string
     {
-        $relative = self::DEFAULT_SOURCE_ROOT;
         $site = $request->getAttribute('site');
-        if ($site !== null && method_exists($site, 'getSettings')) {
-            $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.sourceRoot', ''));
-            if ($configured !== '') {
-                $relative = $configured;
-            }
+        if ($site === null || !method_exists($site, 'getSettings')) {
+            return '';
+        }
+        $relative = trim((string)$site->getSettings()->get('meilisearch.helpdoc.sourceRoot', ''));
+        if ($relative === '') {
+            return '';
         }
         // Absolute path → use as-is. Relative → resolve against project root.
         if (str_starts_with($relative, '/')) {

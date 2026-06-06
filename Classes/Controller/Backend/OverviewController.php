@@ -350,12 +350,12 @@ final class OverviewController
 
         // Aggregate the configured sourceRoot across sites so the import
         // form starts with a sensible path the operator usually wants.
-        // First non-empty wins; falls back to the package default.
-        $defaultSourceRoot = 'chatbot/ChatbotHilfe/DE_xhtml';
+        // First non-empty wins; stays empty if no site has it configured.
+        $defaultSourceRoot = '';
         $knownLanguages = [];
         foreach ($this->siteFinder->getAllSites() as $site) {
             $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.sourceRoot', ''));
-            if ($configured !== '' && $defaultSourceRoot === 'chatbot/ChatbotHilfe/DE_xhtml') {
+            if ($configured !== '' && $defaultSourceRoot === '') {
                 $defaultSourceRoot = $configured;
             }
             foreach ($site->getAllLanguages() as $lang) {

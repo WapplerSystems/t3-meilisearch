@@ -11,8 +11,9 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 
 /**
- * SchemaProvider for DITA help topics living in tx_wsmeilisearch_helpdoc
- * (populated by the import-chatbot-hilfe CLI).
+ * SchemaProvider for help topics living in tx_wsmeilisearch_helpdoc
+ * (populated by the ws_meilisearch:import-help-docs CLI or the BE
+ * upload form).
  *
  * Each row produces one document with id `help-<uid>`. The `uri` field
  * points at the static-topic delivery middleware path under /hilfe/...
@@ -237,7 +238,7 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
             if ($url === '') {
                 return '';
             }
-            // FAL returns paths like "fileadmin/chatbot-hilfe/X/foo.png"
+            // FAL returns paths like "fileadmin/helpdocs/X/foo.png"
             // without a leading slash. The FE result-card embeds the URL
             // as `<img src="…">` so a missing slash makes it resolve
             // relative to the current document path (/de/suche/fileadmin/…

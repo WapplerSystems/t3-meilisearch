@@ -34,7 +34,7 @@ use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 final class HelpDocRepository
 {
     public const HELPDOC_TABLE = 'tx_wsmeilisearch_helpdoc';
-    public const FILEADMIN_FOLDER = 'chatbot-hilfe';
+    public const FILEADMIN_FOLDER = 'helpdocs';
     public const UPLOADS_SUBFOLDER = 'uploads';
     public const STORAGE_UID = 1;
 
