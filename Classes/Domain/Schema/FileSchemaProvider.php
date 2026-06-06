@@ -103,7 +103,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
 
         // Body text extracts once per file — same content across languages.
         $bodytext = $this->extractBody($file, $site);
-        $publicUrl = $file->getPublicUrl() ?? '';
+        $publicUrl = $this->normalisePublicUrl((string)$file->getPublicUrl());
 
         foreach ($site->getLanguages() as $language) {
             $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
@@ -148,18 +148,6 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             if ($excludeExtensions !== [] && in_array(strtolower((string)$file->getExtension()), $excludeExtensions, true)) {
                 continue;
             }
-            // Tiny icons / flags / decoration pollute the corpus
-            // without being useful as results — skip any image
-            // under the operator-chosen byte threshold. Checking
-            // the mime prefix scopes the filter so legitimate
-            // small text files (a 200-byte README) still index.
-            if ($minImageBytes > 0
-                && (int)$file->getSize() < $minImageBytes
-                && str_starts_with((string)$file->getMimeType(), 'image/')
-            ) {
-                continue;
-            }
-
             // The full document build calls into FAL for mime / size /
             // public URL, which probes the underlying storage. On environments
             // forked from prod (S3 storage missing locally, files deleted out-
@@ -167,9 +155,24 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             // skip the file with a warning rather than failing the whole
             // reindex. The DB `missing=0` filter at the SQL level catches the
             // common case; this guard handles the rest.
+            //
+            // The size+mime check shares this try block: getSize() /
+            // getMimeType() on a broken sys_file row reach into the
+            // storage driver too, so any of those calls can throw.
             try {
+                // Tiny icons / flags / decoration pollute the corpus
+                // without being useful as results — skip any image
+                // under the operator-chosen byte threshold. Checking
+                // the mime prefix scopes the filter so legitimate
+                // small text files (a 200-byte README) still index.
+                if ($minImageBytes > 0
+                    && (int)$file->getSize() < $minImageBytes
+                    && str_starts_with((string)$file->getMimeType(), 'image/')
+                ) {
+                    continue;
+                }
                 $bodytext = $this->extractBody($file, $site);
-                $publicUrl = $file->getPublicUrl() ?? '';
+                $publicUrl = $this->normalisePublicUrl((string)$file->getPublicUrl());
             } catch (\Throwable $e) {
                 $this->logger?->warning('FileSchemaProvider skipped {uid} ({ident}): cannot read file: {message}', [
                     'uid' => $file->getUid(),
@@ -347,6 +350,30 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     {
         $kb = (int)$site->getSettings()->get('meilisearch.indexing.minImageSizeKb', 0);
         return max(0, $kb) * 1024;
+    }
+
+    /**
+     * FAL's `getPublicUrl()` returns relative paths like
+     * "fileadmin/foo.pdf" or "typo3conf/ext/.../bar.png" without a
+     * leading slash. Frontend result cards embed the URL as `<a href>`
+     * — a missing slash makes the browser resolve relative to the
+     * current page (e.g. `/de/suche/fileadmin/foo.pdf` → 404). This
+     * normalises by adding a slash to bare paths and leaving absolute
+     * URLs / protocol-relative URLs alone.
+     */
+    private function normalisePublicUrl(string $url): string
+    {
+        if ($url === '') {
+            return '';
+        }
+        if (str_starts_with($url, '/')
+            || str_starts_with($url, 'http://')
+            || str_starts_with($url, 'https://')
+            || str_starts_with($url, '//')
+        ) {
+            return $url;
+        }
+        return '/' . $url;
     }
 
     /**
