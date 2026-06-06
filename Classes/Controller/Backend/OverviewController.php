@@ -68,6 +68,7 @@ final class OverviewController
             'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
             'runFolderImport' => $this->runFolderImportAction($request),
             'runZipImport'    => $this->runZipImportAction($request),
+            'runUrlImport'    => $this->runUrlImportAction($request),
             'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
             'uploadHelpdoc'   => $this->uploadHelpdocAction($request),
             default           => $this->indexAction($request),
@@ -427,6 +428,7 @@ final class OverviewController
             'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
             'folderImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runFolderImport']),
             'zipImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runZipImport']),
+            'urlImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runUrlImport']),
             // CSRF-tokened URL for TYPO3's standard folder element-browser.
             // Built server-side because the BE route is token-protected;
             // the JS module just opens this URL as an iframe modal.
@@ -471,6 +473,46 @@ final class OverviewController
             );
         } catch (\Throwable $e) {
             $this->addFlash('Import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->redirectToHelpdocs();
+    }
+
+    private function runUrlImportAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->redirectToHelpdocs();
+        }
+        $body = (array)$request->getParsedBody();
+        $urls = trim((string)($body['urls'] ?? ''));
+        if ($urls === '') {
+            $this->addFlash('URL list is empty.', ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+        try {
+            $result = $this->importerRegistry->get('url-list')->import([
+                'urls' => $urls,
+                'language' => (int)($body['language'] ?? 0),
+                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
+                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
+                'timeout' => (int)($body['timeout'] ?? 30),
+                'maxSizeMb' => (int)($body['maxSizeMb'] ?? 50),
+            ]);
+            $severity = $result->skipped > 0 ? ContextualFeedbackSeverity::WARNING : ContextualFeedbackSeverity::OK;
+            $msg = sprintf(
+                'URL list: imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
+                $result->imported,
+                $result->skipped,
+                $result->mediaCopied,
+            );
+            // Surface the first few errors so the operator can see which
+            // URLs failed without digging into the log.
+            $errors = (array)($result->extras['errors'] ?? []);
+            if ($errors !== []) {
+                $msg .= ' First errors: ' . implode(' | ', array_slice($errors, 0, 3));
+            }
+            $this->addFlash($msg, $severity);
+        } catch (\Throwable $e) {
+            $this->addFlash('URL list import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }

@@ -324,6 +324,70 @@
         </div>
     </section>
 
+    <!-- ============== URL LIST IMPORT ============== -->
+    <section class="mt-4">
+        <div class="card border-primary">
+            <div class="card-header text-primary"><strong>Import from URL list</strong> <span class="text-muted ms-2">HTTP fetch</span></div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Fetch every URL, store the response in fileadmin, run Tika for the body. Use for public wiki pages, S3-hosted PDF links, customer docs hosted elsewhere. Only <code>http</code> and <code>https</code> are accepted. Blank lines and lines starting with <code>#</code> are skipped.
+                </p>
+                <form action="{urlImportUrl}" method="post">
+                    <input type="hidden" name="token" value="{token}" />
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">URLs <span class="text-muted">(one per line)</span></label>
+                        <textarea name="urls" class="form-control form-control-sm font-monospace" rows="5" required="required" placeholder="https://example.com/handbook.pdf&#10;https://example.com/policy/2026.html&#10;# Comments and blank lines are skipped"></textarea>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Language</label>
+                            <select name="language" class="form-select form-select-sm">
+                                <f:for each="{knownLanguages}" as="label" key="langId">
+                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
+                                </f:for>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Document kind</label>
+                            <select name="help_type" class="form-select form-select-sm">
+                                <option value="reference" selected="selected">reference</option>
+                                <option value="concept">concept</option>
+                                <option value="task">task</option>
+                                <option value="upload">upload</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Timeout (s)</label>
+                            <input type="number" name="timeout" value="30" min="1" max="600" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Max size (MB)</label>
+                            <input type="number" name="maxSizeMb" value="50" min="1" max="500" class="form-control form-control-sm" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Target folder <span class="text-muted">(empty = site default <code>{defaultTargetFolder}</code>)</span></label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="targetFolder" id="urlTargetFolder" class="form-control" placeholder="{defaultTargetFolder}" />
+                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="urlTargetFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
+                                Browse…
+                            </button>
+                        </div>
+                        <div class="form-text small">A <code>urls/</code> subfolder is added automatically.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Fetch &amp; import</button>
+                    <p class="text-muted small mt-2 mb-0">
+                        Run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards. Failed URLs are listed in the flash message; full detail in the log.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <!-- ============== EDITOR ENTRY POINT ============== -->
     <section class="mt-4">
         <h2 class="h5">Editor edits</h2>
