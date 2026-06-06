@@ -21,6 +21,14 @@ buttons, and includes an ad-hoc Search + RAG test form. A scheduler
 task runs `indexAll` (news + files) against one or all sites on a
 cron.
 
+A generic **help-doc** record type (`tx_wsmeilisearch_helpdoc`) gives
+operators a place to drop curated content beyond the core auto-indexed
+sources. Five built-in importers (`dita-ot`, `single-file`, `folder`,
+`zip-bundle`, `url-list`) populate it from DITA-OT XHTML drops, single
+uploads, FAL folder walks, ZIP archives, and HTTP-fetched URL lists —
+all sharing a single `HelpDocSourceImporter` contract so third-party
+extensions can add their own source formats via DI auto-tagging.
+
 Page indexing is delegated to `lochmueller/index` (hard composer
 dependency). The integration ships under `Classes/Integration/ExtIndex/`
 and consumes `IndexPageEvent`/`IndexFileEvent`, writing through this
@@ -259,6 +267,192 @@ model / URL / conversation-memory flags. Two maintenance buttons:
   endpoint health check). Flashes the latency and a truncated reply,
   or the error message if the provider is unreachable / misconfigured.
 
+## Help-doc importers
+
+Beyond the auto-indexed core record types (pages, news, FAL files), the
+extension ships a generic **help-doc** record type (`tx_wsmeilisearch_helpdoc`,
+type=`help` in the unified index) and five pluggable importers that
+populate it from very different sources. The intent: a single search +
+RAG corpus that can absorb a vendor's DITA documentation, an editor's
+PDF upload, a fileadmin sync, a zip drop, and an external URL list —
+without each source needing its own schema or controller.
+
+All importers extend a single contract (`HelpDocSourceImporter`) and
+are picked up via DI auto-tagging. Adding a sixth source means
+implementing the interface — no controller / CLI / template changes.
+
+### Built-in importers
+
+| Slug | Source | Best for | Picker |
+|---|---|---|---|
+| `dita-ot` | DITA-OT XHTML drop on disk | Strukturierte help topics with TOC + per-topic media | Target media folder |
+| `single-file` | One PSR-7 upload | Editor pastes a single curated PDF / DOCX / Markdown | Target folder |
+| `folder` | FAL folder walk | Files dropped into fileadmin via FileList / FTP / sync | Source folder + Target folder |
+| `zip-bundle` | One PSR-7 zip upload | A stack of mixed docs delivered as one archive | Target folder |
+| `url-list` | HTTP fetch a list of URLs | Seeding from public docs sites / S3 PDF lists / wikis | Target folder |
+
+Common behaviour:
+
+- Apache **Tika** extracts body text from every supported file format
+  (PDF, DOCX, HTML, RTF, EPUB, Markdown, plain text, Office, …).
+  Anything outside Tika's mime allowlist still gets indexed by title
+  (HTML pages additionally get a strip_tags fallback so they're
+  searchable by content).
+- **FAL is the file store.** Every imported file becomes a `sys_file`
+  and is attached to the helpdoc row's `media` field via
+  `sys_file_reference`. Search results can deep-link to the original
+  file; `source_path` carries the canonical URL or path.
+- **Per-importer subfolders** keep uploads separate from zip extracts
+  and URL fetches inside the operator-chosen target — `uploads/`,
+  `zips/`, `urls/` are auto-created beside each other under the
+  target. The folders are created **segment-by-segment** so a
+  first-time editor can pick `1:/whatever-i-want/` without prepping
+  fileadmin.
+- **Identifier scheme**: `<sanitised-filename>-f<falUid>` — stable
+  across renames, unique even when two files share a basename, and
+  predictable enough for downstream cross-references.
+
+### Configuration
+
+Two site settings drive the help-doc pipeline:
+
+```yaml
+meilisearch:
+  helpdoc:
+    # Static HTML corpus served at /hilfe/<path> via HelpTopicMiddleware
+    # (DITA-OT XHTML output). Leave empty to disable the middleware.
+    sourceRoot: 'chatbot/ChatbotHilfe/DE_xhtml'
+    # Default FAL target folder for all importers. Operators override
+    # per import via the Browse picker in the BE form.
+    fileadminFolder: '1:/helpdocs/'
+```
+
+`tx_wsmeilisearch_helpdoc` is shipped by `ext_tables.sql` and registered
+in `indexedTables` by default — running `ws_meilisearch:reindex` after
+the first import pushes the rows into the unified per-site index.
+
+### Backend workflow
+
+The **Help docs** tab on the System → Meilisearch module gives operators
+one form per importer slug:
+
+- **Run import** (dita-ot) — source path + language directory +
+  optional purge before importing.
+- **Upload single document** (single-file) — file + title + abstract
+  + language + document kind + target folder.
+- **Batch-import from FAL folder** (folder) — source folder picker +
+  recursive opt-in + language + document kind.
+- **Upload ZIP bundle** (zip-bundle) — file + language + document
+  kind + "preserve subfolders" toggle + target folder.
+- **Import from URL list** (url-list) — textarea (one URL per line,
+  `#` comments + blanks skipped) + language + document kind +
+  timeout + max size + target folder.
+
+The **Purge by language** card next to these forms hard-deletes every
+helpdoc row in the chosen language with a confirm-checkbox guard.
+**Reindex is not triggered automatically** — every form trailer
+reminds the operator to run `ws_meilisearch:reindex` (or use the
+Overview tab) afterwards.
+
+The Browse buttons on every folder field open TYPO3's standard FAL
+folder picker as a modal. The modern URL parameters
+(`?fieldReference=…&useEvents=1`) are used instead of the legacy
+`bparams` pipe-string, so the picker dispatches a CustomEvent on its
+iframe and avoids the postMessage origin gauntlet inherent to nested
+backend modals.
+
+### CLI workflow
+
+The dispatch CLI is `ws_meilisearch:import-help-docs`. The
+`--importer=<slug>` switch picks the implementation; every other
+parameter is interpreted via the importer's `describeFields()` schema.
+
+```bash
+# See every registered importer and its accepted fields
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --list-importers
+
+# DITA-OT XHTML drop (shorthand options for the well-known fields)
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs \
+  --importer=dita-ot \
+  --path=path/to/dita-out \
+  --langDir=de \
+  --language=0 \
+  --no-purge
+
+# Single file upload — best driven via the BE form (CLI uploads need
+# a PSR-7 UploadedFileInterface)
+
+# Walk a FAL folder
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs \
+  --importer=folder \
+  -f folder=1:/handbooks/ \
+  -f recursive=1 \
+  -f language=0 \
+  -f help_type=reference
+
+# URL list (one per line, # comments + blanks skipped)
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs \
+  --importer=url-list \
+  -f urls=$'https://example.com/handbook.pdf\nhttps://example.com/policy.html' \
+  -f targetFolder=1:/external-docs/ \
+  -f timeout=30 \
+  -f maxSizeMb=50
+
+# ZIP bundle — same caveat as single-file (PSR-7 upload only)
+```
+
+The CLI prints a progress bar per item, lists every per-item failure
+verbatim (Tika skip, HTTP error, FAL consistency rejection, …), and
+returns the `imported / skipped / mediaCopied` triple in the final
+success line. Generic `-f name=value` pairs always override the
+shorthand options.
+
+### Safety notes per importer
+
+- **`url-list`** does NOT enforce a domain allowlist. BE-only access
+  is the trust boundary; do not expose the form to anonymous users.
+  Only `http`/`https` schemes are accepted; size cap (default 50 MB)
+  and per-URL timeout (default 30 s) prevent slow servers / oversized
+  responses from wedging the batch.
+- **`zip-bundle`** rejects entries containing `..`, leading `/`, or
+  null bytes (zip-slip), caps at 1000 entries (zip-bomb guard), and
+  silently skips dotfiles (`.DS_Store`, `__MACOSX/`, …).
+- **MIME / extension mismatch.** TYPO3 v14's `ResourceConsistencyService`
+  rejects files whose actual content (per `finfo`) disagrees with
+  the URL-derived extension. The url-list importer runs `finfo` on
+  the response body and picks the matching extension so DITA-OT
+  XHTML pages (which declare `<?xml version="1.0"?>` and get
+  classified as `text/xml`) land as `.xml` instead of `.html`.
+
+### Adding a custom importer
+
+Implement `HelpDocSourceImporter` in your extension's `Classes/Service/Import/Importer/`:
+
+```php
+final class ConfluenceExportImporter implements HelpDocSourceImporter
+{
+    public function name(): string { return 'confluence-export'; }
+    public function label(): string { return 'Confluence space export'; }
+    public function description(): string { return 'Walk an exported Confluence space.'; }
+    public function describeFields(): array
+    {
+        return [
+            ['name' => 'exportPath', 'label' => 'Export path', 'type' => 'text', 'required' => true],
+            ['name' => 'language', 'label' => 'Language', 'type' => 'language', 'default' => 0],
+            ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder'],
+        ];
+    }
+    public function import(array $config, ?callable $onProgress = null): ImportResult { ... }
+}
+```
+
+The `_instanceof` rule in `Configuration/Services.yaml` auto-tags it
+as `ws_meilisearch.source_importer`, so it appears in both
+`--list-importers` and the BE Help-docs tab without further wiring.
+Use the injected `HelpDocRepository` for FAL + Tika + persistence —
+the helpers handle target-folder auto-creation, sanitisation, and
+the standard `media` reference attachment.
+
 ## Scheduler task (Phase 5)
 
 `FullReindexTask` registers under **Administration → Scheduler** as
@@ -304,6 +498,11 @@ ddev exec vendor/bin/typo3 ws_meilisearch:tika-probe 1:/some.pdf main     # run 
 
 # RAG (Phase 4) — runs the configured LLM provider against the site index
 ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
+
+# Help-doc importers — five built-in source formats
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --list-importers
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --importer=folder -f folder=1:/handbooks/ -f recursive=1
+ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --importer=url-list -f urls=$'https://example.com/policy.pdf'
 ```
 
 ## What's wired
@@ -325,7 +524,10 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 | RAG streaming | SSE endpoint at `/_ws_meilisearch/rag/stream`, drop-in JS client renders tokens incrementally | `Classes/Middleware/RagStreamMiddleware.php`, `Resources/Public/JavaScript/RagStream.js` |
 | RAG CLI | `ws_meilisearch:ask "question" [site]` for ad-hoc testing | `Classes/Command/AskCommand.php` |
 | Diagnostics CLI | `ws_meilisearch:doctor` / `:setup-index-config` / `:document` / `:tika-probe` for operator triage | `Classes/Command/DoctorCommand.php`, `SetupIndexConfigCommand.php`, `DocumentCommand.php`, `TikaProbeCommand.php` |
-| Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms | `Classes/Controller/Backend/OverviewController.php` |
+| Backend module | System → Meilisearch: per-site index status, Reindex / Rebuild buttons, ad-hoc Search + RAG test forms, Help-doc importer dashboard | `Classes/Controller/Backend/OverviewController.php` |
+| Help-doc importers | Plugin architecture for populating `tx_wsmeilisearch_helpdoc` from DITA-OT drops, single uploads, FAL folders, ZIP bundles, URL lists | `Classes/Service/Import/HelpDocSourceImporter.php`, `Classes/Service/Import/Importer/*` |
+| Help-doc CLI | `ws_meilisearch:import-help-docs --importer=<slug>` dispatcher with per-importer field schema | `Classes/Command/ImportHelpDocsCommand.php` |
+| FAL folder picker | `data-wsm-folder-picker` button opens TYPO3's standard element-browser modal; writes the combined identifier back into the bound input via the picker's CustomEvent | `Resources/Public/JavaScript/folder-picker.js`, `Configuration/JavaScriptModules.php` |
 | Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
 | Realtime sync (BE forms) | DataHandler hook → indexer (sys_file_metadata + sys_file_reference both translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
 | Realtime sync (FAL storage) | PSR-14 listeners on AfterFileAdded / Deleted / Renamed / Moved / ContentsSet / Replaced / Copied / MetaDataUpdated / RemovedFromIndex | `Classes/DataHandling/FalEventListener.php` |
@@ -388,6 +590,7 @@ factory dedupes by field name across providers.
 - **Phase 3** ✅ Hybrid search + auto-embeddings (OpenAI / HF / Ollama / REST / userProvided)
 - **Phase 4** ✅ RAG module with configurable LLM provider (OpenAI / Anthropic / Ollama / REST)
 - **Phase 5** ✅ Backend module + scheduler task
+- **Phase 6** ✅ Help-doc importers (DITA-OT / single-file / FAL folder / ZIP bundle / URL list) with shared plugin contract + FAL folder picker
 
 ## Known Phase 2 limitations
 
