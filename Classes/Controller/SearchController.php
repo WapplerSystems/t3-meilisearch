@@ -158,6 +158,14 @@ final class SearchController extends ActionController
             $languageLabels[(string)$language->getLanguageId()] = $language->getTitle();
         }
 
+        // f:uri.action without pageUid falls back to the Extbase
+        // plugin's configured defaultPid which is rarely the page the
+        // visitor is currently on. Resolve the current page id from
+        // the request so every pagination / facet link stays on the
+        // same URL.
+        $pageInfo = $this->request->getAttribute('frontend.page.information');
+        $currentPageUid = $pageInfo !== null ? $pageInfo->getId() : (int)($GLOBALS['TSFE']->id ?? 0);
+
         $this->view->assignMultiple([
             'query' => $q,
             'page' => max(1, $page),
@@ -166,6 +174,7 @@ final class SearchController extends ActionController
             'hybrid' => $useHybrid ? 1 : 0,
             'hybridAvailable' => $hybridAvailable,
             'sort' => $sortOption,
+            'currentPageUid' => $currentPageUid,
             // Pre-built links so templates don't have to compute them.
             'sortOptions' => $this->configProvider->sortOptions($site) ?: $this->fallbackSortOptions(),
             // Indexed map for Facets.html to look up per-facet display
