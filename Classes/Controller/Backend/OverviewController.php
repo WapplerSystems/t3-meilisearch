@@ -80,8 +80,8 @@ final class OverviewController
 
     private function reindexAction(ServerRequestInterface $request): ResponseInterface
     {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->context->redirect();
+        if ($wrong = $this->context->requirePost($request)) {
+            return $wrong;
         }
         $parsed = (array)$request->getParsedBody();
         $siteId = (string)($parsed['site'] ?? '');

@@ -68,8 +68,8 @@ final class DiagnoseController
 
     private function repushEmbedder(ServerRequestInterface $request): ResponseInterface
     {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->context->redirect('diagnose');
+        if ($wrong = $this->context->requirePost($request, 'diagnose')) {
+            return $wrong;
         }
         $siteId = (string)(($request->getParsedBody() ?? [])['site'] ?? '');
         if ($siteId === '') {
@@ -104,8 +104,8 @@ final class DiagnoseController
 
     private function pingRag(ServerRequestInterface $request): ResponseInterface
     {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->context->redirect('diagnose');
+        if ($wrong = $this->context->requirePost($request, 'diagnose')) {
+            return $wrong;
         }
         $siteId = (string)(($request->getParsedBody() ?? [])['site'] ?? '');
         if ($siteId === '') {

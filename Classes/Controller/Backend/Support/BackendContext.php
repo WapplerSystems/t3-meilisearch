@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Controller\Backend\Support;
 
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Routing\UriBuilder as BackendUriBuilder;
+use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
 use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
@@ -36,6 +38,7 @@ final class BackendContext
     public function __construct(
         private readonly BackendUriBuilder $backendUriBuilder,
         private readonly FlashMessageService $flashMessageService,
+        private readonly FormProtectionFactory $formProtectionFactory,
     ) {}
 
     /**
@@ -54,25 +57,29 @@ final class BackendContext
     }
 
     /**
-     * Tab nav data assigned by every page template. The CSRF token is
-     * pulled out of the URL the BackendUriBuilder generates because
-     * HTML5 GET-forms discard the action URL's query string — the form
-     * has to ship the token as a hidden field instead. See the long
-     * comment on commonTabUrls() in the pre-split controller for the
-     * incident history.
+     * Tab nav data assigned by every page template — URLs for the four
+     * tabs plus the CSRF token that GET forms need to embed as a hidden
+     * field (HTML5 spec discards the action URL's query string on form
+     * GET submit, so the token has to ride in the form body).
+     *
+     * Token generation mirrors what BackendUriBuilder does internally
+     * (FormProtectionFactory::createForType('backend')->generateToken(
+     * 'route', $routeName)) so we don't have to parse-and-extract from
+     * the URL — that worked but quietly broke if TYPO3 ever moved the
+     * token to a header or cookie.
      *
      * @return array<string,string>
      */
     public function tabNavData(): array
     {
-        $testUrl = $this->route('test');
-        parse_str((string)parse_url($testUrl, PHP_URL_QUERY), $query);
         return [
             'indexUrl' => $this->route(),
-            'testUrl' => $testUrl,
+            'testUrl' => $this->route('test'),
             'diagnoseUrl' => $this->route('diagnose'),
             'helpdocsUrl' => $this->route('helpdocs'),
-            'token' => (string)($query['token'] ?? ''),
+            'token' => $this->formProtectionFactory
+                ->createForType('backend')
+                ->generateToken('route', self::ROUTE_NAME),
         ];
     }
 
@@ -81,5 +88,23 @@ final class BackendContext
         $this->flashMessageService
             ->getMessageQueueByIdentifier()
             ->addMessage(new FlashMessage($message, '', $severity, true));
+    }
+
+    /**
+     * Guard for action methods that must only run via POST. Returns the
+     * redirect response to send back if the request method is wrong,
+     * `null` if the request is fine and the caller may proceed. Pass
+     * the slug of the tab the operator should land on after the
+     * redirect (defaults to the Overview / index tab).
+     *
+     * Usage:
+     *   if ($r = $this->context->requirePost($request, 'helpdocs')) { return $r; }
+     */
+    public function requirePost(ServerRequestInterface $request, ?string $redirectAction = null): ?ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) === 'POST') {
+            return null;
+        }
+        return $this->redirect($redirectAction);
     }
 }

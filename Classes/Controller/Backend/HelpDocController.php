@@ -144,8 +144,8 @@ final class HelpDocController
      */
     private function runImporter(ServerRequestInterface $request): ResponseInterface
     {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->context->redirect('helpdocs');
+        if ($wrong = $this->context->requirePost($request, 'helpdocs')) {
+            return $wrong;
         }
         $body = (array)$request->getParsedBody();
         $slug = trim((string)($body['_importer'] ?? ''));
@@ -248,8 +248,8 @@ final class HelpDocController
 
     private function purge(ServerRequestInterface $request): ResponseInterface
     {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->context->redirect('helpdocs');
+        if ($wrong = $this->context->requirePost($request, 'helpdocs')) {
+            return $wrong;
         }
         $body = (array)$request->getParsedBody();
         $languageId = (int)($body['language'] ?? -1);
