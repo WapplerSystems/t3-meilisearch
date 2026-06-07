@@ -25,6 +25,10 @@ services:
       # implementations; the interface itself stays out of the container.
       - '../Classes/Service/Import/ImportResult.php'
       - '../Classes/Service/Import/HelpDocSourceImporter.php'
+      # RagTestResult is a readonly DTO returned by RagTestRunner;
+      # interface is a marker, not a service.
+      - '../Classes/Service/RagTest/RagTestResult.php'
+      - '../Classes/Service/RagTest/EmbeddingClientInterface.php'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
@@ -33,6 +37,8 @@ services:
       tags: ['ws_meilisearch.llm_provider']
     WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter:
       tags: ['ws_meilisearch.source_importer']
+    WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientInterface:
+      tags: ['ws_meilisearch.embedding_client']
 
   WapplerSystems\Meilisearch\Service\SearchEngineFactory:
     public: true
@@ -58,6 +64,10 @@ services:
     public: true
     arguments:
       $importers: !tagged_iterator ws_meilisearch.source_importer
+
+  WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientRegistry:
+    arguments:
+      $clients: !tagged_iterator ws_meilisearch.embedding_client
 
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:

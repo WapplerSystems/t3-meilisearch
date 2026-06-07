@@ -41,3 +41,41 @@ CREATE TABLE tx_wsmeilisearch_helpdoc (
     KEY identifier_language (identifier(64), sys_language_uid),
     KEY parent (parent_identifier(64))
 );
+
+-- RAG regression tests: editor-maintained (question, expected answer)
+-- pairs that are periodically run against the configured RAG provider
+-- so a model rotation / prompt tune / context-window change can't
+-- silently degrade answer quality. RagTestRunner computes cosine
+-- similarity between expected and actual answer via the site's
+-- configured embedder; pass / fail is decided against the per-record
+-- similarity_threshold. Last run's state is persisted on the row so
+-- the BE List module shows a current pass / fail badge.
+CREATE TABLE tx_wsmeilisearch_ragtest (
+    uid                   INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    pid                   INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    tstamp                INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    crdate                INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    deleted               SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+    hidden                SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+
+    title                 VARCHAR(255) DEFAULT '' NOT NULL,
+    question              TEXT,
+    expected_answer       TEXT,
+    -- Pass threshold for cosine similarity. 0.85 is a sane default for
+    -- nomic-embed-text; tune per record if a question can be answered
+    -- in many wordings.
+    similarity_threshold  DECIMAL(4,3) UNSIGNED DEFAULT '0.850' NOT NULL,
+    -- Which site to run the test against. Empty = first site that has
+    -- a RAG provider configured.
+    site_identifier       VARCHAR(64) DEFAULT '' NOT NULL,
+    -- Persisted state of the last run — read by the BE List module so
+    -- editors can see pass / fail at a glance without re-running.
+    last_run_at           INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    last_score            DECIMAL(4,3) UNSIGNED DEFAULT NULL,
+    last_status           VARCHAR(16) DEFAULT '' NOT NULL,
+    last_actual_answer    MEDIUMTEXT,
+    last_error            TEXT,
+
+    PRIMARY KEY (uid),
+    KEY parent (pid)
+);
