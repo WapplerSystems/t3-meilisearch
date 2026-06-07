@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service\Llm;
 
+use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Http\RequestFactory;
@@ -180,7 +181,7 @@ final class AnthropicProvider implements LlmProviderInterface, LoggerAwareInterf
      *
      * @return iterable<string>
      */
-    private function parseAnthropicSse(\Psr\Http\Message\StreamInterface $body): iterable
+    private function parseAnthropicSse(StreamInterface $body): iterable
     {
         $buffer = '';
         while (!$body->eof()) {

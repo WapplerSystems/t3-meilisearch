@@ -167,7 +167,10 @@ final class TestController
                 'label' => 'Keyword search',
                 'description' => 'Plain typo-tolerant full-text search across pages, news, and indexed files.',
                 'feature' => 'phase 1',
-                'params' => $base + ['q' => 'saskatchewan'],
+                // Pick a word likely to hit on any docs site. Operator
+                // can edit the query after the example loads — the
+                // value here just seeds the input.
+                'params' => $base + ['q' => 'guide'],
             ],
             [
                 'label' => 'Filter: only files',

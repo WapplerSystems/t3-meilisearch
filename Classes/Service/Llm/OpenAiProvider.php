@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service\Llm;
 
+use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Http\RequestFactory;
@@ -174,7 +175,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
      *
      * @return iterable<string>
      */
-    protected function parseSseDeltas(\Psr\Http\Message\StreamInterface $body): iterable
+    protected function parseSseDeltas(StreamInterface $body): iterable
     {
         $buffer = '';
         while (!$body->eof()) {
