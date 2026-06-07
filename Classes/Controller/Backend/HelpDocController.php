@@ -90,13 +90,39 @@ final class HelpDocController
         // Render the importer cards: each registered HelpDocSourceImporter
         // contributes its own form via describeFields(). Adding a new
         // importer doesn't require any template change here.
+        //
+        // Well-known field names get pre-filled with the site-resolved
+        // defaults so operators don't have to retype paths they've
+        // already configured in settings.yaml. Importers can still
+        // ship their own `default` in describeFields() and it'll win
+        // over the site default. Keep this map small — it's
+        // intentionally a controller-side override, not a generic
+        // mechanism baked into the importer contract.
+        $fieldDefaults = [
+            'path' => $defaultSourceRoot,
+            'targetFolder' => $defaultTargetFolder === HelpDocRepository::DEFAULT_TARGET_FOLDER
+                ? '' // leave the placeholder visible, don't prefill the literal fallback
+                : $defaultTargetFolder,
+        ];
         $importers = [];
         foreach ($this->importerRegistry->all() as $importer) {
+            $fields = $importer->describeFields();
+            foreach ($fields as &$field) {
+                $name = (string)($field['name'] ?? '');
+                $existingDefault = $field['default'] ?? '';
+                if (($existingDefault === '' || $existingDefault === null)
+                    && isset($fieldDefaults[$name])
+                    && $fieldDefaults[$name] !== ''
+                ) {
+                    $field['default'] = $fieldDefaults[$name];
+                }
+            }
+            unset($field);
             $importers[] = [
                 'name' => $importer->name(),
                 'label' => $importer->label(),
                 'description' => $importer->description(),
-                'fields' => $importer->describeFields(),
+                'fields' => $fields,
             ];
         }
 
