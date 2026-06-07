@@ -1,0 +1,133 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — RAG regression tests</h1>
+    <f:variable name="active" value="ragtests"/>
+    <f:render partial="Backend/TabNav" arguments="{_all}" />
+
+    <p class="text-muted">
+        Quality-assurance harness for the RAG pipeline. Each row in <code>tx_wsmeilisearch_ragtest</code>
+        is a (question, expected answer, threshold) triple; "Run" asks the RAG provider the question
+        and scores the actual answer against the expected one via embedding cosine similarity. A
+        score below the threshold means the model / prompt / corpus has drifted away from the
+        expected answer — a real quality regression. The
+        <a href="https://github.com/WapplerSystems/t3-meilisearch" rel="noopener">scheduler task</a>
+        runs the same engine on cron; this tab is for ad-hoc triage.
+    </p>
+
+    <!-- ============== SUMMARY + GLOBAL ACTIONS ============== -->
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center gap-3 flex-wrap">
+            <strong>Current state</strong>
+            <span class="badge text-bg-light">
+                {summary.total} total
+                <f:if condition="{summary.enabled} != {summary.total}">
+                    <span class="text-muted">({summary.enabled} enabled)</span>
+                </f:if>
+            </span>
+            <span class="badge text-bg-success">{summary.pass} pass</span>
+            <span class="badge text-bg-warning">{summary.fail} fail</span>
+            <span class="badge text-bg-secondary">{summary.error} error</span>
+            <span class="badge text-bg-light">{summary.never} never run</span>
+
+            <div class="ms-auto d-flex gap-2">
+                <a href="{newTestUrl}" class="btn btn-sm btn-default">+ New test</a>
+                <a href="{listEditUrl}" class="btn btn-sm btn-default">Open in List module</a>
+                <f:if condition="{summary.enabled}">
+                    <form action="{runAllUrl}" method="post" class="d-inline">
+                        <input type="hidden" name="token" value="{token}" />
+                        <button type="submit" class="btn btn-sm btn-primary"
+                                onclick="return confirm('Run all {summary.enabled} enabled test(s)? This calls the RAG provider once per test.');">
+                            Run all
+                        </button>
+                    </form>
+                </f:if>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============== TEST LIST ============== -->
+    <f:if condition="{tests}">
+        <f:then>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 1%"></th>
+                            <th>Title</th>
+                            <th>Question</th>
+                            <th>Site</th>
+                            <th class="text-end">Threshold</th>
+                            <th class="text-end">Last score</th>
+                            <th>Status</th>
+                            <th>Last run</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <f:for each="{tests}" as="t">
+                            <tr class="{f:if(condition: '{t.hidden}', then: 'opacity-50')}">
+                                <td class="text-muted small">#{t.uid}</td>
+                                <td>
+                                    <strong>{t.title -> f:format.htmlspecialchars()}</strong>
+                                    <f:if condition="{t.hidden}">
+                                        <span class="badge text-bg-secondary ms-1">hidden</span>
+                                    </f:if>
+                                </td>
+                                <td class="small text-muted">
+                                    {t.question -> f:format.crop(maxCharacters: 80) -> f:format.htmlspecialchars()}
+                                </td>
+                                <td><code>{t.site_identifier}</code></td>
+                                <td class="text-end font-monospace small">{t.similarity_threshold}</td>
+                                <td class="text-end font-monospace small">
+                                    <f:if condition="{t.last_score}">
+                                        <f:then>{t.last_score}</f:then>
+                                        <f:else>—</f:else>
+                                    </f:if>
+                                </td>
+                                <td>
+                                    <f:switch expression="{t.last_status}">
+                                        <f:case value="pass"><span class="badge text-bg-success">PASS</span></f:case>
+                                        <f:case value="fail">
+                                            <span class="badge text-bg-warning" title="{t.last_actual_answer -> f:format.crop(maxCharacters: 200)}">FAIL</span>
+                                        </f:case>
+                                        <f:case value="error">
+                                            <span class="badge text-bg-danger" title="{t.last_error -> f:format.crop(maxCharacters: 200)}">ERROR</span>
+                                        </f:case>
+                                        <f:defaultCase><span class="text-muted small">never run</span></f:defaultCase>
+                                    </f:switch>
+                                </td>
+                                <td class="text-muted small">
+                                    <f:if condition="{t.last_run_at}">
+                                        <f:then><f:format.date date="@{t.last_run_at}" format="Y-m-d H:i"/></f:then>
+                                        <f:else>—</f:else>
+                                    </f:if>
+                                </td>
+                                <td class="text-end">
+                                    <form action="{runOneUrl}" method="post" class="d-inline">
+                                        <input type="hidden" name="token" value="{token}" />
+                                        <input type="hidden" name="uid" value="{t.uid}" />
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Run</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </f:for>
+                    </tbody>
+                </table>
+            </div>
+        </f:then>
+        <f:else>
+            <div class="alert alert-info">
+                No regression tests defined yet. Click <a href="{newTestUrl}" class="alert-link">+ New test</a>
+                to add the first one (you'll need a question, the expected answer, and a similarity
+                threshold — 0.85 is a sane default).
+            </div>
+        </f:else>
+    </f:if>
+
+</f:section>
+
+</html>

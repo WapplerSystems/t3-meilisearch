@@ -66,6 +66,29 @@ final class RagTestRunner
     }
 
     /**
+     * Run a single test by uid (BE "Run now" button). Loads the row,
+     * scores it, persists the outcome. Throws when the uid points to
+     * a non-existent / deleted row — the caller surfaces that as a
+     * flash message.
+     */
+    public function runOne(int $uid): RagTestResult
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $qb->getRestrictions()->removeAll()->add(new \TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction());
+        $row = $qb->select('uid', 'title', 'question', 'expected_answer', 'similarity_threshold', 'site_identifier')
+            ->from(self::TABLE)
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchAssociative();
+        if ($row === false) {
+            throw new \RuntimeException(sprintf('No test row with uid=%d', $uid));
+        }
+        $result = $this->runRow($row);
+        $this->persist((int)$row['uid'], $result);
+        return $result;
+    }
+
+    /**
      * @param array<string,mixed> $row test definition row
      */
     private function runRow(array $row): RagTestResult

@@ -77,6 +77,7 @@ final class BackendContext
             'testUrl' => $this->route('test'),
             'diagnoseUrl' => $this->route('diagnose'),
             'helpdocsUrl' => $this->route('helpdocs'),
+            'ragTestsUrl' => $this->route('ragtests'),
             'token' => $this->formProtectionFactory
                 ->createForType('backend')
                 ->generateToken('route', self::ROUTE_NAME),
