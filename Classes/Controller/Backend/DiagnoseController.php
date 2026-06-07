@@ -10,6 +10,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
+use WapplerSystems\Meilisearch\Controller\Backend\Support\SiteOverviewProvider;
 use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
 use WapplerSystems\Meilisearch\Service\IndexMetadataProvider;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
@@ -34,6 +35,7 @@ final class DiagnoseController
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly SiteFinder $siteFinder,
         private readonly IndexMetadataProvider $metadataProvider,
+        private readonly SiteOverviewProvider $siteOverviewProvider,
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly EmbedderConfigurator $embedderConfigurator,
         private readonly BackendContext $context,
@@ -173,54 +175,10 @@ final class DiagnoseController
         return [
             'identifier' => $site->getIdentifier(),
             'configured' => $meta['configured'],
-            // Desired embedder config (what the operator put in settings.yaml)
-            'desiredEmbedder' => $this->describeDesiredEmbedder($site),
+            'desiredEmbedder' => $this->siteOverviewProvider->describeDesiredEmbedder($site),
             'actualEmbedder' => $meta['actualEmbedder'],
-            'rag' => $this->describeRagConfig($site),
+            'rag' => $this->siteOverviewProvider->describeRagConfig($site),
             'error' => $meta['error'],
-        ];
-    }
-
-    /**
-     * @return array<string,mixed>|null
-     */
-    private function describeDesiredEmbedder(Site $site): ?array
-    {
-        $settings = $site->getSettings();
-        $source = trim((string)$settings->get('meilisearch.embedder.source', ''));
-        if ($source === '') {
-            return null;
-        }
-        // apiKey deliberately omitted — we never want to render it.
-        return array_filter([
-            'source' => $source,
-            'model' => trim((string)$settings->get('meilisearch.embedder.model', '')),
-            'url' => trim((string)$settings->get('meilisearch.embedder.url', '')),
-            'dimensions' => (int)$settings->get('meilisearch.embedder.dimensions', 0) ?: null,
-            'documentTemplate' => trim((string)$settings->get('meilisearch.embedder.documentTemplate', '')),
-            'semanticRatio' => (float)$settings->get('meilisearch.embedder.semanticRatio', 0.5),
-        ], static fn ($v) => $v !== '' && $v !== null);
-    }
-
-    /**
-     * @return array<string,mixed>|null
-     */
-    private function describeRagConfig(Site $site): ?array
-    {
-        $settings = $site->getSettings();
-        $provider = trim((string)$settings->get('meilisearch.rag.provider', ''));
-        if ($provider === '') {
-            return null;
-        }
-        return [
-            'provider' => $provider,
-            'model' => trim((string)$settings->get('meilisearch.rag.model', '')),
-            'url' => trim((string)$settings->get('meilisearch.rag.url', '')),
-            'hasApiKey' => trim((string)$settings->get('meilisearch.rag.apiKey', '')) !== '',
-            'useHybrid' => (bool)$settings->get('meilisearch.rag.useHybrid', true),
-            'conversationEnabled' => (bool)$settings->get('meilisearch.rag.conversation.enabled', false),
-            'maxContextHits' => (int)$settings->get('meilisearch.rag.maxContextHits', 5),
-            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
         ];
     }
 }

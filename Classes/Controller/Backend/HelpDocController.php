@@ -10,9 +10,9 @@ use TYPO3\CMS\Backend\Routing\UriBuilder as BackendUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\CMS\Core\Page\PageRenderer;
-use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
+use WapplerSystems\Meilisearch\Controller\Backend\Support\SiteOverviewProvider;
 use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
 use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
@@ -37,11 +37,11 @@ final class HelpDocController
     public function __construct(
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly BackendUriBuilder $backendUriBuilder,
-        private readonly SiteFinder $siteFinder,
         private readonly SourceImporterRegistry $importerRegistry,
         private readonly HelpDocRepository $helpDocRepository,
         private readonly PageRenderer $pageRenderer,
         private readonly BackendContext $context,
+        private readonly SiteOverviewProvider $siteOverviewProvider,
     ) {}
 
     public function handle(ServerRequestInterface $request, string $action): ResponseInterface
@@ -62,33 +62,16 @@ final class HelpDocController
             JavaScriptModuleInstruction::create('@wapplersystems/meilisearch/folder-picker.js'),
         );
 
-        // Walk every site once and collect:
-        //   - the first non-empty meilisearch.helpdoc.sourceRoot (BE-form
-        //     default for the DITA importer's path field)
-        //   - the union of all declared languages, labelled
-        //   - the first non-empty meilisearch.helpdoc.fileadminFolder
-        //     (target placeholder)
-        $defaultSourceRoot = '';
-        $defaultTargetFolder = HelpDocRepository::DEFAULT_TARGET_FOLDER;
-        $defaultTargetSet = false;
-        $knownLanguages = [];
-        foreach ($this->siteFinder->getAllSites() as $site) {
-            $settings = $site->getSettings();
-            $configuredSource = trim((string)$settings->get('meilisearch.helpdoc.sourceRoot', ''));
-            if ($configuredSource !== '' && $defaultSourceRoot === '') {
-                $defaultSourceRoot = $configuredSource;
-            }
-            $configuredTarget = trim((string)$settings->get('meilisearch.helpdoc.fileadminFolder', ''));
-            if ($configuredTarget !== '' && !$defaultTargetSet) {
-                $defaultTargetFolder = $configuredTarget;
-                $defaultTargetSet = true;
-            }
-            foreach ($site->getAllLanguages() as $lang) {
-                $id = $lang->getLanguageId();
-                $knownLanguages[$id] = $knownLanguages[$id] ?? sprintf('%d — %s', $id, $lang->getTitle());
-            }
-        }
-        ksort($knownLanguages);
+        // BE-form placeholders / defaults pulled from whichever site
+        // has them set first. Iteration moved to SiteOverviewProvider
+        // so the three lookups (sourceRoot, fileadminFolder,
+        // knownLanguages) don't each open their own getAllSites loop.
+        $defaultSourceRoot = $this->siteOverviewProvider->firstNonEmpty('meilisearch.helpdoc.sourceRoot');
+        $defaultTargetFolder = $this->siteOverviewProvider->firstNonEmpty(
+            'meilisearch.helpdoc.fileadminFolder',
+            HelpDocRepository::DEFAULT_TARGET_FOLDER,
+        );
+        $knownLanguages = $this->siteOverviewProvider->knownLanguages();
 
         $stats = $this->helpDocRepository->stats();
         // Augment each language row with its TYPO3 label so the
