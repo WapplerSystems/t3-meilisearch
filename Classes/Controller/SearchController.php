@@ -74,9 +74,10 @@ final class SearchController extends ActionController
         if (!$site instanceof Site) {
             return $this->htmlResponse();
         }
-        // Per-plugin TypoScript wins when explicitly set (preserves operator
-        // overrides on existing site packages); otherwise the new Site-Settings
-        // defaults from meilisearch.frontend.perPage / meilisearch.facets apply.
+        // Per-plugin TypoScript / FlexForm wins when explicitly set
+        // (preserves operator overrides on existing site packages); otherwise
+        // the Site-Settings defaults from meilisearch.frontend.perPage /
+        // meilisearch.facets apply.
         $perPage = isset($this->settings['perPage']) && (int)$this->settings['perPage'] > 0
             ? (int)$this->settings['perPage']
             : $this->configProvider->defaultPerPage($site);
@@ -87,15 +88,29 @@ final class SearchController extends ActionController
             $facetList = $this->configProvider->facetAttributes($site);
         }
 
-        // Integrator switch (per-site flag in settings.yaml /
-        // settings.definitions.yaml): a single per-language search page
-        // hides the language facet and force-filters results to the
-        // active site language. Any incoming `filters[language]` from the
-        // URL is discarded — the visitor must not be able to escape the
-        // scope by hand-crafting the query string. Read directly from the
-        // site settings so the fragment middleware (which has no Extbase
-        // plugin context) can apply the same flag identically.
-        $restrictToLanguage = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false);
+        // Default sort: visitor sort wins; if absent, FlexForm's
+        // settings.defaultSort wins; otherwise relevance (empty string).
+        if ($sort === '') {
+            $sort = trim((string)($this->settings['defaultSort'] ?? ''));
+        }
+
+        // Integrator switch: per-language search page hides the language
+        // facet and force-filters results to the active site language.
+        // Resolution: per-plugin FlexForm tri-state ('1' = on, '0' = off,
+        // '' = inherit) wins over the site-level
+        // meilisearch.restrictToCurrentLanguage flag. The fragment
+        // middleware (which has no Extbase plugin context) only reads the
+        // site flag — that's the legacy behaviour, intentional: a plugin
+        // override doesn't propagate into the AJAX fragment of a different
+        // page.
+        $restrictFlexValue = $this->settings['restrictToCurrentLanguage'] ?? null;
+        if ($restrictFlexValue === '1' || $restrictFlexValue === 1) {
+            $restrictToLanguage = true;
+        } elseif ($restrictFlexValue === '0' || $restrictFlexValue === 0) {
+            $restrictToLanguage = false;
+        } else {
+            $restrictToLanguage = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false);
+        }
         if ($restrictToLanguage) {
             $currentLanguageId = $this->resolveCurrentLanguageId();
             if ($currentLanguageId !== null) {

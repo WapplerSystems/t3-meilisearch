@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Per-plugin-instance overrides for the WsMeilisearch / Search plugin.
+    Every field here is OPTIONAL — leaving it empty falls back to the
+    Site-Settings default (meilisearch.*). The matching read-sites in
+    SearchController explicitly check for "empty / unset" and only then
+    inherit, so an integrator can override one field without losing the
+    rest of the site config.
+
+    Storage: $this->settings['<key>'] in the controller (Extbase merges
+    FlexForm values into the settings array automatically).
+-->
+<T3DataStructure>
+    <sheets>
+        <sDEF>
+            <ROOT>
+                <sheetTitle>Search plugin settings</sheetTitle>
+                <type>array</type>
+                <el>
+
+                    <settings.facets>
+                        <label>Visible facets</label>
+                        <description>Comma-separated list of attribute names (e.g. type,language). Empty inherits from meilisearch.facets in site settings. Available attributes depend on the configured SchemaProviders — typically: type, language, mimeType, extension, year.</description>
+                        <config>
+                            <type>input</type>
+                            <size>40</size>
+                            <eval>trim</eval>
+                            <placeholder>type,language</placeholder>
+                        </config>
+                    </settings.facets>
+
+                    <settings.perPage>
+                        <label>Results per page</label>
+                        <description>Empty or 0 inherits from meilisearch.frontend.perPage (site default 10).</description>
+                        <config>
+                            <type>number</type>
+                            <size>5</size>
+                            <range>
+                                <lower>0</lower>
+                                <upper>500</upper>
+                            </range>
+                            <default>0</default>
+                        </config>
+                    </settings.perPage>
+
+                    <settings.defaultSort>
+                        <label>Default sort</label>
+                        <description>Overrides the initial sort order (visitor can still switch via the dropdown). Empty inherits from site settings (relevance).</description>
+                        <config>
+                            <type>select</type>
+                            <renderType>selectSingle</renderType>
+                            <items>
+                                <numIndex index="0">
+                                    <label>Inherit / Relevance</label>
+                                    <value></value>
+                                </numIndex>
+                                <numIndex index="1">
+                                    <label>Newest first (datetime desc)</label>
+                                    <value>datetime:desc</value>
+                                </numIndex>
+                                <numIndex index="2">
+                                    <label>Oldest first (datetime asc)</label>
+                                    <value>datetime:asc</value>
+                                </numIndex>
+                                <numIndex index="3">
+                                    <label>Largest file first (fileSize desc)</label>
+                                    <value>fileSize:desc</value>
+                                </numIndex>
+                                <numIndex index="4">
+                                    <label>Smallest file first (fileSize asc)</label>
+                                    <value>fileSize:asc</value>
+                                </numIndex>
+                            </items>
+                        </config>
+                    </settings.defaultSort>
+
+                    <settings.restrictToCurrentLanguage>
+                        <label>Restrict to current language</label>
+                        <description>Tri-state: "Inherit" reads meilisearch.restrictToCurrentLanguage from the site, otherwise forces on/off for this plugin only. Use on per-language search pages where the language facet would just be noise.</description>
+                        <config>
+                            <type>select</type>
+                            <renderType>selectSingle</renderType>
+                            <items>
+                                <numIndex index="0">
+                                    <label>Inherit from site setting</label>
+                                    <value></value>
+                                </numIndex>
+                                <numIndex index="1">
+                                    <label>Force ON (filter to current language)</label>
+                                    <value>1</value>
+                                </numIndex>
+                                <numIndex index="2">
+                                    <label>Force OFF (cross-language results)</label>
+                                    <value>0</value>
+                                </numIndex>
+                            </items>
+                        </config>
+                    </settings.restrictToCurrentLanguage>
+
+                </el>
+            </ROOT>
+        </sDEF>
+    </sheets>
+</T3DataStructure>
