@@ -56,3 +56,16 @@ $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilise
     'options' => [],
     'groups' => ['system'],
 ];
+
+// Per-site Meilisearch metadata cache (doc count + active embedder). 60s
+// TTL keeps the Overview / Diagnostics BE tabs snappy on multi-site
+// installs without burning a roundtrip per site per page render. Cache
+// is invalidated explicitly after Reindex and Re-push Embedder actions
+// (see IndexMetadataProvider). Database backend so the entries survive
+// across requests; the volume is tiny (one row per site).
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilisearch_meta'] ??= [
+    'backend' => \TYPO3\CMS\Core\Cache\Backend\Typo3DatabaseBackend::class,
+    'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+    'options' => ['defaultLifetime' => 60],
+    'groups' => ['system'],
+];

@@ -11,9 +11,9 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
 use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
+use WapplerSystems\Meilisearch\Service\IndexMetadataProvider;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
-use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
  * The Diagnostics tab + its two maintenance actions:
@@ -33,7 +33,7 @@ final class DiagnoseController
     public function __construct(
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly SiteFinder $siteFinder,
-        private readonly SearchEngineFactory $engineFactory,
+        private readonly IndexMetadataProvider $metadataProvider,
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly EmbedderConfigurator $embedderConfigurator,
         private readonly BackendContext $context,
@@ -83,6 +83,10 @@ final class DiagnoseController
         }
         try {
             $result = $this->embedderConfigurator->ensureForSite($site);
+            // Invalidate the metadata cache so the next render of the
+            // Diagnostics card shows the just-pushed embedder state
+            // instead of the stale "not pushed" badge.
+            $this->metadataProvider->invalidate($site);
             // ensureForSite returns: 'configured' | 'unchanged' | 'disabled' | 'skipped'
             $severity = match ($result) {
                 'configured' => ContextualFeedbackSeverity::OK,
@@ -165,37 +169,16 @@ final class DiagnoseController
      */
     private function buildDiagnosticsCard(Site $site): array
     {
-        $settings = $site->getSettings();
-        $configured = trim((string)$settings->get('meilisearch.url', '')) !== '';
-
-        $card = [
+        $meta = $this->metadataProvider->getMeta($site);
+        return [
             'identifier' => $site->getIdentifier(),
-            'configured' => $configured,
+            'configured' => $meta['configured'],
             // Desired embedder config (what the operator put in settings.yaml)
             'desiredEmbedder' => $this->describeDesiredEmbedder($site),
-            'actualEmbedder' => null,
-            // RAG block
+            'actualEmbedder' => $meta['actualEmbedder'],
             'rag' => $this->describeRagConfig($site),
-            'error' => null,
+            'error' => $meta['error'],
         ];
-        if (!$configured) {
-            return $card;
-        }
-
-        $client = $this->engineFactory->createClientForSite($site);
-        if ($client === null) {
-            return $card;
-        }
-        try {
-            $index = $client->index($this->engineFactory->getIndexName($site));
-            $actual = $index->getEmbedders();
-            if (is_array($actual) && isset($actual[EmbedderConfigurator::EMBEDDER_NAME])) {
-                $card['actualEmbedder'] = $actual[EmbedderConfigurator::EMBEDDER_NAME];
-            }
-        } catch (\Throwable $e) {
-            $card['error'] = $e->getMessage();
-        }
-        return $card;
     }
 
     /**

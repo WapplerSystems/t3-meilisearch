@@ -11,10 +11,9 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
-use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
 use WapplerSystems\Meilisearch\Service\IndexerService;
+use WapplerSystems\Meilisearch\Service\IndexMetadataProvider;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
-use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
  * Backend module entry-point for ws_meilisearch. Owns two concerns:
@@ -38,8 +37,8 @@ final class OverviewController
     public function __construct(
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly SiteFinder $siteFinder,
-        private readonly SearchEngineFactory $engineFactory,
         private readonly IndexerService $indexerService,
+        private readonly IndexMetadataProvider $metadataProvider,
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly BackendContext $context,
         private readonly TestController $testController,
@@ -104,6 +103,7 @@ final class OverviewController
                 return $this->context->redirect();
             }
             $count = $this->indexerService->indexAll($site);
+            $this->metadataProvider->invalidate($site);
             $this->context->addFlash(sprintf('Reindexed %d document(s) for site "%s".', $count, $siteId), ContextualFeedbackSeverity::OK);
         } catch (\Throwable $e) {
             $this->context->addFlash('Reindex failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
@@ -117,41 +117,16 @@ final class OverviewController
     private function buildSiteRow(Site $site): array
     {
         $settings = $site->getSettings();
-        $configured = trim((string)$settings->get('meilisearch.url', '')) !== '';
-
-        $row = [
+        $meta = $this->metadataProvider->getMeta($site);
+        return [
             'identifier' => $site->getIdentifier(),
-            'configured' => $configured,
-            'indexName' => $configured ? $this->engineFactory->getIndexName($site) : '',
+            'configured' => $meta['configured'],
+            'indexName' => $meta['indexName'],
             'embedderSource' => (string)$settings->get('meilisearch.embedder.source', ''),
             'ragProvider' => (string)$settings->get('meilisearch.rag.provider', ''),
-            'docCount' => null,
-            'embedderActive' => false,
-            'error' => null,
+            'docCount' => $meta['docCount'],
+            'embedderActive' => $meta['embedderActive'],
+            'error' => $meta['error'],
         ];
-
-        if (!$configured) {
-            return $row;
-        }
-
-        $client = $this->engineFactory->createClientForSite($site);
-        if ($client === null) {
-            return $row;
-        }
-        $index = $client->index($row['indexName']);
-
-        try {
-            $stats = $index->stats();
-            $row['docCount'] = (int)($stats['numberOfDocuments'] ?? 0);
-        } catch (\Throwable $e) {
-            $row['error'] = $e->getMessage();
-        }
-        try {
-            $embedders = $index->getEmbedders();
-            $row['embedderActive'] = is_array($embedders) && isset($embedders[EmbedderConfigurator::EMBEDDER_NAME]);
-        } catch (\Throwable) {
-            $row['embedderActive'] = false;
-        }
-        return $row;
     }
 }
