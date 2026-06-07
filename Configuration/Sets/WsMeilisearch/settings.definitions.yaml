@@ -41,6 +41,59 @@ settings:
     type: string
     default: '1:/helpdocs/'
 
+  # --- Quota check (ws_meilisearch:check-quotas) -----------------------
+  # Run periodically (cron / scheduler) against Infomaniak / OpenAI /
+  # Anthropic to catch usage approaching the cap before it bites.
+
+  meilisearch.quota.threshold:
+    label: 'Quota warning threshold (%)'
+    description: 'Percent of cap that triggers the warning email when ws_meilisearch:check-quotas runs. Default 80 — leaves enough runway to top up the plan before the hard cap.'
+    type: int
+    default: 80
+
+  meilisearch.quota.recipient:
+    label: 'Quota warning email recipient'
+    description: 'Where warning emails go when a provider exceeds the threshold. Empty disables the email — the CLI still prints the table for log scraping. Single address or comma-separated list.'
+    type: string
+    default: ''
+
+  # OpenAI's usage endpoint needs an Admin API key (sk-admin-…), NOT the
+  # completion key used by the RAG provider — separate scope, separate
+  # storage so a key rotation on one doesn't blast the other.
+  meilisearch.quota.openai.adminKey:
+    label: 'OpenAI admin API key (for quota check only)'
+    description: 'Admin-scoped key (starts with sk-admin-...) needed by /v1/organization/usage/completions. NOT the same as meilisearch.rag.apiKey.'
+    type: string
+    default: ''
+  meilisearch.quota.openai.monthlyCap:
+    label: 'OpenAI monthly token cap'
+    description: 'Operator-set cap in tokens; OpenAI returns usage but no quota number, so this is the value the threshold is measured against. Set to your monthly budget in tokens.'
+    type: int
+    default: 0
+
+  # Same shape for Anthropic — admin key is separate from the completion
+  # key, and the cap is operator-set since Anthropic doesn't expose
+  # account-level quotas via API.
+  meilisearch.quota.anthropic.adminKey:
+    label: 'Anthropic admin API key (for quota check only)'
+    description: 'Admin-scoped key needed by /v1/organizations/usage_report. NOT the same as meilisearch.rag.apiKey.'
+    type: string
+    default: ''
+  meilisearch.quota.anthropic.monthlyCap:
+    label: 'Anthropic monthly token cap'
+    description: 'Operator-set cap in tokens; Anthropic returns usage but no quota number, so this is the value the threshold is measured against.'
+    type: int
+    default: 0
+
+  # Infomaniak's AI-completion key only authorises /chat + /embeddings
+  # endpoints — usage data needs a Manager-scope Personal Access Token
+  # created at manager.infomaniak.com → API.
+  meilisearch.quota.infomaniak.apiToken:
+    label: 'Infomaniak Manager API token (for quota check only)'
+    description: 'Personal Access Token from manager.infomaniak.com → API. Different from meilisearch.rag.apiKey: that one is product-scoped (chat + embeddings only) and cannot read usage; this one needs Manager scope.'
+    type: string
+    default: ''
+
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'
     description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'

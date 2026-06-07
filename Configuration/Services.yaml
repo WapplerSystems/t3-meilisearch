@@ -29,6 +29,9 @@ services:
       # interface is a marker, not a service.
       - '../Classes/Service/RagTest/RagTestResult.php'
       - '../Classes/Service/RagTest/EmbeddingClientInterface.php'
+      # QuotaStatus readonly DTO + interface marker.
+      - '../Classes/Service/Quota/QuotaStatus.php'
+      - '../Classes/Service/Quota/QuotaProviderInterface.php'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
@@ -39,6 +42,8 @@ services:
       tags: ['ws_meilisearch.source_importer']
     WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientInterface:
       tags: ['ws_meilisearch.embedding_client']
+    WapplerSystems\Meilisearch\Service\Quota\QuotaProviderInterface:
+      tags: ['ws_meilisearch.quota_provider']
 
   WapplerSystems\Meilisearch\Service\SearchEngineFactory:
     public: true
@@ -74,6 +79,10 @@ services:
   # no DI container reference.
   WapplerSystems\Meilisearch\Service\RagTest\RagTestRunner:
     public: true
+
+  WapplerSystems\Meilisearch\Service\Quota\QuotaCheckRunner:
+    arguments:
+      $providers: !tagged_iterator ws_meilisearch.quota_provider
 
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:
