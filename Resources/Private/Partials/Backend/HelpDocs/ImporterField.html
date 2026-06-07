@@ -1,0 +1,127 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+<f:comment>
+    Renders one form field for a HelpDocSourceImporter, dispatched by
+    `field.type`. The schema lives in PHP (describeFields() on each
+    importer); this partial is the rendering pole of that contract.
+
+    Arguments:
+      - field             one entry from describeFields()
+      - knownLanguages    int[langId] => label, populates type=language
+      - defaultTargetFolder  placeholder for empty type=folder inputs
+      - folderBrowserUrl  CSRF-tokened element-browser URL for the picker
+
+    Checkbox handling: HTML form-submit drops unchecked boxes entirely,
+    so we render a hidden `<input value="0">` immediately before the
+    checkbox `<input value="1">`. PHP's last-wins parsing gives the
+    controller a deterministic value (no ambiguity between "unchecked"
+    and "field not in the form").
+</f:comment>
+
+<f:variable name="fieldId" value="wsm-imp-{field.name}"/>
+<f:variable name="requiredAttr">{f:if(condition: field.required, then: ' required="required"')}</f:variable>
+
+<f:switch expression="{field.type}">
+
+    <f:case value="text">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">
+                {field.label}<f:if condition="{field.required}"><span class="text-danger ms-1">*</span></f:if>
+            </label>
+            <input type="text" id="{fieldId}" name="{field.name}"
+                   value="{field.default}"
+                   class="form-control form-control-sm"
+                   {requiredAttr -> f:format.raw()} />
+            <f:if condition="{field.help}"><div class="form-text small">{field.help}</div></f:if>
+        </div>
+    </f:case>
+
+    <f:case value="textarea">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">
+                {field.label}<f:if condition="{field.required}"><span class="text-danger ms-1">*</span></f:if>
+            </label>
+            <textarea id="{fieldId}" name="{field.name}" rows="4"
+                      class="form-control form-control-sm font-monospace"
+                      {requiredAttr -> f:format.raw()}>{field.default}</textarea>
+            <f:if condition="{field.help}"><div class="form-text small">{field.help}</div></f:if>
+        </div>
+    </f:case>
+
+    <f:case value="file">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">
+                {field.label}<f:if condition="{field.required}"><span class="text-danger ms-1">*</span></f:if>
+            </label>
+            <input type="file" id="{fieldId}" name="{field.name}"
+                   class="form-control form-control-sm"
+                   {requiredAttr -> f:format.raw()} />
+            <f:if condition="{field.help}"><div class="form-text small">{field.help}</div></f:if>
+        </div>
+    </f:case>
+
+    <f:case value="language">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">{field.label}</label>
+            <select id="{fieldId}" name="{field.name}" class="form-select form-select-sm">
+                <f:for each="{knownLanguages}" as="label" key="langId">
+                    <option value="{langId}" {f:if(condition: '{langId} == {field.default}', then: 'selected="selected"')}>{label}</option>
+                </f:for>
+            </select>
+        </div>
+    </f:case>
+
+    <f:case value="select">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">{field.label}</label>
+            <select id="{fieldId}" name="{field.name}" class="form-select form-select-sm">
+                <f:for each="{field.options}" as="optLabel" key="optValue">
+                    <option value="{optValue}" {f:if(condition: '\'{optValue}\' == \'{field.default}\'', then: 'selected="selected"')}>{optLabel}</option>
+                </f:for>
+            </select>
+            <f:if condition="{field.help}"><div class="form-text small">{field.help}</div></f:if>
+        </div>
+    </f:case>
+
+    <f:case value="checkbox">
+        <div class="form-check mb-2">
+            <input type="hidden" name="{field.name}" value="0" />
+            <input type="checkbox" id="{fieldId}" name="{field.name}" value="1"
+                   class="form-check-input"
+                   {f:if(condition: field.default, then: 'checked="checked"')} />
+            <label for="{fieldId}" class="form-check-label small">
+                {field.label}<f:if condition="{field.help}"> <span class="text-muted">— {field.help}</span></f:if>
+            </label>
+        </div>
+    </f:case>
+
+    <f:case value="folder">
+        <div class="mb-2">
+            <label class="form-label small text-muted" for="{fieldId}">
+                {field.label}<f:if condition="{field.required}"><span class="text-danger ms-1">*</span></f:if>
+                <span class="text-muted ms-1">(empty = site default <code>{defaultTargetFolder}</code>)</span>
+            </label>
+            <div class="input-group input-group-sm">
+                <input type="text" id="{fieldId}" name="{field.name}"
+                       value="{field.default}"
+                       class="form-control"
+                       placeholder="{defaultTargetFolder}"
+                       {requiredAttr -> f:format.raw()} />
+                <button type="button" class="btn btn-outline-secondary"
+                        data-wsm-folder-picker="{fieldId}"
+                        data-wsm-folder-picker-url="{folderBrowserUrl}"
+                        title="Select folder">
+                    Browse…
+                </button>
+            </div>
+            <f:if condition="{field.help}"><div class="form-text small">{field.help}</div></f:if>
+        </div>
+    </f:case>
+
+    <f:defaultCase>
+        <div class="alert alert-warning small">Unknown field type <code>{field.type}</code> for <code>{field.name}</code>.</div>
+    </f:defaultCase>
+
+</f:switch>
+
+</html>

@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Controller\Backend;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\UriBuilder as BackendUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
@@ -18,6 +19,7 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
 use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
+use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
 use WapplerSystems\Meilisearch\Service\IndexerService;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
@@ -65,12 +67,13 @@ final class OverviewController
             'repushEmbedder'  => $this->repushEmbedderAction($request),
             'pingRag'         => $this->pingRagAction($request),
             'helpdocs'        => $this->helpdocsAction($request),
-            'runImportHelpdocs' => $this->runImportHelpdocsAction($request),
-            'runFolderImport' => $this->runFolderImportAction($request),
-            'runZipImport'    => $this->runZipImportAction($request),
-            'runUrlImport'    => $this->runUrlImportAction($request),
+            // Single dispatcher for every registered HelpDocSourceImporter.
+            // The form POSTs a hidden `_importer` field; the action looks
+            // the slug up in the registry, builds the config from the
+            // importer's own describeFields() schema, and runs it. Adding
+            // a new importer needs zero controller / template changes.
+            'runImporter'     => $this->runImporterAction($request),
             'purgeHelpdocs'   => $this->purgeHelpdocsAction($request),
-            'uploadHelpdoc'   => $this->uploadHelpdocAction($request),
             default           => $this->indexAction($request),
         };
     }
@@ -425,168 +428,134 @@ final class OverviewController
             'defaultLangDir' => 'de',
             'listEditUrl' => $listEditUrl,
             'importers' => $importers,
-            'runImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImportHelpdocs']),
-            'folderImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runFolderImport']),
-            'zipImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runZipImport']),
-            'urlImportUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runUrlImport']),
+            // Single endpoint for every registered importer — slug
+            // travels as a hidden `_importer` field in the form.
+            'runImporterUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'runImporter']),
             // CSRF-tokened URL for TYPO3's standard folder element-browser.
             // Built server-side because the BE route is token-protected;
             // the JS module just opens this URL as an iframe modal.
             'folderBrowserUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
             'purgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'purgeHelpdocs']),
-            'uploadUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('system_wsmeilisearch', ['action' => 'uploadHelpdoc']),
             ...$this->commonTabUrls(),
         ]);
         return $moduleTemplate->renderResponse('Backend/Overview/HelpDocs');
     }
 
-    private function runImportHelpdocsAction(ServerRequestInterface $request): ResponseInterface
+    /**
+     * Generic dispatcher for every registered HelpDocSourceImporter.
+     * The form carries a hidden `_importer` field with the slug; this
+     * action looks the importer up in the registry, maps form values
+     * onto the importer's describeFields() schema, and runs it. Replaces
+     * the five near-identical actions that used to bind a single
+     * importer each.
+     */
+    private function runImporterAction(ServerRequestInterface $request): ResponseInterface
     {
         if (strtoupper($request->getMethod()) !== 'POST') {
             return $this->redirectToHelpdocs();
         }
         $body = (array)$request->getParsedBody();
-        $path = trim((string)($body['path'] ?? ''));
-        if ($path === '') {
-            $this->addFlash('Path is required.', ContextualFeedbackSeverity::ERROR);
+        $slug = trim((string)($body['_importer'] ?? ''));
+        if ($slug === '' || !$this->importerRegistry->has($slug)) {
+            $this->addFlash(sprintf('Unknown importer "%s".', $slug), ContextualFeedbackSeverity::ERROR);
             return $this->redirectToHelpdocs();
         }
-        $languageId = (int)($body['language'] ?? 0);
-        try {
-            $result = $this->importerRegistry->get('dita-ot')->import([
-                'path' => $path,
-                'langDir' => trim((string)($body['langDir'] ?? 'de')),
-                'language' => $languageId,
-                'pid' => 0,
-                'purge' => isset($body['purge']) && (string)$body['purge'] === '1',
-                'limit' => 0,
-            ]);
-            $this->addFlash(
-                sprintf(
-                    'Imported %d topic(s) into language %d (%d skipped, %d media attached). Run reindex to push them to Meilisearch.',
-                    $result->imported,
-                    $languageId,
-                    $result->skipped,
-                    $result->mediaCopied,
-                ),
-                ContextualFeedbackSeverity::OK,
-            );
-        } catch (\Throwable $e) {
-            $this->addFlash('Import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
-        }
-        return $this->redirectToHelpdocs();
-    }
+        $importer = $this->importerRegistry->get($slug);
 
-    private function runUrlImportAction(ServerRequestInterface $request): ResponseInterface
-    {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->redirectToHelpdocs();
-        }
-        $body = (array)$request->getParsedBody();
-        $urls = trim((string)($body['urls'] ?? ''));
-        if ($urls === '') {
-            $this->addFlash('URL list is empty.', ContextualFeedbackSeverity::ERROR);
-            return $this->redirectToHelpdocs();
-        }
         try {
-            $result = $this->importerRegistry->get('url-list')->import([
-                'urls' => $urls,
-                'language' => (int)($body['language'] ?? 0),
-                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
-                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
-                'timeout' => (int)($body['timeout'] ?? 30),
-                'maxSizeMb' => (int)($body['maxSizeMb'] ?? 50),
-            ]);
-            $severity = $result->skipped > 0 ? ContextualFeedbackSeverity::WARNING : ContextualFeedbackSeverity::OK;
-            $msg = sprintf(
-                'URL list: imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
+            $config = $this->buildImporterConfig($importer, $body, $request->getUploadedFiles());
+        } catch (\Throwable $e) {
+            $this->addFlash(sprintf('%s: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
+            return $this->redirectToHelpdocs();
+        }
+
+        try {
+            $result = $importer->import($config);
+            $message = sprintf(
+                '%s: imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
+                $importer->label(),
                 $result->imported,
                 $result->skipped,
                 $result->mediaCopied,
             );
-            // Surface the first few errors so the operator can see which
-            // URLs failed without digging into the log.
+            // Surface the first few per-item errors (URL fetches, …) so the
+            // operator sees what broke without digging into the log.
             $errors = (array)($result->extras['errors'] ?? []);
             if ($errors !== []) {
-                $msg .= ' First errors: ' . implode(' | ', array_slice($errors, 0, 3));
+                $message .= ' First errors: ' . implode(' | ', array_slice($errors, 0, 3));
             }
-            $this->addFlash($msg, $severity);
+            $severity = $result->imported === 0
+                ? ContextualFeedbackSeverity::WARNING
+                : ($errors !== [] || $result->skipped > 0
+                    ? ContextualFeedbackSeverity::WARNING
+                    : ContextualFeedbackSeverity::OK);
+            $this->addFlash($message, $severity);
         } catch (\Throwable $e) {
-            $this->addFlash('URL list import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+            $this->addFlash(sprintf('%s failed: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }
 
-    private function runZipImportAction(ServerRequestInterface $request): ResponseInterface
-    {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->redirectToHelpdocs();
-        }
-        $body = (array)$request->getParsedBody();
-        $uploadedFiles = $request->getUploadedFiles();
-        $upload = $uploadedFiles['archive'] ?? null;
-        if (!$upload instanceof \Psr\Http\Message\UploadedFileInterface) {
-            $this->addFlash('No zip uploaded.', ContextualFeedbackSeverity::ERROR);
-            return $this->redirectToHelpdocs();
-        }
-        try {
-            $result = $this->importerRegistry->get('zip-bundle')->import([
-                'upload' => $upload,
-                'language' => (int)($body['language'] ?? 0),
-                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
-                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
-                'preserveSubfolders' => isset($body['preserveSubfolders']) && (string)$body['preserveSubfolders'] === '1',
-                'titleFromFilename' => !isset($body['titleFromFilename']) || (string)$body['titleFromFilename'] === '1',
-            ]);
-            $this->addFlash(
-                sprintf(
-                    'Zip "%s": imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
-                    $upload->getClientFilename(),
-                    $result->imported,
-                    $result->skipped,
-                    $result->mediaCopied,
-                ),
-                ContextualFeedbackSeverity::OK,
-            );
-        } catch (\Throwable $e) {
-            $this->addFlash('Zip import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
-        }
-        return $this->redirectToHelpdocs();
-    }
+    /**
+     * Map form values onto the importer's describeFields() schema. Per
+     * field type:
+     *   - file      → PSR-7 UploadedFile from $uploadedFiles[$name]
+     *   - checkbox  → bool (the form ships a hidden=0 plus checkbox=1
+     *                 marker so absent==unchecked, see ImporterField.html)
+     *   - text/textarea/select/language/folder → trimmed string passed
+     *                 through; importer casts to int as needed
+     *
+     * Required fields throw with a friendly label so the flash message
+     * tells the operator which input they forgot.
+     *
+     * @param array<string, mixed> $body
+     * @param array<string, mixed> $uploadedFiles
+     * @return array<string, mixed>
+     */
+    private function buildImporterConfig(
+        HelpDocSourceImporter $importer,
+        array $body,
+        array $uploadedFiles,
+    ): array {
+        $config = [];
+        foreach ($importer->describeFields() as $field) {
+            $name = (string)($field['name'] ?? '');
+            $type = (string)($field['type'] ?? 'text');
+            $label = (string)($field['label'] ?? $name);
+            $required = !empty($field['required']);
 
-    private function runFolderImportAction(ServerRequestInterface $request): ResponseInterface
-    {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->redirectToHelpdocs();
+            if ($type === 'file') {
+                $upload = $uploadedFiles[$name] ?? null;
+                if ($upload instanceof UploadedFileInterface && $upload->getError() !== UPLOAD_ERR_NO_FILE) {
+                    $config[$name] = $upload;
+                } elseif ($required) {
+                    throw new \RuntimeException(sprintf('"%s" is required.', $label));
+                }
+                continue;
+            }
+
+            if ($type === 'checkbox') {
+                // ImporterField.html renders a hidden=0 input before the
+                // checkbox=1 input so the form always carries the field;
+                // last-wins parsing gives us "1" or "0".
+                if (array_key_exists($name, $body)) {
+                    $config[$name] = (string)$body[$name] === '1';
+                } else {
+                    $config[$name] = (bool)($field['default'] ?? false);
+                }
+                continue;
+            }
+
+            $value = $body[$name] ?? $field['default'] ?? '';
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            if ($required && ($value === '' || $value === null)) {
+                throw new \RuntimeException(sprintf('"%s" is required.', $label));
+            }
+            $config[$name] = $value;
         }
-        $body = (array)$request->getParsedBody();
-        $folder = trim((string)($body['folder'] ?? ''));
-        if ($folder === '') {
-            $this->addFlash('Folder identifier is required.', ContextualFeedbackSeverity::ERROR);
-            return $this->redirectToHelpdocs();
-        }
-        try {
-            $result = $this->importerRegistry->get('folder')->import([
-                'folder' => $folder,
-                'recursive' => isset($body['recursive']) && (string)$body['recursive'] === '1',
-                'language' => (int)($body['language'] ?? 0),
-                'pid' => 0,
-                'help_type' => trim((string)($body['help_type'] ?? 'reference')),
-            ]);
-            $this->addFlash(
-                sprintf(
-                    'Folder import from "%s": imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
-                    $folder,
-                    $result->imported,
-                    $result->skipped,
-                    $result->mediaCopied,
-                ),
-                ContextualFeedbackSeverity::OK,
-            );
-        } catch (\Throwable $e) {
-            $this->addFlash('Folder import failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
-        }
-        return $this->redirectToHelpdocs();
+        return $config;
     }
 
     private function purgeHelpdocsAction(ServerRequestInterface $request): ResponseInterface
@@ -613,50 +582,6 @@ final class OverviewController
             );
         } catch (\Throwable $e) {
             $this->addFlash('Purge failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
-        }
-        return $this->redirectToHelpdocs();
-    }
-
-    private function uploadHelpdocAction(ServerRequestInterface $request): ResponseInterface
-    {
-        if (strtoupper($request->getMethod()) !== 'POST') {
-            return $this->redirectToHelpdocs();
-        }
-        $body = (array)$request->getParsedBody();
-        $uploadedFiles = $request->getUploadedFiles();
-        $upload = $uploadedFiles['document'] ?? null;
-        if (!$upload instanceof \Psr\Http\Message\UploadedFileInterface) {
-            $this->addFlash('No file uploaded.', ContextualFeedbackSeverity::ERROR);
-            return $this->redirectToHelpdocs();
-        }
-        try {
-            $result = $this->importerRegistry->get('single-file')->import([
-                'upload' => $upload,
-                'title' => trim((string)($body['title'] ?? '')),
-                'abstract' => trim((string)($body['abstract'] ?? '')),
-                'language' => (int)($body['language'] ?? 0),
-                'help_type' => trim((string)($body['help_type'] ?? 'upload')),
-                'targetFolder' => trim((string)($body['targetFolder'] ?? '')),
-            ]);
-            $extras = $result->extras;
-            $extractNote = match ($extras['extractStatus'] ?? '') {
-                'success' => sprintf('Tika extracted %d chars', (int)($extras['extractedChars'] ?? 0)),
-                'skipped' => 'Tika skipped (no extraction — title-only doc)',
-                'failed'  => 'Tika failed — document indexed without body text',
-                default   => 'No Tika configured',
-            };
-            $this->addFlash(
-                sprintf(
-                    'Uploaded "%s" (helpdoc #%d, FAL file #%d). %s. Run reindex to push it to Meilisearch.',
-                    $upload->getClientFilename(),
-                    (int)($extras['uid'] ?? 0),
-                    (int)($extras['falUid'] ?? 0),
-                    $extractNote,
-                ),
-                ContextualFeedbackSeverity::OK,
-            );
-        } catch (\Throwable $e) {
-            $this->addFlash('Upload failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
         return $this->redirectToHelpdocs();
     }

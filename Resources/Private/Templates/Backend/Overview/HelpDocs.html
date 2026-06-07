@@ -6,10 +6,10 @@
 
 <f:section name="Content">
     <h1>Meilisearch — Help docs</h1>
-    <f:render partial="Backend/TabNav" arguments="{active: 'helpdocs', indexUrl: indexUrl, testUrl: testUrl, diagnoseUrl: diagnoseUrl, helpdocsUrl: helpdocsUrl}" />
+    <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="text-muted">
-        DITA-OT XHTML help topics live in <code>tx_wsmeilisearch_helpdoc</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Re-imports purge and rebuild the language scope so the table tracks whatever the docs team last regenerated. Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
+        Help topics live in <code>tx_wsmeilisearch_helpdoc</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
     </p>
 
     <!-- ============== STATS ============== -->
@@ -57,65 +57,29 @@
         </div>
     </div>
 
-    <div class="row g-3">
-        <!-- ============== IMPORT FORM ============== -->
-        <div class="col-md-7">
-            <div class="card h-100">
-                <div class="card-header"><strong>Run import</strong></div>
-                <div class="card-body">
-                    <form action="{runImportUrl}" method="post">
-                        <input type="hidden" name="token" value="{token}" />
+    <!-- ============== IMPORTERS ============== -->
+    <h2 class="h5 mb-2">Run an importer</h2>
+    <p class="text-muted small mb-3">
+        One card per registered <code>HelpDocSourceImporter</code>. New importers added in PHP appear here automatically — no template change needed.
+    </p>
+    <f:for each="{importers}" as="importer">
+        <f:render partial="Backend/HelpDocs/ImporterForm"
+                  arguments="{importer: importer, knownLanguages: knownLanguages, defaultTargetFolder: defaultTargetFolder, folderBrowserUrl: folderBrowserUrl, token: token, runImporterUrl: runImporterUrl}" />
+    </f:for>
 
-                        <div class="mb-2">
-                            <label class="form-label small text-muted">Source path</label>
-                            <input type="text" name="path" value="{defaultSourceRoot}" class="form-control form-control-sm" placeholder="path/to/dita-out" required="required" />
-                            <div class="form-text small">Absolute path or relative to the project root. Must contain <code>index.html</code> and a <code>&lt;langDir&gt;/topics/</code> subfolder.</div>
-                        </div>
+    <!-- ============== PURGE FORM ============== -->
+    <section class="mt-4">
+        <div class="card border-danger">
+            <div class="card-header text-danger"><strong>Purge by language</strong></div>
+            <div class="card-body">
+                <p class="small text-muted">
+                    Hard-deletes every helpdoc row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
+                </p>
+                <form action="{purgeUrl}" method="post">
+                    <input type="hidden" name="token" value="{token}" />
 
-                        <div class="row g-2 mb-2">
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Language directory</label>
-                                <input type="text" name="langDir" value="{defaultLangDir}" class="form-control form-control-sm" placeholder="de" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Target sys_language_uid</label>
-                                <select name="language" class="form-select form-select-sm">
-                                    <f:for each="{knownLanguages}" as="label" key="langId">
-                                        <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
-                                    </f:for>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-check mb-3">
-                            <input type="checkbox" name="purge" value="1" id="hd-purge" class="form-check-input" checked="checked" />
-                            <label for="hd-purge" class="form-check-label">
-                                Purge before importing
-                                <span class="text-muted small">(recommended — wipes existing rows for the chosen language so re-runs are idempotent)</span>
-                            </label>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">Start import</button>
-                        <p class="text-muted small mt-2 mb-0">
-                            Reindex is NOT triggered automatically — run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards to push the freshly imported docs to Meilisearch.
-                        </p>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============== PURGE FORM ============== -->
-        <div class="col-md-5">
-            <div class="card h-100 border-danger">
-                <div class="card-header text-danger"><strong>Purge by language</strong></div>
-                <div class="card-body">
-                    <p class="small text-muted">
-                        Hard-deletes every helpdoc row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
-                    </p>
-                    <form action="{purgeUrl}" method="post">
-                        <input type="hidden" name="token" value="{token}" />
-
-                        <div class="mb-2">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
                             <label class="form-label small text-muted">Language</label>
                             <select name="language" class="form-select form-select-sm">
                                 <f:for each="{knownLanguages}" as="label" key="langId">
@@ -123,266 +87,18 @@
                                 </f:for>
                             </select>
                         </div>
-
-                        <div class="form-check mb-3">
-                            <input type="checkbox" name="confirm" value="1" id="hd-confirm" class="form-check-input" />
-                            <label for="hd-confirm" class="form-check-label small">
-                                I understand this drops <strong>all</strong> helpdoc rows for the selected language.
-                            </label>
-                        </div>
-
-                        <button type="submit" class="btn btn-outline-danger">Purge</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============== SINGLE-FILE UPLOAD ============== -->
-    <section class="mt-4">
-        <div class="card border-success">
-            <div class="card-header text-success"><strong>Upload single document</strong> <span class="text-muted ms-2">PDF / DOCX / HTML / Markdown / Office</span></div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">
-                    Drop a single curated document into the knowledge base — useful for one-off uploads (FAQ PDF, internal handbook, customer brief) that don't fit the DITA-OT import workflow. Tika extracts the body text from the uploaded file (PDF / DOCX / Office / HTML / EPUB / TXT etc., per <code>meilisearch.tika.allowedMimeTypes</code>); the editor-supplied title + abstract drive how the entry appears in search results.
-                </p>
-                <form action="{uploadUrl}" method="post" enctype="multipart/form-data">
-                    <input type="hidden" name="token" value="{token}" />
-
-                    <div class="mb-2">
-                        <label class="form-label small text-muted">File</label>
-                        <input type="file" name="document" class="form-control form-control-sm" required="required" />
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-8">
-                            <label class="form-label small text-muted">Title <span class="text-muted">(empty = file name)</span></label>
-                            <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Onboarding Guide 2026" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Language</label>
-                            <select name="language" class="form-select form-select-sm">
-                                <f:for each="{knownLanguages}" as="label" key="langId">
-                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
-                                </f:for>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-8">
-                            <label class="form-label small text-muted">Abstract <span class="text-muted">(optional, shown as the result snippet)</span></label>
-                            <textarea name="abstract" class="form-control form-control-sm" rows="2" placeholder="One-paragraph summary so search results don't fall back to the first 200 chars of the body."></textarea>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Document kind</label>
-                            <select name="help_type" class="form-select form-select-sm">
-                                <option value="upload" selected="selected">upload</option>
-                                <option value="concept">concept</option>
-                                <option value="task">task</option>
-                                <option value="reference">reference</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Target folder <span class="text-muted">(empty = site default <code>{defaultTargetFolder}</code>)</span></label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="targetFolder" id="uploadTargetFolder" class="form-control" placeholder="{defaultTargetFolder}" />
-                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="uploadTargetFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text small">FAL combined identifier (storage:path). The <code>uploads/</code> subfolder is added automatically.</div>
-                    </div>
-
-                    <button type="submit" class="btn btn-success">Upload &amp; create helpdoc</button>
-                    <p class="text-muted small mt-2 mb-0">
-                        After upload the new entry is visible in the List module immediately. Run <code>ws_meilisearch:reindex</code> (or the Overview tab) to push it to Meilisearch.
-                    </p>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============== FOLDER BATCH IMPORT ============== -->
-    <section class="mt-4">
-        <div class="card border-info">
-            <div class="card-header text-info"><strong>Batch-import from FAL folder</strong> <span class="text-muted ms-2">PDF / DOCX / HTML / Markdown / …</span></div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">
-                    Walk a fileadmin folder and create one helpdoc per file in it. Existing <code>sys_file</code> rows are reused — files are not copied. Good for dropping a stack of PDFs into <code>fileadmin/handbooks/</code> via FileList and then turning them into searchable entries in one shot.
-                </p>
-                <form action="{folderImportUrl}" method="post">
-                    <input type="hidden" name="token" value="{token}" />
-
-                    <div class="mb-2">
-                        <label class="form-label small text-muted">Source folder</label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="folder" id="folderImportFolder" class="form-control" placeholder="1:/handbooks/" required="required" />
-                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="folderImportFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text small">FAL combined identifier (storage:path). Use the picker to pick visually.</div>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Language</label>
-                            <select name="language" class="form-select form-select-sm">
-                                <f:for each="{knownLanguages}" as="label" key="langId">
-                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
-                                </f:for>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Document kind</label>
-                            <select name="help_type" class="form-select form-select-sm">
-                                <option value="reference" selected="selected">reference</option>
-                                <option value="concept">concept</option>
-                                <option value="task">task</option>
-                                <option value="upload">upload</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
+                        <div class="col-md-5">
                             <div class="form-check">
-                                <input type="checkbox" name="recursive" value="1" id="fi-recursive" class="form-check-input" />
-                                <label for="fi-recursive" class="form-check-label small">Include subfolders</label>
+                                <input type="checkbox" name="confirm" value="1" id="hd-confirm" class="form-check-input" />
+                                <label for="hd-confirm" class="form-check-label small">
+                                    I understand this drops <strong>all</strong> helpdoc rows for the selected language.
+                                </label>
                             </div>
                         </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-info">Batch-import folder</button>
-                    <p class="text-muted small mt-2 mb-0">
-                        Run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards. The folder importer is also available via <code>ws_meilisearch:import-help-docs --importer=folder -f folder=1:/handbooks/</code>.
-                    </p>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============== ZIP BUNDLE UPLOAD ============== -->
-    <section class="mt-4">
-        <div class="card border-warning">
-            <div class="card-header text-warning"><strong>Upload ZIP bundle</strong> <span class="text-muted ms-2">many docs at once</span></div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">
-                    Upload one <code>.zip</code> containing many documents — each entry becomes its own helpdoc. Path-traversal entries and dotfiles are dropped automatically. Cap of 1000 entries per archive (zip-bomb guard).
-                </p>
-                <form action="{zipImportUrl}" method="post" enctype="multipart/form-data">
-                    <input type="hidden" name="token" value="{token}" />
-
-                    <div class="mb-2">
-                        <label class="form-label small text-muted">ZIP file</label>
-                        <input type="file" name="archive" accept=".zip,application/zip" class="form-control form-control-sm" required="required" />
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Language</label>
-                            <select name="language" class="form-select form-select-sm">
-                                <f:for each="{knownLanguages}" as="label" key="langId">
-                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
-                                </f:for>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Document kind</label>
-                            <select name="help_type" class="form-select form-select-sm">
-                                <option value="reference" selected="selected">reference</option>
-                                <option value="concept">concept</option>
-                                <option value="task">task</option>
-                                <option value="upload">upload</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <div class="form-check">
-                                <input type="checkbox" name="preserveSubfolders" value="1" id="zip-preserve" class="form-check-input" />
-                                <label for="zip-preserve" class="form-check-label small">Preserve subfolders</label>
-                            </div>
+                        <div class="col-md-3 text-end">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Purge</button>
                         </div>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Target folder <span class="text-muted">(empty = site default <code>{defaultTargetFolder}</code>)</span></label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="targetFolder" id="zipTargetFolder" class="form-control" placeholder="{defaultTargetFolder}" />
-                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="zipTargetFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text small">A <code>zips/</code> subfolder is added automatically.</div>
-                    </div>
-
-                    <button type="submit" class="btn btn-warning">Upload &amp; extract</button>
-                    <p class="text-muted small mt-2 mb-0">
-                        Run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards.
-                    </p>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============== URL LIST IMPORT ============== -->
-    <section class="mt-4">
-        <div class="card border-primary">
-            <div class="card-header text-primary"><strong>Import from URL list</strong> <span class="text-muted ms-2">HTTP fetch</span></div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">
-                    Fetch every URL, store the response in fileadmin, run Tika for the body. Use for public wiki pages, S3-hosted PDF links, customer docs hosted elsewhere. Only <code>http</code> and <code>https</code> are accepted. Blank lines and lines starting with <code>#</code> are skipped.
-                </p>
-                <form action="{urlImportUrl}" method="post">
-                    <input type="hidden" name="token" value="{token}" />
-
-                    <div class="mb-2">
-                        <label class="form-label small text-muted">URLs <span class="text-muted">(one per line)</span></label>
-                        <textarea name="urls" class="form-control form-control-sm font-monospace" rows="5" required="required" placeholder="https://example.com/handbook.pdf&#10;https://example.com/policy/2026.html&#10;# Comments and blank lines are skipped"></textarea>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted">Language</label>
-                            <select name="language" class="form-select form-select-sm">
-                                <f:for each="{knownLanguages}" as="label" key="langId">
-                                    <option value="{langId}" {f:if(condition: '{langId} == 0', then: 'selected="selected"')}>{label}</option>
-                                </f:for>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted">Document kind</label>
-                            <select name="help_type" class="form-select form-select-sm">
-                                <option value="reference" selected="selected">reference</option>
-                                <option value="concept">concept</option>
-                                <option value="task">task</option>
-                                <option value="upload">upload</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted">Timeout (s)</label>
-                            <input type="number" name="timeout" value="30" min="1" max="600" class="form-control form-control-sm" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted">Max size (MB)</label>
-                            <input type="number" name="maxSizeMb" value="50" min="1" max="500" class="form-control form-control-sm" />
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Target folder <span class="text-muted">(empty = site default <code>{defaultTargetFolder}</code>)</span></label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="targetFolder" id="urlTargetFolder" class="form-control" placeholder="{defaultTargetFolder}" />
-                            <button type="button" class="btn btn-outline-secondary" data-wsm-folder-picker="urlTargetFolder" data-wsm-folder-picker-url="{folderBrowserUrl}" title="Select folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text small">A <code>urls/</code> subfolder is added automatically.</div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Fetch &amp; import</button>
-                    <p class="text-muted small mt-2 mb-0">
-                        Run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards. Failed URLs are listed in the flash message; full detail in the log.
-                    </p>
                 </form>
             </div>
         </div>

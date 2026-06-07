@@ -1,0 +1,54 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+<f:comment>
+    One card per registered HelpDocSourceImporter — the import slug,
+    label and field list all come from PHP via describeFields(). Adding
+    a new importer creates a new card here without any template change.
+
+    Arguments:
+      - importer            {name, label, description, fields[]}
+      - knownLanguages      int[langId] => label
+      - defaultTargetFolder placeholder for folder pickers
+      - folderBrowserUrl    CSRF-tokened element-browser URL
+      - token               BE form CSRF token
+      - runImporterUrl      controller endpoint
+</f:comment>
+
+<f:comment>
+    Detect any file field so we set enctype only when needed — avoids
+    multipart parsing overhead for the all-text importers.
+</f:comment>
+<f:variable name="hasFile" value="0"/>
+<f:for each="{importer.fields}" as="field">
+    <f:if condition="{field.type} == 'file'"><f:variable name="hasFile" value="1"/></f:if>
+</f:for>
+
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>{importer.label}</strong>
+        <code class="text-muted small">{importer.name}</code>
+    </div>
+    <div class="card-body">
+        <p class="small text-muted mb-3">{importer.description}</p>
+
+        <form action="{runImporterUrl}" method="post"
+              {f:if(condition: hasFile, then: 'enctype="multipart/form-data"')}>
+            <input type="hidden" name="token" value="{token}" />
+            <input type="hidden" name="_importer" value="{importer.name}" />
+
+            <f:for each="{importer.fields}" as="field">
+                <f:render partial="Backend/HelpDocs/ImporterField"
+                          arguments="{field: field, knownLanguages: knownLanguages, defaultTargetFolder: defaultTargetFolder, folderBrowserUrl: folderBrowserUrl}"/>
+            </f:for>
+
+            <button type="submit" class="btn btn-primary btn-sm">
+                Run <code class="text-light">{importer.name}</code>
+            </button>
+            <p class="text-muted small mt-2 mb-0">
+                Reindex is NOT triggered automatically — run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards to push the imported docs to Meilisearch.
+            </p>
+        </form>
+    </div>
+</div>
+
+</html>
