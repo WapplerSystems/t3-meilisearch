@@ -79,3 +79,25 @@ CREATE TABLE tx_wsmeilisearch_ragtest (
     PRIMARY KEY (uid),
     KEY parent (pid)
 );
+
+-- One row per RagTestRunner invocation per test. Drives the
+-- score-history sparkline in the BE tab + lets operators eyeball
+-- the trend after a model rotation. Pruned to RagTestRunner::HISTORY_KEEP
+-- entries per test on each new insert (rolling window, bounded
+-- growth without per-row maintenance).
+CREATE TABLE tx_wsmeilisearch_ragtest_run (
+    uid             INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    pid             INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    crdate          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    -- Soft FK to tx_wsmeilisearch_ragtest.uid; no DBAL constraint
+    -- declared because TYPO3's deleted=1 soft-delete + replicated
+    -- environments make hard FKs brittle.
+    test_uid        INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    status          VARCHAR(16) DEFAULT '' NOT NULL,
+    score           DECIMAL(4,3) UNSIGNED DEFAULT NULL,
+    actual_answer   MEDIUMTEXT,
+    error_message   TEXT,
+
+    PRIMARY KEY (uid),
+    KEY test_recent (test_uid, crdate)
+);

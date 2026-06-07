@@ -26,6 +26,15 @@ use WapplerSystems\Meilisearch\Service\Rag\RagService;
 final class RagTestRunner
 {
     public const TABLE = 'tx_wsmeilisearch_ragtest';
+    public const HISTORY_TABLE = 'tx_wsmeilisearch_ragtest_run';
+    /**
+     * Per-test cap on stored history rows. Rolling-window pruning runs
+     * after every insert so the table stays bounded without operator
+     * intervention. 100 ≈ ~3 months of nightly runs — enough for
+     * sparkline trend recognition, small enough that the DELETE stays
+     * a single index-driven query.
+     */
+    public const HISTORY_KEEP = 100;
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -186,14 +195,16 @@ final class RagTestRunner
 
     private function persist(int $uid, RagTestResult $result): void
     {
-        $conn = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $conn->update(self::TABLE, [
+        $now = time();
+        // Update the test row's last_* snapshot (drives the BE List
+        // module badges + the BE-tab status column).
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(self::TABLE, [
             'last_status' => $result->status,
             'last_score' => $result->score,
             'last_actual_answer' => $result->actualAnswer,
             'last_error' => $result->error,
-            'last_run_at' => time(),
-            'tstamp' => time(),
+            'last_run_at' => $now,
+            'tstamp' => $now,
         ], ['uid' => $uid], [
             ParameterType::STRING,
             ParameterType::STRING, // DECIMAL accepts string; null stays null
@@ -202,5 +213,73 @@ final class RagTestRunner
             ParameterType::INTEGER,
             ParameterType::INTEGER,
         ]);
+        // Append one history row (rolling per-test log used by the
+        // sparkline + trend table).
+        $historyConn = $this->connectionPool->getConnectionForTable(self::HISTORY_TABLE);
+        $historyConn->insert(self::HISTORY_TABLE, [
+            'pid' => 0,
+            'crdate' => $now,
+            'test_uid' => $uid,
+            'status' => $result->status,
+            'score' => $result->score,
+            'actual_answer' => $result->actualAnswer,
+            'error_message' => $result->error,
+        ]);
+        $this->pruneHistory($uid);
+    }
+
+    /**
+     * Roll the history table: keep only the most recent
+     * {@see HISTORY_KEEP} rows per test_uid, drop the rest. Cheap on
+     * the test_recent index; runs after every insert so we never
+     * accumulate more than HISTORY_KEEP per test (with one transient
+     * +1 between INSERT and DELETE).
+     */
+    private function pruneHistory(int $testUid): void
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable(self::HISTORY_TABLE);
+        $cutoffRow = $qb->select('crdate')
+            ->from(self::HISTORY_TABLE)
+            ->where($qb->expr()->eq('test_uid', $qb->createNamedParameter($testUid, ParameterType::INTEGER)))
+            ->orderBy('crdate', 'DESC')
+            ->setFirstResult(self::HISTORY_KEEP)
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchAssociative();
+        if ($cutoffRow === false) {
+            return; // fewer than HISTORY_KEEP rows for this test, nothing to prune
+        }
+        $del = $this->connectionPool->getQueryBuilderForTable(self::HISTORY_TABLE);
+        $del->delete(self::HISTORY_TABLE)
+            ->where(
+                $del->expr()->eq('test_uid', $del->createNamedParameter($testUid, ParameterType::INTEGER)),
+                $del->expr()->lte('crdate', $del->createNamedParameter((int)$cutoffRow['crdate'], ParameterType::INTEGER)),
+            )
+            ->executeStatement();
+    }
+
+    /**
+     * Fetch the last N (score, status, crdate) for a test, oldest
+     * first. Used by the BE tab to render the sparkline.
+     *
+     * @return list<array{crdate:int, status:string, score:float|null}>
+     */
+    public function historyFor(int $testUid, int $limit = self::HISTORY_KEEP): array
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable(self::HISTORY_TABLE);
+        $rows = $qb->select('crdate', 'status', 'score')
+            ->from(self::HISTORY_TABLE)
+            ->where($qb->expr()->eq('test_uid', $qb->createNamedParameter($testUid, ParameterType::INTEGER)))
+            ->orderBy('crdate', 'DESC')
+            ->setMaxResults($limit)
+            ->executeQuery()
+            ->fetchAllAssociative();
+        // Reverse to oldest-first for chart rendering.
+        $rows = array_reverse($rows);
+        return array_map(static fn (array $r): array => [
+            'crdate' => (int)$r['crdate'],
+            'status' => (string)$r['status'],
+            'score' => $r['score'] !== null ? (float)$r['score'] : null,
+        ], $rows);
     }
 }

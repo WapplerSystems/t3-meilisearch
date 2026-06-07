@@ -56,6 +56,13 @@ final class RagTestController
 
         $rows = $this->loadRows();
         $summary = $this->summarise($rows);
+        // Augment each row with a pre-rendered sparkline SVG path of
+        // the last N scores. Doing the math here keeps the Fluid
+        // template a thin renderer — no inline coordinate calculation.
+        foreach ($rows as &$row) {
+            $row['sparkline'] = $this->buildSparkline((int)$row['uid']);
+        }
+        unset($row);
 
         $moduleTemplate->assignMultiple([
             'tests' => $rows,
@@ -228,5 +235,55 @@ final class RagTestController
             RagTestResult::FAIL => sprintf('"%s" failed (score %.3f below threshold).', $title, $result->score),
             default             => sprintf('"%s" errored: %s', $title, $result->error),
         };
+    }
+
+    /**
+     * Render an inline SVG sparkline (polyline) of the last N scores
+     * for a test. Returns null if there's <2 data points (a single
+     * dot isn't a trend). Scaled to 0..1 on the Y axis since cosine
+     * scores live there; X axis is by sample index (no time gaps —
+     * we want trend shape, not strict chronological spacing).
+     *
+     * Width and stroke colour match Bootstrap's text-muted; an SVG
+     * <title> child gives a tooltip with min / max / count info.
+     *
+     * @return array{path:string, lastScore:?float, min:float, max:float, count:int}|null
+     */
+    private function buildSparkline(int $testUid): ?array
+    {
+        $history = $this->runner->historyFor($testUid, 30);
+        $scores = array_values(array_filter(
+            array_map(static fn (array $r): ?float => $r['score'], $history),
+            static fn (?float $v): bool => $v !== null,
+        ));
+        if (count($scores) < 2) {
+            return null;
+        }
+        $count = count($scores);
+        $min = min($scores);
+        $max = max($scores);
+        // SVG canvas: 80×24 logical pixels. 1px padding so the line
+        // doesn't kiss the edges.
+        $w = 80;
+        $h = 24;
+        $pad = 1;
+        $innerW = $w - 2 * $pad;
+        $innerH = $h - 2 * $pad;
+        // Y scale: always 0..1 (cosine bounds) so two sparklines on
+        // different tests visually compare. Floor / ceil
+        // would compress and hide drift relative to threshold.
+        $points = [];
+        foreach ($scores as $i => $score) {
+            $x = $pad + ($innerW * $i / max(1, $count - 1));
+            $y = $pad + ($innerH * (1.0 - $score));
+            $points[] = sprintf('%.1f,%.1f', $x, $y);
+        }
+        return [
+            'path' => implode(' ', $points),
+            'lastScore' => $scores[$count - 1],
+            'min' => $min,
+            'max' => $max,
+            'count' => $count,
+        ];
     }
 }
