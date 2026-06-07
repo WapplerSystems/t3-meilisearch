@@ -29,6 +29,16 @@ uploads, FAL folder walks, ZIP archives, and HTTP-fetched URL lists —
 all sharing a single `HelpDocSourceImporter` contract so third-party
 extensions can add their own source formats via DI auto-tagging.
 
+A **RAG quality-assurance** layer ships alongside the runtime: editor-
+maintained (question, expected answer) pairs in
+`tx_wsmeilisearch_ragtest` are scored against the actual RAG answer
+via embedding cosine similarity (Ollama / OpenAI / Infomaniak), with
+per-test thresholds, rolling 100-run history, BE tab + per-test
+sparklines, CLI + scheduler task. A separate
+`ws_meilisearch:check-quotas` CLI watches commercial provider usage
+(OpenAI / Anthropic / Infomaniak) and emails a warning above the
+configured threshold.
+
 Page indexing is delegated to `lochmueller/index` (hard composer
 dependency). The integration ships under `Classes/Integration/ExtIndex/`
 and consumes `IndexPageEvent`/`IndexFileEvent`, writing through this
@@ -481,6 +491,129 @@ Use the injected `HelpDocRepository` for FAL + Tika + persistence —
 the helpers handle target-folder auto-creation, sanitisation, and
 the standard `media` reference attachment.
 
+## RAG quality regression
+
+Editor-maintained (question, expected answer, threshold) triples live
+in `tx_wsmeilisearch_ragtest`. The runner asks the configured RAG
+provider each question, embeds expected + actual via the site's
+embedder, and scores cosine similarity against the per-row
+`similarity_threshold` — pass / fail / error. Idempotent and safe
+to run on cron; the same engine is reachable from three places so
+ad-hoc triage and unattended runs never drift.
+
+### Three trigger paths, one engine
+
+| Trigger | When to use |
+|---|---|
+| **BE tab** "RAG tests" | Ad-hoc triage. Per-row Run button + global Run-all. Sparkline column shows the last ~30 score points so trends are visible at a glance. |
+| **CLI** `ws_meilisearch:run-rag-tests [site] [--show-answers]` | One-shot from a deploy script or local checking. Distinct exit codes (0 / 1 / 2) for cron — see "Exit-code taxonomy" below. |
+| **Scheduler task** *Meilisearch: RAG regression tests* | Periodic monitoring. TYPO3-native v14 task; reuses `tx_wsmeilisearch_site_identifier`. Returns `false` on any FAIL so the scheduler flags the run; ERROR-only runs stay `true` (infrastructure hiccup, not regression). |
+
+### Threshold-tuning is per-test
+
+Cosine similarity scores depend heavily on the embedder and on text
+length. 0.85 is a sane default for `nomic-embed-text` on full-paragraph
+expected answers; short German texts often score 0.80+ even on
+semantically-unrelated content because of shared vocabulary. The
+operator picks the threshold per row based on how strict the match
+needs to be:
+
+- `0.70` → permissive, catches paraphrases but also tolerates "no
+   information" replies
+- `0.85` → strict semantic match
+- `0.95` → near-verbatim agreement
+
+### Embedding clients
+
+`HelpDocSourceImporter`-style plugin pattern. The right client is
+picked by matching `meilisearch.embedder.source` against each
+registered client's `supports()` vote:
+
+| Source slug | Endpoint |
+|---|---|
+| `ollama` | Native `/api/embeddings` (not the OpenAI-compatible `/v1/...` route — they share a host but expect different request shapes) |
+| `openAi` | `/v1/embeddings` with bearer token; default URL `https://api.openai.com/v1/embeddings` |
+| `infomaniak` | `/1/ai/<productId>/openai/v1/embeddings` — URL built from `meilisearch.infomaniak.productId`; same key as RAG / Meilisearch embedder |
+
+Add another provider by implementing `EmbeddingClientInterface`; the
+`_instanceof` rule in `Services.yaml` auto-tags it and the registry
+picks it up.
+
+### Per-run history + sparklines
+
+Every run also writes a row to `tx_wsmeilisearch_ragtest_run` (test
+uid, status, score, actual answer, crdate). A rolling per-test
+prune keeps the table at `RagTestRunner::HISTORY_KEEP=100` rows so
+growth is bounded without operator cron. The BE tab pre-renders an
+inline SVG sparkline of the last 30 scores per test — Y axis is
+fixed 0..1 so two sparklines compare visually across tests, and
+the `<title>` carries `count / min / max / last` for hover detail.
+
+### Exit-code taxonomy (CLI + scheduler)
+
+| Exit | Meaning |
+|---|---|
+| `0` | All PASS |
+| `1` | At least one FAIL — real quality regression. Cron monitor latches. |
+| `2` | Errors only (RAG provider down, embedder down, transport hiccup). NOT a quality signal — re-run after the underlying fix. |
+
+Same distinction maps to the scheduler task return value: `false` only
+when a FAIL happened; ERROR-only runs stay `true` so the scheduler
+doesn't latch on transient infrastructure noise.
+
+## Quota checks for commercial providers
+
+`ws_meilisearch:check-quotas` walks every site, fans out to a
+`QuotaProvider` per configured commercial backend (Infomaniak /
+OpenAI / Anthropic), and emails a warning when usage crosses
+`meilisearch.quota.threshold` (default 80%). Idempotent — only emails
+when over threshold. Exit `1` when any provider is over, so cron
+monitors latch.
+
+### Configuration
+
+```yaml
+meilisearch:
+  quota:
+    threshold: 80                       # percent
+    recipient: 'ops@example.com'         # single or comma-separated list
+
+    # OpenAI's /v1/organization/usage/completions needs an admin key
+    # (sk-admin-...), DIFFERENT from meilisearch.rag.apiKey which is
+    # least-privilege completion-only.
+    openai:
+      adminKey: '%env(OPENAI_ADMIN_KEY)%'
+      monthlyCap: 5000000               # operator-set; OpenAI returns
+                                         # usage but no quota number
+
+    # Same shape for Anthropic — admin key needed, monthly cap
+    # operator-set.
+    anthropic:
+      adminKey: '%env(ANTHROPIC_ADMIN_KEY)%'
+      monthlyCap: 10000000
+
+    # Infomaniak's AI completion key only authorises /chat + /embeddings
+    # — usage data needs a separate Manager-scope Personal Access Token
+    # from manager.infomaniak.com → API.
+    infomaniak:
+      apiToken: '%env(INFOMANIAK_MANAGER_TOKEN)%'
+```
+
+### Adding a custom provider
+
+Implement `QuotaProviderInterface`, return `QuotaStatus::ok(...)` /
+`::error(...)`. The `_instanceof` tag auto-registers it; the runner
+dispatches by matching the site's configured provider slug.
+
+```php
+final class MyProvider implements QuotaProviderInterface
+{
+    public function name(): string { return 'My provider'; }
+    public function supports(string $slug): bool { return $slug === 'myco'; }
+    public function checkQuota(Site $site): QuotaStatus { /* … */ }
+}
+```
+
 ## Scheduler task (Phase 5)
 
 `FullReindexTask` registers under **Administration → Scheduler** as
@@ -531,6 +664,15 @@ ddev exec vendor/bin/typo3 ws_meilisearch:ask "How do I reset my password?" main
 ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --list-importers
 ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --importer=folder -f folder=1:/handbooks/ -f recursive=1
 ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --importer=url-list -f urls=$'https://example.com/policy.pdf'
+
+# RAG quality regression — score actual answers against expected ones
+ddev exec vendor/bin/typo3 ws_meilisearch:run-rag-tests                    # all enabled tests, all sites
+ddev exec vendor/bin/typo3 ws_meilisearch:run-rag-tests main               # one site only
+ddev exec vendor/bin/typo3 ws_meilisearch:run-rag-tests --show-answers     # verbose: print actual answers per test
+
+# Commercial AI provider quota check + threshold-based warning email
+ddev exec vendor/bin/typo3 ws_meilisearch:check-quotas                     # all sites, mail on over-threshold
+ddev exec vendor/bin/typo3 ws_meilisearch:check-quotas main --dry-run      # one site, print table, no mail
 ```
 
 ## What's wired
@@ -556,6 +698,11 @@ ddev exec vendor/bin/typo3 ws_meilisearch:import-help-docs --importer=url-list -
 | Help-doc importers | Plugin architecture for populating `tx_wsmeilisearch_helpdoc` from DITA-OT drops, single uploads, FAL folders, ZIP bundles, URL lists | `Classes/Service/Import/HelpDocSourceImporter.php`, `Classes/Service/Import/Importer/*` |
 | Help-doc CLI | `ws_meilisearch:import-help-docs --importer=<slug>` dispatcher with per-importer field schema | `Classes/Command/ImportHelpDocsCommand.php` |
 | FAL folder picker | `data-wsm-folder-picker` button opens TYPO3's standard element-browser modal; writes the combined identifier back into the bound input via the picker's CustomEvent | `Resources/Public/JavaScript/folder-picker.js`, `Configuration/JavaScriptModules.php` |
+| RAG regression runner | Run one or many (question, expected, threshold) rows, embed via the configured `EmbeddingClient`, score cosine, persist per-test state + rolling history. Shared by CLI, scheduler, BE tab. | `Classes/Service/RagTest/RagTestRunner.php`, `Classes/Service/RagTest/EmbeddingClient*.php` |
+| RAG regression CLI | `ws_meilisearch:run-rag-tests [site] [--show-answers]` with pass / fail / error exit codes for cron | `Classes/Command/RunRagTestsCommand.php` |
+| RAG regression scheduler task | TYPO3 v14 native task — same engine + return value `false` on FAIL, `true` on ERROR-only | `Classes/Task/RunRagTestsTask.php` |
+| RAG regression BE tab | `?action=ragtests`: per-test state table with sparklines, Run-now / Run-all, summary badges, New-test deep link | `Classes/Controller/Backend/RagTestController.php`, `Resources/Private/Templates/Backend/Overview/RagTests.html` |
+| Quota check CLI | `ws_meilisearch:check-quotas [site] [--dry-run]` — fans out to `QuotaProvider` per configured commercial backend, emails over-threshold | `Classes/Command/CheckQuotasCommand.php`, `Classes/Service/Quota/*` |
 | Scheduler task | TYPO3 v14 native task (TCA-driven, no AdditionalFieldProvider) for periodic reindex of one site or all | `Classes/Task/FullReindexTask.php` |
 | Realtime sync (BE forms) | DataHandler hook → indexer (sys_file_metadata + sys_file_reference both translated to sys_file) | `Classes/DataHandling/RecordChangeListener.php` |
 | Realtime sync (FAL storage) | PSR-14 listeners on AfterFileAdded / Deleted / Renamed / Moved / ContentsSet / Replaced / Copied / MetaDataUpdated / RemovedFromIndex | `Classes/DataHandling/FalEventListener.php` |
@@ -598,6 +745,23 @@ match to your setup and adapt:
 - **Facet checkboxes auto-submit on change** (`this.form.requestSubmit()`),
   so users don't need a separate "Apply filters" button.
 
+### Per-instance overrides via FlexForm
+
+The Search plugin ships a FlexForm so the same `wsmeilisearch_search`
+CType can be configured differently per content element. Every field
+is optional — empty inherits from the Site Settings default.
+
+| FlexForm field | Overrides | Notes |
+|---|---|---|
+| Visible facets | `meilisearch.facets` | Comma-separated attribute list (e.g. `type,language`) |
+| Results per page | `meilisearch.frontend.perPage` | Int 0..500. 0 inherits the site default |
+| Default sort | (none — initial sort) | One of: Relevance, datetime desc/asc, fileSize desc/asc. Visitor's `?sort=` param still wins |
+| Restrict to current language | `meilisearch.restrictToCurrentLanguage` | Tri-state: Inherit / Force ON / Force OFF |
+
+Useful when a per-language search page wants the language filter
+forced on while the global search page wants cross-language results
+— same install, same site settings, different plugin instances.
+
 ## Adding a new record type
 
 Implement `SchemaProviderInterface`. Auto-wired and auto-tagged via
@@ -619,6 +783,7 @@ factory dedupes by field name across providers.
 - **Phase 4** ✅ RAG module with configurable LLM provider (OpenAI / Anthropic / Ollama / REST)
 - **Phase 5** ✅ Backend module + scheduler task
 - **Phase 6** ✅ Help-doc importers (DITA-OT / single-file / FAL folder / ZIP bundle / URL list) with shared plugin contract + FAL folder picker
+- **Phase 7** ✅ RAG quality-assurance suite (regression tests with cosine-similarity scoring, BE tab + sparklines, scheduler task) + commercial-provider quota checks with email warnings
 
 ## Known Phase 2 limitations
 
