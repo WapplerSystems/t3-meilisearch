@@ -592,12 +592,25 @@ meilisearch:
       adminKey: '%env(ANTHROPIC_ADMIN_KEY)%'
       monthlyCap: 10000000
 
-    # Infomaniak's AI completion key only authorises /chat + /embeddings
-    # — usage data needs a separate Manager-scope Personal Access Token
-    # from manager.infomaniak.com → API.
+    # Infomaniak's AI completion key only authorises /chat + /embeddings.
+    # A Manager-scope Personal Access Token (manager.infomaniak.com →
+    # API) confirms the AI product is reachable; the actual usage
+    # numbers must be read in the Manager UI — see the limitation note
+    # below.
     infomaniak:
       apiToken: '%env(INFOMANIAK_MANAGER_TOKEN)%'
 ```
+
+**Infomaniak limitation:** Verified 2026-06-07 against Infomaniak's
+production API with a Manager-scope token: there is currently NO
+usage endpoint for AI Tools. `/1/ai` returns product reachability
++ status but no token counts; product-scoped paths
+(`/1/ai/<id>/usage`, `/quota`, `/spending`, …) all return 404. The
+Infomaniak provider does what it can — confirm reachability + point
+the operator at `manager.infomaniak.com/v3/ai/products/<id>/usage`
+for manual gauge reading. Until Infomaniak exposes an API the
+"current state" badge stays ERROR with that explanatory message
+rather than faking a green light.
 
 ### Adding a custom provider
 

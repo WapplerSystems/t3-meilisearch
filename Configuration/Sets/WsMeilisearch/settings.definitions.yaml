@@ -85,12 +85,13 @@ settings:
     type: int
     default: 0
 
-  # Infomaniak's AI-completion key only authorises /chat + /embeddings
-  # endpoints — usage data needs a Manager-scope Personal Access Token
-  # created at manager.infomaniak.com → API.
+  # Infomaniak exposes NO usage API for AI Tools (verified 2026-06-07,
+  # see the long comment in InfomaniakQuotaProvider). This token is
+  # only used to confirm token validity + product reachability via
+  # /1/ai. Quota numbers themselves must be read from the Manager UI.
   meilisearch.quota.infomaniak.apiToken:
-    label: 'Infomaniak Manager API token (for quota check only)'
-    description: 'Personal Access Token from manager.infomaniak.com → API. Different from meilisearch.rag.apiKey: that one is product-scoped (chat + embeddings only) and cannot read usage; this one needs Manager scope.'
+    label: 'Infomaniak Manager API token (reachability check only)'
+    description: 'Optional. Personal Access Token from manager.infomaniak.com → API. Used to confirm the AI product is reachable; Infomaniak does not expose a usage API so actual quota numbers must be read at manager.infomaniak.com → AI Tools.'
     type: string
     default: ''
 
