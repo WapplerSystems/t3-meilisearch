@@ -1,0 +1,243 @@
+<?php
+declare(strict_types=1);
+
+namespace WapplerSystems\Meilisearch\Controller\Backend;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
+use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
+use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
+use WapplerSystems\Meilisearch\Service\EmbedderConfigurator;
+use WapplerSystems\Meilisearch\Service\Llm\LlmException;
+use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
+use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
+
+/**
+ * The Diagnostics tab + its two maintenance actions:
+ *
+ *   - diagnose      GET   per-site card with desired-vs-actual
+ *                          embedder config and RAG provider state
+ *   - repushEmbedder POST one-shot EmbedderConfigurator::ensureForSite()
+ *   - pingRag       POST  one-shot ping→pong against the configured
+ *                          LLM provider, bypassing retrieval entirely
+ *
+ * Split out of OverviewController so it carries only the services it
+ * actually needs (EmbedderConfigurator + LlmProviderRegistry + the
+ * Meilisearch client factory for embedder read-back).
+ */
+final class DiagnoseController
+{
+    public function __construct(
+        private readonly ModuleTemplateFactory $moduleTemplateFactory,
+        private readonly SiteFinder $siteFinder,
+        private readonly SearchEngineFactory $engineFactory,
+        private readonly LlmProviderRegistry $providerRegistry,
+        private readonly EmbedderConfigurator $embedderConfigurator,
+        private readonly BackendContext $context,
+    ) {}
+
+    public function handle(ServerRequestInterface $request, string $action): ResponseInterface
+    {
+        return match ($action) {
+            'repushEmbedder' => $this->repushEmbedder($request),
+            'pingRag'        => $this->pingRag($request),
+            default          => $this->diagnose($request),
+        };
+    }
+
+    private function diagnose(ServerRequestInterface $request): ResponseInterface
+    {
+        $moduleTemplate = $this->moduleTemplateFactory->create($request);
+
+        $cards = [];
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            $cards[] = $this->buildDiagnosticsCard($site);
+        }
+
+        $moduleTemplate->assignMultiple([
+            'cards' => $cards,
+            'repushUrl' => $this->context->route('repushEmbedder'),
+            'pingUrl' => $this->context->route('pingRag'),
+            ...$this->context->tabNavData(),
+        ]);
+        return $moduleTemplate->renderResponse('Backend/Overview/Diagnose');
+    }
+
+    private function repushEmbedder(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->context->redirect('diagnose');
+        }
+        $siteId = (string)(($request->getParsedBody() ?? [])['site'] ?? '');
+        if ($siteId === '') {
+            return $this->context->redirect('diagnose');
+        }
+        try {
+            $site = $this->siteFinder->getSiteByIdentifier($siteId);
+        } catch (\Throwable) {
+            $this->context->addFlash('Unknown site: ' . $siteId, ContextualFeedbackSeverity::ERROR);
+            return $this->context->redirect('diagnose');
+        }
+        try {
+            $result = $this->embedderConfigurator->ensureForSite($site);
+            // ensureForSite returns: 'configured' | 'unchanged' | 'disabled' | 'skipped'
+            $severity = match ($result) {
+                'configured' => ContextualFeedbackSeverity::OK,
+                'unchanged'  => ContextualFeedbackSeverity::INFO,
+                'disabled'   => ContextualFeedbackSeverity::INFO,
+                'skipped'    => ContextualFeedbackSeverity::WARNING,
+                default      => ContextualFeedbackSeverity::INFO,
+            };
+            $this->context->addFlash(sprintf('Embedder push for "%s": %s', $siteId, $result), $severity);
+        } catch (\Throwable $e) {
+            $this->context->addFlash('Embedder push failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+        }
+        return $this->context->redirect('diagnose');
+    }
+
+    private function pingRag(ServerRequestInterface $request): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'POST') {
+            return $this->context->redirect('diagnose');
+        }
+        $siteId = (string)(($request->getParsedBody() ?? [])['site'] ?? '');
+        if ($siteId === '') {
+            return $this->context->redirect('diagnose');
+        }
+        try {
+            $site = $this->siteFinder->getSiteByIdentifier($siteId);
+        } catch (\Throwable) {
+            $this->context->addFlash('Unknown site: ' . $siteId, ContextualFeedbackSeverity::ERROR);
+            return $this->context->redirect('diagnose');
+        }
+
+        $settings = $site->getSettings();
+        $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
+        if ($providerName === '') {
+            $this->context->addFlash(sprintf('Site "%s" has no RAG provider configured.', $siteId), ContextualFeedbackSeverity::WARNING);
+            return $this->context->redirect('diagnose');
+        }
+        $provider = $this->providerRegistry->get($providerName);
+        if ($provider === null) {
+            $this->context->addFlash(sprintf('Provider "%s" not registered.', $providerName), ContextualFeedbackSeverity::ERROR);
+            return $this->context->redirect('diagnose');
+        }
+
+        // Single short ping prompt. We deliberately don't go through
+        // RagService because retrieval isn't part of the health check —
+        // we only care whether the LLM endpoint responds.
+        $start = microtime(true);
+        try {
+            $answer = $provider->complete(
+                [
+                    ['role' => 'system', 'content' => 'You are a health probe. Reply "pong" to any input.'],
+                    ['role' => 'user', 'content' => 'ping'],
+                ],
+                [
+                    'model' => (string)$settings->get('meilisearch.rag.model', ''),
+                    'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
+                    'url' => (string)$settings->get('meilisearch.rag.url', ''),
+                    'temperature' => 0.0,
+                    'maxTokens' => 16,
+                ],
+            );
+            $elapsedMs = (int)round((microtime(true) - $start) * 1000);
+            $excerpt = trim(mb_substr($answer, 0, 80));
+            $this->context->addFlash(
+                sprintf('RAG ping for "%s" succeeded in %d ms — reply: "%s"', $siteId, $elapsedMs, $excerpt),
+                ContextualFeedbackSeverity::OK,
+            );
+        } catch (LlmException $e) {
+            $elapsedMs = (int)round((microtime(true) - $start) * 1000);
+            $this->context->addFlash(
+                sprintf('RAG ping for "%s" failed after %d ms: %s', $siteId, $elapsedMs, $e->getMessage()),
+                ContextualFeedbackSeverity::ERROR,
+            );
+        }
+        return $this->context->redirect('diagnose');
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function buildDiagnosticsCard(Site $site): array
+    {
+        $settings = $site->getSettings();
+        $configured = trim((string)$settings->get('meilisearch.url', '')) !== '';
+
+        $card = [
+            'identifier' => $site->getIdentifier(),
+            'configured' => $configured,
+            // Desired embedder config (what the operator put in settings.yaml)
+            'desiredEmbedder' => $this->describeDesiredEmbedder($site),
+            'actualEmbedder' => null,
+            // RAG block
+            'rag' => $this->describeRagConfig($site),
+            'error' => null,
+        ];
+        if (!$configured) {
+            return $card;
+        }
+
+        $client = $this->engineFactory->createClientForSite($site);
+        if ($client === null) {
+            return $card;
+        }
+        try {
+            $index = $client->index($this->engineFactory->getIndexName($site));
+            $actual = $index->getEmbedders();
+            if (is_array($actual) && isset($actual[EmbedderConfigurator::EMBEDDER_NAME])) {
+                $card['actualEmbedder'] = $actual[EmbedderConfigurator::EMBEDDER_NAME];
+            }
+        } catch (\Throwable $e) {
+            $card['error'] = $e->getMessage();
+        }
+        return $card;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function describeDesiredEmbedder(Site $site): ?array
+    {
+        $settings = $site->getSettings();
+        $source = trim((string)$settings->get('meilisearch.embedder.source', ''));
+        if ($source === '') {
+            return null;
+        }
+        // apiKey deliberately omitted — we never want to render it.
+        return array_filter([
+            'source' => $source,
+            'model' => trim((string)$settings->get('meilisearch.embedder.model', '')),
+            'url' => trim((string)$settings->get('meilisearch.embedder.url', '')),
+            'dimensions' => (int)$settings->get('meilisearch.embedder.dimensions', 0) ?: null,
+            'documentTemplate' => trim((string)$settings->get('meilisearch.embedder.documentTemplate', '')),
+            'semanticRatio' => (float)$settings->get('meilisearch.embedder.semanticRatio', 0.5),
+        ], static fn ($v) => $v !== '' && $v !== null);
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function describeRagConfig(Site $site): ?array
+    {
+        $settings = $site->getSettings();
+        $provider = trim((string)$settings->get('meilisearch.rag.provider', ''));
+        if ($provider === '') {
+            return null;
+        }
+        return [
+            'provider' => $provider,
+            'model' => trim((string)$settings->get('meilisearch.rag.model', '')),
+            'url' => trim((string)$settings->get('meilisearch.rag.url', '')),
+            'hasApiKey' => trim((string)$settings->get('meilisearch.rag.apiKey', '')) !== '',
+            'useHybrid' => (bool)$settings->get('meilisearch.rag.useHybrid', true),
+            'conversationEnabled' => (bool)$settings->get('meilisearch.rag.conversation.enabled', false),
+            'maxContextHits' => (int)$settings->get('meilisearch.rag.maxContextHits', 5),
+            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+        ];
+    }
+}
