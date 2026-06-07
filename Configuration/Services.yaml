@@ -69,6 +69,12 @@ services:
     arguments:
       $clients: !tagged_iterator ws_meilisearch.embedding_client
 
+  # Public because RunRagTestsTask instantiates the runner via
+  # GeneralUtility::makeInstance from the scheduler runtime, which has
+  # no DI container reference.
+  WapplerSystems\Meilisearch\Service\RagTest\RagTestRunner:
+    public: true
+
   # Hooked into DataHandler from ext_localconf.php — must be resolvable as a service.
   WapplerSystems\Meilisearch\DataHandling\RecordChangeListener:
     public: true
