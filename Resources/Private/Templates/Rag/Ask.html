@@ -118,6 +118,18 @@
                 </f:if>
             </f:else>
         </f:if>
+
+        <f:comment>
+            Contact fallback — rendered below whatever the switch
+            produced (answer card, no_context/failed alert, or the
+            conversation thread). Controller sets {showFallback} per
+            meilisearch.rag.fallback.show; the partial itself
+            additionally bails out if no email/phone/ticketUrl is set,
+            so an empty contact config produces no extra markup.
+        </f:comment>
+        <f:if condition="{showFallback}">
+            <f:render partial="Rag/FallbackContact" arguments="{fallback: fallback, question: question}"/>
+        </f:if>
     </div>
 </f:section>
 

@@ -1,0 +1,58 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+<f:comment>
+    Fallback contact card — rendered below the RAG answer when the
+    model couldn't help (or always, depending on
+    meilisearch.rag.fallback.show). Stays invisible when none of
+    email / phone / ticketUrl are set, even if the controller
+    decided to render the partial.
+
+    Arguments:
+      - fallback   {email, phone, ticketUrl, contactName}
+      - question   the visitor's current question (pre-filled as the
+                   mailto subject so the recipient knows what was asked)
+</f:comment>
+
+<f:if condition="{fallback.email} || {fallback.phone} || {fallback.ticketUrl}">
+    <aside class="ws-meilisearch-rag-fallback alert alert-light border mt-3" role="complementary">
+        <h3 class="h6 mb-2">
+            <f:if condition="{fallback.contactName}">
+                <f:then>{fallback.contactName -> f:format.htmlspecialchars()}</f:then>
+                <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.heading"/></f:else>
+            </f:if>
+        </h3>
+        <p class="small text-muted mb-2">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.intro"/>
+        </p>
+
+        <ul class="list-unstyled mb-0 d-flex flex-wrap gap-3">
+            <f:if condition="{fallback.email}">
+                <li>
+                    <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.email"/>:</strong>
+                    <a href="mailto:{fallback.email}?subject={f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.email.subject')}: {question -> f:format.urlencode()}"
+                       class="ws-meilisearch-rag-fallback__email">
+                        {fallback.email -> f:format.htmlspecialchars()}
+                    </a>
+                </li>
+            </f:if>
+            <f:if condition="{fallback.phone}">
+                <li>
+                    <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.phone"/>:</strong>
+                    <a href="tel:{fallback.telHref}" class="ws-meilisearch-rag-fallback__phone">
+                        {fallback.phone -> f:format.htmlspecialchars()}
+                    </a>
+                </li>
+            </f:if>
+            <f:if condition="{fallback.ticketUrl}">
+                <li>
+                    <a href="{fallback.ticketUrl}" target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-primary ws-meilisearch-rag-fallback__ticket">
+                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.ticket"/>
+                    </a>
+                </li>
+            </f:if>
+        </ul>
+    </aside>
+</f:if>
+
+</html>

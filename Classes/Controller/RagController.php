@@ -58,10 +58,18 @@ final class RagController extends ActionController
     {
         $site = $this->resolveSite();
         $conversation = $this->loadConversation($site);
+        // The initial form has no answer to anchor a fallback on, so
+        // only show the contact card when the operator explicitly
+        // wants it always-on. onlyEmpty/never both render nothing here.
+        $mode = $site instanceof Site
+            ? strtolower(trim((string)$site->getSettings()->get('meilisearch.rag.fallback.show', 'onlyEmpty')))
+            : 'never';
         $this->view->assignMultiple([
             'question' => $q,
             'conversation' => $conversation->turns,
             'conversationEnabled' => $this->conversationEnabled($site),
+            'fallback' => $this->resolveFallback($site),
+            'showFallback' => $mode === 'always',
         ]);
         return $this->htmlResponse();
     }
@@ -109,8 +117,58 @@ final class RagController extends ActionController
             'answer' => $answer,
             'conversation' => $conversation->turns,
             'conversationEnabled' => $this->conversationEnabled($site),
+            'fallback' => $this->resolveFallback($site),
+            'showFallback' => $this->shouldShowFallback($site, $answer->status, $answer->citedIds),
         ]);
         return $this->htmlResponse();
+    }
+
+    /**
+     * Pull the four optional fallback fields from site settings and
+     * pre-compute the tel: href (strip spaces / dashes so a number
+     * like "0241 / 88 98 01" still produces a valid dialer link).
+     *
+     * @return array{contactName:string,email:string,phone:string,telHref:string,ticketUrl:string}
+     */
+    private function resolveFallback(?Site $site): array
+    {
+        if (!$site instanceof Site) {
+            return ['contactName' => '', 'email' => '', 'phone' => '', 'telHref' => '', 'ticketUrl' => ''];
+        }
+        $settings = $site->getSettings();
+        $phone = trim((string)$settings->get('meilisearch.rag.fallback.phone', ''));
+        return [
+            'contactName' => trim((string)$settings->get('meilisearch.rag.fallback.contactName', '')),
+            'email' => trim((string)$settings->get('meilisearch.rag.fallback.email', '')),
+            'phone' => $phone,
+            // tel: links need a dial-friendly value — strip everything
+            // except digits, leading +, and pause/wait extensions.
+            'telHref' => $phone !== '' ? (string)preg_replace('/[^\d+]/', '', $phone) : '',
+            'ticketUrl' => trim((string)$settings->get('meilisearch.rag.fallback.ticketUrl', '')),
+        ];
+    }
+
+    /**
+     * Decide whether the fallback partial renders. Driven by
+     * meilisearch.rag.fallback.show:
+     *   always     — under every answer
+     *   onlyEmpty  — only when the model couldn't ground in sources
+     *                (status no_context / failed, OR ok-but-no-citations)
+     *   never      — disabled
+     *
+     * @param list<string> $citedIds
+     */
+    private function shouldShowFallback(?Site $site, string $status, array $citedIds): bool
+    {
+        if (!$site instanceof Site) {
+            return false;
+        }
+        $mode = strtolower(trim((string)$site->getSettings()->get('meilisearch.rag.fallback.show', 'onlyEmpty')));
+        return match ($mode) {
+            'always' => true,
+            'never' => false,
+            default => $status !== 'ok' || $citedIds === [],
+        };
     }
 
     public function resetAction(): ResponseInterface

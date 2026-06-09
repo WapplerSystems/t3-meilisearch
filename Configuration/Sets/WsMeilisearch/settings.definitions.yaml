@@ -95,6 +95,44 @@ settings:
     type: string
     default: ''
 
+  # --- RAG fallback contact info ---------------------------------------
+  # Rendered below the RAG answer card so visitors have a way to reach a
+  # human when the model has no good answer (or always, per .show below).
+
+  meilisearch.rag.fallback.show:
+    label: 'When to show the fallback contact'
+    description: 'onlyEmpty = render only when the RAG pipeline returned no_context / failed / low-confidence (no citations). always = render under every answer. never = hide entirely.'
+    type: string
+    enum:
+      onlyEmpty: 'Only when no answer / low confidence'
+      always: 'Under every answer'
+      never: 'Never (hide)'
+    default: 'onlyEmpty'
+
+  meilisearch.rag.fallback.contactName:
+    label: 'Contact name / organisation'
+    description: 'Optional heading above the contact details (e.g. "LINEAR Support" or "Anna Beispiel"). Empty hides the heading.'
+    type: string
+    default: ''
+
+  meilisearch.rag.fallback.email:
+    label: 'Fallback email address'
+    description: 'Rendered as mailto: link. The visitor''s current question is pre-filled as the subject when they click. Empty hides the email row.'
+    type: string
+    default: ''
+
+  meilisearch.rag.fallback.phone:
+    label: 'Fallback phone number'
+    description: 'Rendered as tel: link. Display value stays as typed; the href strips spaces / dashes so dialers don''t choke. Empty hides the phone row.'
+    type: string
+    default: ''
+
+  meilisearch.rag.fallback.ticketUrl:
+    label: 'Ticket system URL'
+    description: 'Optional URL to a ticket system (Jira, Redmine, Zammad, …). Renders as a button "Open a ticket" when set.'
+    type: string
+    default: ''
+
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'
     description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'

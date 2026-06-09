@@ -12,6 +12,10 @@
 
         <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled}"/>
         <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+
+        <f:if condition="{showFallback}">
+            <f:render partial="Rag/FallbackContact" arguments="{fallback: fallback, question: question}"/>
+        </f:if>
     </div>
 </f:section>
 

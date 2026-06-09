@@ -71,6 +71,30 @@
                 <source>Assistant</source>
                 <target>Assistent</target>
             </trans-unit>
+            <trans-unit id="rag.fallback.heading">
+                <source>Still have questions?</source>
+                <target>Noch Fragen?</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.intro">
+                <source>If your question wasn't answered, reach a human:</source>
+                <target>Wenn Ihre Frage nicht beantwortet wurde, erreichen Sie uns direkt:</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email">
+                <source>Email</source>
+                <target>E-Mail</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email.subject">
+                <source>Question from the website chat</source>
+                <target>Frage über die Website</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.phone">
+                <source>Phone</source>
+                <target>Telefon</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.ticket">
+                <source>Open a ticket</source>
+                <target>Ticket erstellen</target>
+            </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
                 <target>Letzte Suchen</target>

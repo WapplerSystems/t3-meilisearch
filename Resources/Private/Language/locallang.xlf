@@ -54,6 +54,24 @@
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
             </trans-unit>
+            <trans-unit id="rag.fallback.heading">
+                <source>Still have questions?</source>
+            </trans-unit>
+            <trans-unit id="rag.fallback.intro">
+                <source>If your question wasn't answered, reach a human:</source>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email">
+                <source>Email</source>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email.subject">
+                <source>Question from the website chat</source>
+            </trans-unit>
+            <trans-unit id="rag.fallback.phone">
+                <source>Phone</source>
+            </trans-unit>
+            <trans-unit id="rag.fallback.ticket">
+                <source>Open a ticket</source>
+            </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
             </trans-unit>
