@@ -27,3 +27,17 @@ plugin.tx_wsmeilisearch_search {
         # here to scope the value to one plugin instance.
     }
 }
+
+# --- RAG floating chat widget --------------------------------------------
+# Site-setting–driven opt-in. When enabled, every FE page that includes
+# this Set gets a fixed bubble bottom-right that opens the RAG plugin
+# in a slide-up panel. URL+label come from Site Settings so each site
+# can point the iframe at its own /suche-equivalent and brand the label.
+[{$meilisearch.rag.chatWidget.enabled} == 1]
+    page.footerData.1746000000 = TEXT
+    page.footerData.1746000000.value (
+<div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
+    )
+    page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
+    page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
+[END]

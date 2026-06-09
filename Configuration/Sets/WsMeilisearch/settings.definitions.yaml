@@ -133,6 +133,31 @@ settings:
     type: string
     default: ''
 
+  # --- RAG floating chat widget ----------------------------------------
+  # When enabled, a bubble appears bottom-right on every FE page that
+  # is rendered by this site's TypoScript root. Click → slide-up panel
+  # iframes the RAG plugin page (chatWidget.url), giving visitors a
+  # one-click chat entry from any page without needing dedicated chat
+  # links in the navigation.
+
+  meilisearch.rag.chatWidget.enabled:
+    label: 'Enable floating chat widget'
+    description: 'Render a chat bubble bottom-right on every page that opens the RAG plugin in a slide-up panel. Disabled by default — opt-in per site.'
+    type: bool
+    default: false
+
+  meilisearch.rag.chatWidget.url:
+    label: 'Chat widget target URL'
+    description: 'URL the bubble panel iframes. Should point to a page that contains the wsmeilisearch_rag plugin. Path-relative (e.g. /de/suche) or absolute. Append ?chatframe=1 if you have a chrome-stripped layout for embedded usage.'
+    type: string
+    default: '/de/suche'
+
+  meilisearch.rag.chatWidget.label:
+    label: 'Chat widget label'
+    description: 'Used as the panel heading AND as the bubble''s aria-label / tooltip. Keep it short and self-explanatory (e.g. "KI-Chat", "Frag uns", "Help").'
+    type: string
+    default: 'KI-Chat'
+
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'
     description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'

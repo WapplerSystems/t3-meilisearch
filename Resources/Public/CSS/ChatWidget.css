@@ -1,0 +1,149 @@
+/*
+ * RAG floating chat widget.
+ *
+ * Brand-neutral defaults — picks up the host page's --bs-primary
+ * when available (Bootstrap 5 sites) but works on any CSS context.
+ * Overrideable via CSS custom properties scoped to .ws-meilisearch-chat-bubble
+ * or .ws-meilisearch-chat-panel without touching the markup.
+ *
+ * Mobile (< 480px wide) → panel becomes full-screen sheet.
+ * Desktop → 380×580 corner panel anchored above the bubble.
+ */
+
+.ws-meilisearch-chat-bubble {
+    --bubble-bg: var(--bs-primary, #0d6efd);
+    --bubble-fg: #fff;
+    --bubble-bg-hover: var(--bs-primary-bg-subtle, #084298);
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 1050;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bubble-bg);
+    color: var(--bubble-fg);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.ws-meilisearch-chat-bubble:hover,
+.ws-meilisearch-chat-bubble:focus-visible {
+    background: var(--bubble-bg-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+    outline: none;
+}
+.ws-meilisearch-chat-bubble:focus-visible {
+    outline: 3px solid rgba(13, 110, 253, 0.4);
+    outline-offset: 3px;
+}
+.ws-meilisearch-chat-bubble.is-active {
+    transform: rotate(8deg);
+}
+
+.ws-meilisearch-chat-panel {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 5.5rem; /* clear of the bubble + small gap */
+    z-index: 1049;
+    width: 380px;
+    height: 580px;
+    max-height: calc(100vh - 7rem);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Off-state: invisible + nudged down so the open transition has
+       travel to animate. */
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    transform-origin: bottom right;
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease;
+}
+.ws-meilisearch-chat-panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.ws-meilisearch-chat-panel__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--bs-primary, #0d6efd);
+    color: #fff;
+}
+.ws-meilisearch-chat-panel__heading {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.ws-meilisearch-chat-panel__close {
+    background: transparent;
+    border: none;
+    color: inherit;
+    padding: 0.25rem;
+    margin-right: -0.25rem;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 120ms ease;
+}
+.ws-meilisearch-chat-panel__close:hover,
+.ws-meilisearch-chat-panel__close:focus-visible {
+    background: rgba(255, 255, 255, 0.18);
+    outline: none;
+}
+
+.ws-meilisearch-chat-panel__frame {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #fff;
+}
+
+/* Mobile sheet: cover the whole viewport instead of a postage-stamp
+   panel — typing on a phone in a 380px box is unusable. */
+@media (max-width: 480px) {
+    .ws-meilisearch-chat-bubble {
+        right: 1rem;
+        bottom: 1rem;
+    }
+    .ws-meilisearch-chat-panel {
+        right: 0;
+        bottom: 0;
+        left: 0;
+        top: 0;
+        width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
+
+/* Respect prefers-reduced-motion — no zoom/translate transitions. */
+@media (prefers-reduced-motion: reduce) {
+    .ws-meilisearch-chat-bubble,
+    .ws-meilisearch-chat-panel {
+        transition: none;
+    }
+    .ws-meilisearch-chat-bubble.is-active {
+        transform: none;
+    }
+    .ws-meilisearch-chat-panel {
+        transform: none;
+    }
+}
