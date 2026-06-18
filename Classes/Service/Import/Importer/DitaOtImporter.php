@@ -122,6 +122,18 @@ final class DitaOtImporter implements KnowledgeResourceSourceImporter
             $row['source_path'] = $this->relativeSourcePath($topicFile, $rootPath);
             $row['media'] = 0;
 
+            // DITA-OT emits `<base>-1.html`, `<base>_2.html` etc. when a
+            // topic is referenced from multiple places in the map. Those
+            // are content-identical duplicates of the base topic; skip if
+            // we already imported the base under the same language.
+            if ($this->isSuffixedDuplicate((string)$row['identifier'], $languageId)) {
+                $skipped++;
+                if ($onProgress !== null) {
+                    $onProgress($index, $total, (string)$row['identifier']);
+                }
+                continue;
+            }
+
             $uid = $this->repository->insertKnowledgeResource($row);
             $imported++;
 
@@ -173,6 +185,25 @@ final class DitaOtImporter implements KnowledgeResourceSourceImporter
             }
         }
         return $map;
+    }
+
+    /**
+     * Detect the `<base>-N.html` / `<base>_N.html` pattern DITA-OT uses
+     * when the same topic appears multiple times in the map. Both
+     * variants are byte-identical to the base topic — accept only the
+     * base, skip the suffix-stamped duplicates. Returns true when the
+     * suffix is present AND the unsuffixed base already exists in the
+     * DB under the same language; false otherwise (so genuinely new
+     * topics aren't blocked just because their slug happens to end in
+     * a digit).
+     */
+    private function isSuffixedDuplicate(string $identifier, int $languageId): bool
+    {
+        if (!preg_match('/^(.+)[-_][0-9]+$/', $identifier, $m)) {
+            return false;
+        }
+        $baseId = $m[1];
+        return $this->repository->existsByIdentifierAndLanguage($baseId, $languageId);
     }
 
     /**

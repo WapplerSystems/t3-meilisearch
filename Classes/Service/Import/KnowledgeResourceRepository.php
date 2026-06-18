@@ -92,6 +92,30 @@ final class KnowledgeResourceRepository
     }
 
     /**
+     * Whether a row with the given identifier (and same language) already
+     * exists. Importers use it to skip duplicate inserts — DITA-OT in
+     * particular emits `<basename>-1.html`, `<basename>_2.html` etc. when
+     * a topic is referenced from multiple places in the map, which would
+     * otherwise create accidental duplicate rows on every re-import.
+     */
+    public function existsByIdentifierAndLanguage(string $identifier, int $languageId): bool
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable(self::HELPDOC_TABLE);
+        $qb->getRestrictions()->removeAll();
+        $row = $qb->select('uid')
+            ->from(self::HELPDOC_TABLE)
+            ->where(
+                $qb->expr()->eq('identifier', $qb->createNamedParameter($identifier)),
+                $qb->expr()->eq('sys_language_uid', $qb->createNamedParameter($languageId, \TYPO3\CMS\Core\Database\Connection::PARAM_INT)),
+                $qb->expr()->eq('deleted', $qb->createNamedParameter(0, \TYPO3\CMS\Core\Database\Connection::PARAM_INT)),
+            )
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchAssociative();
+        return $row !== false;
+    }
+
+    /**
      * Link an existing FAL file to a knowledge resource row's `media` field.
      * Used by importers that already obtained a sys_file via
      * {@see addFileFromPath()} or {@see addFileFromUpload()}.
