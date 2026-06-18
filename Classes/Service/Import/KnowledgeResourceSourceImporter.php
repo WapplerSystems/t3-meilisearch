@@ -5,7 +5,7 @@ namespace WapplerSystems\Meilisearch\Service\Import;
 
 /**
  * Contract for anything that pulls knowledge documents into
- * tx_wsmeilisearch_helpdoc + the linked FAL files. Each implementation
+ * tx_wsmeilisearch_knowledge_resource + the linked FAL files. Each implementation
  * understands one source format (DITA-OT XHTML drop, single file
  * upload, ZIP bundle, URL crawl, Confluence export, …).
  *
@@ -20,11 +20,11 @@ namespace WapplerSystems\Meilisearch\Service\Import;
  *   4. {@see import()} runs, returns ImportResult.
  *
  * The implementation does its own persistence via the shared
- * HelpDocRepository (DI-injected). The interface stays storage-agnostic
+ * KnowledgeResourceRepository (DI-injected). The interface stays storage-agnostic
  * so a future importer could write to a different table without
  * touching this contract.
  */
-interface HelpDocSourceImporter
+interface KnowledgeResourceSourceImporter
 {
     /** Machine slug: 'dita-ot', 'single-file', 'zip-bundle', … */
     public function name(): string;
@@ -56,7 +56,7 @@ interface HelpDocSourceImporter
      *   - language:  <select> populated from the active site's languages
      *   - folder:    FAL combined identifier (e.g. "1:/helpdocs/"), rendered
      *                with TYPO3's folder picker on the BE side; the value is
-     *                resolved to a Folder via HelpDocRepository::resolveFolder().
+     *                resolved to a Folder via KnowledgeResourceRepository::resolveFolder().
      *
      * @return list<array{name:string,label:string,type:string,required?:bool,default?:mixed,options?:array<string,string>,help?:string}>
      */

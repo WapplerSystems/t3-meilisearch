@@ -88,6 +88,10 @@ final class RagService implements LoggerAwareInterface
         $event = new BeforeRagQueryEvent($question, array_merge([
             'perPage' => $maxHits,
             'hybrid' => $useHybrid,
+            // Knowledge resources are the primary grounding corpus and must
+            // be retrieved here even though they're hidden from the public
+            // FE search results.
+            'includeKnowledgeResources' => true,
         ], $options));
         $this->eventDispatcher->dispatch($event);
 
@@ -195,6 +199,7 @@ final class RagService implements LoggerAwareInterface
         $event = new BeforeRagQueryEvent($question, array_merge([
             'perPage' => $maxHits,
             'hybrid' => $useHybrid,
+            'includeKnowledgeResources' => true,
         ], $options));
         $this->eventDispatcher->dispatch($event);
 
@@ -206,7 +211,9 @@ final class RagService implements LoggerAwareInterface
         }
 
         // Emit sources first so the UI has something to render while
-        // tokens start streaming in.
+        // tokens start streaming in. Knowledge resources are part of the
+        // hits (the LLM grounds in them) but the UI filters them out of
+        // the user-visible "Sources" panel — see Rag/Ask.html.
         yield RagStreamChunk::sources($hits);
 
         $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');

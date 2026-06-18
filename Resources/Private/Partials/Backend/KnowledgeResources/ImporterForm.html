@@ -1,7 +1,7 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
       data-namespace-typo3-fluid="true">
 <f:comment>
-    One card per registered HelpDocSourceImporter — the import slug,
+    One card per registered KnowledgeResourceSourceImporter — the import slug,
     label and field list all come from PHP via describeFields(). Adding
     a new importer creates a new card here without any template change.
 
@@ -37,7 +37,7 @@
             <input type="hidden" name="_importer" value="{importer.name}" />
 
             <f:for each="{importer.fields}" as="field">
-                <f:render partial="Backend/HelpDocs/ImporterField"
+                <f:render partial="Backend/KnowledgeResources/ImporterField"
                           arguments="{field: field, knownLanguages: knownLanguages, defaultTargetFolder: defaultTargetFolder, folderBrowserUrl: folderBrowserUrl}"/>
             </f:for>
 

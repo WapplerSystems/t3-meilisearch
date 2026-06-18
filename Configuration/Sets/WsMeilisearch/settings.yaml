@@ -101,7 +101,7 @@ meilisearch:
         url:      uri
         image:    imageUrl
         breadcrumb: parentTitle
-        helpType: helpType
+        resourceType: resourceType
       highlight: [title, abstract, body, parentTitle]
       crop:
         - 'abstract:200'

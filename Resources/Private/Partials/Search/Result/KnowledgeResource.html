@@ -3,7 +3,7 @@
     data-namespace-typo3-fluid="true">
 <f:comment>
     Result card for DITA help topics (type=help). The hit carries the
-    extra fields HelpDocSchemaProvider writes: helpType (concept|task|
+    extra fields KnowledgeResourceSchemaProvider writes: resourceType (concept|task|
     reference), helpSourcePath, imageUrl (FAL public URL, may be empty),
     parentTitle (breadcrumb to the parent topic in the TOC).
 </f:comment>
@@ -31,7 +31,7 @@
                         </f:variable>
                         <a href="{hit.uri}" class="text-decoration-none" target="_blank" rel="noopener">{titleHtml -> f:format.raw()}</a>
                     </h3>
-                    <f:switch expression="{hit.helpType}">
+                    <f:switch expression="{hit.resourceType}">
                         <f:case value="task"><span class="badge text-bg-success ws-meilisearch-hit__type">Anleitung</span></f:case>
                         <f:case value="reference"><span class="badge text-bg-info ws-meilisearch-hit__type">Details</span></f:case>
                         <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">Hilfe</span></f:defaultCase>

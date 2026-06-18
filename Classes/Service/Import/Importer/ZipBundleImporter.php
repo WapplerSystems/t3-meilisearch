@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Service\Import\Importer;
 
 use Psr\Http\Message\UploadedFileInterface;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\ImportResult;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 
@@ -14,7 +14,7 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  * MD / TXT / Office / EPUB / …). Operator uploads one .zip, the
  * importer extracts each entry to a temp dir, copies the file into
  * fileadmin via FAL, runs Tika to fill the body, and creates one
- * helpdoc per file.
+ * knowledge resource per file.
  *
  * Two safety guards:
  *   - Zip-slip rejection: any entry name containing ".." or starting
@@ -24,7 +24,7 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  *     hours of FAL+Tika round-trips.
  *
  * Tika decides what's indexable via its own mime allowlist — files
- * outside that list become helpdocs with empty body (still searchable
+ * outside that list become knowledge resources with empty body (still searchable
  * by title). To skip those entirely, configure
  * `meilisearch.tika.allowedMimeTypes` to be permissive.
  *
@@ -33,7 +33,7 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  * want to preserve the zip's directory structure tick "Preserve
  * subfolders".
  */
-final class ZipBundleImporter implements HelpDocSourceImporter
+final class ZipBundleImporter implements KnowledgeResourceSourceImporter
 {
     /** Anything larger than this in the zip is treated as suspicious. */
     private const MAX_ENTRIES = 1000;
@@ -42,7 +42,7 @@ final class ZipBundleImporter implements HelpDocSourceImporter
     private const ZIPS_SUBFOLDER = 'zips';
 
     public function __construct(
-        private readonly HelpDocRepository $repository,
+        private readonly KnowledgeResourceRepository $repository,
     ) {}
 
     public function name(): string
@@ -57,7 +57,7 @@ final class ZipBundleImporter implements HelpDocSourceImporter
 
     public function description(): string
     {
-        return 'Upload one .zip containing many documents — each entry becomes its own helpdoc.';
+        return 'Upload one .zip containing many documents — each entry becomes its own knowledge resource.';
     }
 
     public function describeFields(): array
@@ -66,14 +66,14 @@ final class ZipBundleImporter implements HelpDocSourceImporter
             ['name' => 'upload', 'label' => 'ZIP file', 'type' => 'file', 'required' => true,
              'help' => 'A .zip archive containing the documents to import.'],
             ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'help_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
+            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
              'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
             ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where the extracted files land in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder). A "zips/" subfolder is added automatically.'],
+             'help' => 'Where the extracted files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "zips/" subfolder is added automatically.'],
             ['name' => 'preserveSubfolders', 'label' => 'Preserve subfolders', 'type' => 'checkbox', 'default' => false,
              'help' => 'Off (default) flattens the zip — every file lands directly in zips/. On mirrors the zip\'s directory structure.'],
             ['name' => 'titleFromFilename', 'label' => 'Use filename as title', 'type' => 'checkbox', 'default' => true,
-             'help' => 'When off, every helpdoc starts with an empty title.'],
+             'help' => 'When off, every knowledge resource starts with an empty title.'],
         ];
     }
 
@@ -92,9 +92,9 @@ final class ZipBundleImporter implements HelpDocSourceImporter
         }
 
         $languageId = (int)($config['language'] ?? 0);
-        $helpType = trim((string)($config['help_type'] ?? 'reference'));
-        if (!in_array($helpType, ['reference', 'concept', 'task', 'upload'], true)) {
-            $helpType = 'reference';
+        $resourceType = trim((string)($config['resource_type'] ?? 'reference'));
+        if (!in_array($resourceType, ['reference', 'concept', 'task', 'upload'], true)) {
+            $resourceType = 'reference';
         }
         $targetRoot = trim((string)($config['targetFolder'] ?? ''));
         $preserveSubfolders = (bool)($config['preserveSubfolders'] ?? false);
@@ -169,19 +169,19 @@ final class ZipBundleImporter implements HelpDocSourceImporter
                 $identifier = $this->repository->sanitiseIdentifier(pathinfo($baseName, PATHINFO_FILENAME))
                     . '-f' . $falFile->getUid();
 
-                $helpdocUid = $this->repository->insertHelpdoc([
+                $knowledgeResourceUid = $this->repository->insertKnowledgeResource([
                     'pid' => 0,
                     'sys_language_uid' => $languageId,
                     'identifier' => substr($identifier, 0, 190),
                     'title' => substr($title, 0, 512),
                     'abstract' => '',
                     'body' => $body,
-                    'help_type' => $helpType,
+                    'resource_type' => $resourceType,
                     'parent_identifier' => '',
                     'source_path' => (string)$falFile->getPublicUrl(),
                     'media' => 0,
                 ]);
-                $this->repository->attachMedia($falFile, $helpdocUid, $languageId, 0);
+                $this->repository->attachMedia($falFile, $knowledgeResourceUid, $languageId, 0);
                 $imported++;
                 $mediaCopied++;
 

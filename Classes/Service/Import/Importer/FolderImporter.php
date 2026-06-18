@@ -5,14 +5,14 @@ namespace WapplerSystems\Meilisearch\Service\Import\Importer;
 
 use TYPO3\CMS\Core\Resource\File as FalFile;
 use TYPO3\CMS\Core\Resource\Folder;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\ImportResult;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 
 /**
  * Batch-import every file already present in a FAL folder as one
- * helpdoc per file. The folder lives wherever the operator chose
+ * knowledge resource per file. The folder lives wherever the operator chose
  * (default storage's fileadmin, or any other storage they have access
  * to) — sys_file rows for those files may already exist; we re-use
  * them rather than copying.
@@ -20,18 +20,18 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  * Use cases: an editor uploaded a stack of PDFs into
  * fileadmin/handbooks/ via FileList, or a sync process drops Markdown
  * into fileadmin/imports/ daily. The importer points at that folder
- * and turns each file into a searchable helpdoc — title from the file
+ * and turns each file into a searchable knowledge resource — title from the file
  * name (sans extension), body from Tika extraction.
  *
  * Subfolders are walked iff `recursive` is true. Hidden files (those
  * starting with ".") are skipped. The file's existing FAL identifier
  * is used; no copy happens, no rename — which keeps the operator's
- * mental model intact (the file in fileadmin IS the helpdoc's media).
+ * mental model intact (the file in fileadmin IS the knowledge resource's media).
  */
-final class FolderImporter implements HelpDocSourceImporter
+final class FolderImporter implements KnowledgeResourceSourceImporter
 {
     public function __construct(
-        private readonly HelpDocRepository $repository,
+        private readonly KnowledgeResourceRepository $repository,
     ) {}
 
     public function name(): string
@@ -46,7 +46,7 @@ final class FolderImporter implements HelpDocSourceImporter
 
     public function description(): string
     {
-        return 'Walk a fileadmin folder and create one helpdoc per file. Reuses existing FAL records.';
+        return 'Walk a fileadmin folder and create one knowledge resource per file. Reuses existing FAL records.';
     }
 
     public function describeFields(): array
@@ -59,10 +59,10 @@ final class FolderImporter implements HelpDocSourceImporter
             ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
             ['name' => 'pid', 'label' => 'Storage pid', 'type' => 'text', 'default' => '0',
              'help' => 'Page id where the records live. 0 = site root.'],
-            ['name' => 'help_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
+            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
              'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
             ['name' => 'titleFromFilename', 'label' => 'Use filename as title', 'type' => 'checkbox', 'default' => true,
-             'help' => 'When off, every helpdoc starts with an empty title — only useful if you plan to edit them manually afterwards.'],
+             'help' => 'When off, every knowledge resource starts with an empty title — only useful if you plan to edit them manually afterwards.'],
         ];
     }
 
@@ -76,9 +76,9 @@ final class FolderImporter implements HelpDocSourceImporter
         $recursive = (bool)($config['recursive'] ?? false);
         $languageId = (int)($config['language'] ?? 0);
         $pid = (int)($config['pid'] ?? 0);
-        $helpType = trim((string)($config['help_type'] ?? 'reference'));
-        if (!in_array($helpType, ['reference', 'concept', 'task', 'upload'], true)) {
-            $helpType = 'reference';
+        $resourceType = trim((string)($config['resource_type'] ?? 'reference'));
+        if (!in_array($resourceType, ['reference', 'concept', 'task', 'upload'], true)) {
+            $resourceType = 'reference';
         }
         $titleFromFilename = (bool)($config['titleFromFilename'] ?? true);
 
@@ -106,19 +106,19 @@ final class FolderImporter implements HelpDocSourceImporter
             $extracted = $this->repository->extractText($falFile);
             $body = $extracted->status === ExtractionResult::SUCCESS ? $extracted->text : '';
 
-            $helpdocUid = $this->repository->insertHelpdoc([
+            $knowledgeResourceUid = $this->repository->insertKnowledgeResource([
                 'pid' => $pid,
                 'sys_language_uid' => $languageId,
                 'identifier' => substr($identifier, 0, 190),
                 'title' => substr($title, 0, 512),
                 'abstract' => '',
                 'body' => $body,
-                'help_type' => $helpType,
+                'resource_type' => $resourceType,
                 'parent_identifier' => '',
                 'source_path' => (string)$falFile->getPublicUrl(),
                 'media' => 0,
             ]);
-            $this->repository->attachMedia($falFile, $helpdocUid, $languageId, $pid);
+            $this->repository->attachMedia($falFile, $knowledgeResourceUid, $languageId, $pid);
             $imported++;
             $mediaCopied++;
 

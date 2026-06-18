@@ -38,6 +38,26 @@ final class RagAnswer
     }
 
     /**
+     * Sources the FE template may show as a clickable citation list.
+     * Strips hits of type 'knowledge_resource' — those are internal
+     * RAG-grounding corpus (DITA topics imported via the
+     * KnowledgeResource importer) which are deliberately hidden from
+     * the public sources panel even though the LLM is told to ground
+     * its answer in them. Used by `Rag/Ask.html`; the LLM-context path
+     * keeps reading `$sources` directly so the full hit set still
+     * grounds the answer.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getPublicSources(): array
+    {
+        return array_values(array_filter(
+            $this->sources,
+            static fn(array $hit): bool => (string)($hit['type'] ?? '') !== 'knowledge_resource',
+        ));
+    }
+
+    /**
      * HTML-rendered version of {@see $answer} with citation brackets
      * rewritten as `[<a href title>Article title</a>]` so the reader
      * sees what the source actually is, not a cryptic `help-1935` id.

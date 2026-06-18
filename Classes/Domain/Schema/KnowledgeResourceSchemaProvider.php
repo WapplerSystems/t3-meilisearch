@@ -11,19 +11,19 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 
 /**
- * SchemaProvider for help topics living in tx_wsmeilisearch_helpdoc
- * (populated by the ws_meilisearch:import-help-docs CLI or the BE
+ * SchemaProvider for help topics living in tx_wsmeilisearch_knowledge_resource
+ * (populated by the ws_meilisearch:import-knowledge-resources CLI or the BE
  * upload form).
  *
  * Each row produces one document with id `help-<uid>`. The `uri` field
  * points at the static-topic delivery middleware path under /hilfe/...
- * (see HelpTopicMiddleware) so RAG sources are clickable.
+ * (see KnowledgeResourceTopicMiddleware) so RAG sources are clickable.
  *
  * The primary media (FAL-attached image / video) is resolved at fetch
  * time and exposed as `imageUrl` on the document so the FE result-card
  * partial can render a thumbnail.
  */
-final class HelpDocSchemaProvider implements SchemaProviderInterface
+final class KnowledgeResourceSchemaProvider implements SchemaProviderInterface
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -33,12 +33,12 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
 
     public function getTable(): string
     {
-        return 'tx_wsmeilisearch_helpdoc';
+        return 'tx_wsmeilisearch_knowledge_resource';
     }
 
     public function supports(string $table): bool
     {
-        return $table === 'tx_wsmeilisearch_helpdoc';
+        return $table === 'tx_wsmeilisearch_knowledge_resource';
     }
 
     public function buildDocumentId(int $uid): string
@@ -48,7 +48,7 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
 
     public function buildDocumentIds(int $uid, Site $site): iterable
     {
-        // Each language has its own helpdoc row → its own uid → its own
+        // Each language has its own knowledge resource row → its own uid → its own
         // doc id, matching how NewsSchemaProvider treats translations.
         yield $this->buildDocumentId($uid);
     }
@@ -63,9 +63,9 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
 
     public function iterateDocuments(Site $site): iterable
     {
-        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_helpdoc');
+        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_knowledge_resource');
         $result = $qb->select(...$this->columnsToSelect())
-            ->from('tx_wsmeilisearch_helpdoc')
+            ->from('tx_wsmeilisearch_knowledge_resource')
             ->where(
                 $qb->expr()->eq('deleted', 0),
                 $qb->expr()->eq('hidden', 0)
@@ -80,7 +80,7 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
     {
         return [
             // Help-type label for facet filtering (concept / task / reference).
-            new TextField('helpType', searchable: false, filterable: true, facet: true),
+            new TextField('resourceType', searchable: false, filterable: true, facet: true),
             // Path to the topic relative to the DITA root — RAG sources can
             // reconstruct the /hilfe/... URL from this, and the SchemaProvider
             // also writes it into the standard `uri` field.
@@ -102,16 +102,16 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
     {
         return [
             'uid', 'pid', 'sys_language_uid', 'identifier', 'title', 'abstract',
-            'body', 'help_type', 'parent_identifier', 'source_path', 'media',
+            'body', 'resource_type', 'parent_identifier', 'source_path', 'media',
             'tx_wsmeilisearch_boost',
         ];
     }
 
     private function fetchRow(int $uid): ?array
     {
-        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_helpdoc');
+        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_knowledge_resource');
         $row = $qb->select(...$this->columnsToSelect())
-            ->from('tx_wsmeilisearch_helpdoc')
+            ->from('tx_wsmeilisearch_knowledge_resource')
             ->where(
                 $qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)),
                 $qb->expr()->eq('deleted', 0),
@@ -147,7 +147,7 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
 
         return [
             'id' => $this->buildDocumentId($uid),
-            'type' => 'help',
+            'type' => 'knowledge_resource',
             'uid' => $uid,
             'pid' => (int)$row['pid'],
             'language' => $languageId,
@@ -158,12 +158,12 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
             'keywords' => $identifier,
             'content' => trim($title . "\n\n" . $abstract . "\n\n" . $body),
             'uri' => $uri,
-            'helpType' => (string)$row['help_type'],
+            'resourceType' => (string)$row['resource_type'],
             'helpSourcePath' => $sourcePath,
             'imageUrl' => $imageUrl,
             'parentTitle' => $parent['title'] ?? '',
             'parentUid' => $parent['uid'] ?? 0,
-            'boost' => $this->boostCalculator->compositeFor($site, 'help', $recordBoost),
+            'boost' => $this->boostCalculator->compositeFor($site, 'knowledge_resource', $recordBoost),
         ];
     }
 
@@ -172,7 +172,7 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
         if ($sourcePath === '') {
             return '';
         }
-        // The HelpTopicMiddleware mounts the DITA root under /hilfe/, so
+        // The KnowledgeResourceTopicMiddleware mounts the DITA root under /hilfe/, so
         // sourcePath="de/topics/foo.html" → /hilfe/de/topics/foo.html.
         return '/hilfe/' . ltrim($sourcePath, '/');
     }
@@ -188,9 +188,9 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
         if ($parentIdentifier === '') {
             return [];
         }
-        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_helpdoc');
+        $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_knowledge_resource');
         $row = $qb->select('uid', 'title')
-            ->from('tx_wsmeilisearch_helpdoc')
+            ->from('tx_wsmeilisearch_knowledge_resource')
             ->where(
                 $qb->expr()->eq('identifier', $qb->createNamedParameter($parentIdentifier)),
                 $qb->expr()->eq('sys_language_uid', $qb->createNamedParameter($languageId, \Doctrine\DBAL\ParameterType::INTEGER)),
@@ -208,21 +208,21 @@ final class HelpDocSchemaProvider implements SchemaProviderInterface
 
     /**
      * Returns the public URL of the first FAL media reference attached
-     * to this helpdoc row (or empty string if none / if the file is
+     * to this knowledge resource row (or empty string if none / if the file is
      * gone). Direct DBAL lookup keeps it cheap during full reindex —
      * the iterator emits 3711 rows and a fully objectified
      * ResourceFactory::getFileReferencesByForeignReference call per row
      * would be wasteful.
      */
-    private function resolveImageUrl(int $helpdocUid): string
+    private function resolveImageUrl(int $knowledgeResourceUid): string
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
         $row = $qb->select('uid_local')
             ->from('sys_file_reference')
             ->where(
-                $qb->expr()->eq('tablenames', $qb->createNamedParameter('tx_wsmeilisearch_helpdoc')),
+                $qb->expr()->eq('tablenames', $qb->createNamedParameter('tx_wsmeilisearch_knowledge_resource')),
                 $qb->expr()->eq('fieldname', $qb->createNamedParameter('media')),
-                $qb->expr()->eq('uid_foreign', $qb->createNamedParameter($helpdocUid, \Doctrine\DBAL\ParameterType::INTEGER)),
+                $qb->expr()->eq('uid_foreign', $qb->createNamedParameter($knowledgeResourceUid, \Doctrine\DBAL\ParameterType::INTEGER)),
                 $qb->expr()->eq('deleted', 0)
             )
             ->orderBy('sorting_foreign', 'ASC')

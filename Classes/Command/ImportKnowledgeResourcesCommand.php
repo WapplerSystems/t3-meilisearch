@@ -13,7 +13,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
 
 /**
- * Dispatch-CLI for any registered {@see HelpDocSourceImporter}. The
+ * Dispatch-CLI for any registered {@see KnowledgeResourceSourceImporter}. The
  * `--importer=` slug picks the implementation (default: dita-ot for
  * backwards compatibility with the original LINEAR-Solutions workflow);
  * every other option is interpreted via the importer's `describeFields()`
@@ -24,10 +24,10 @@ use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
  * progress bar, plus the ability to run from cron / deploy scripts.
  */
 #[AsCommand(
-    name: 'ws_meilisearch:import-help-docs',
+    name: 'ws_meilisearch:import-knowledge-resources',
     description: 'Import help docs from a registered source importer (DITA-OT XHTML by default).',
 )]
-final class ImportHelpDocsCommand extends Command
+final class ImportKnowledgeResourcesCommand extends Command
 {
     public function __construct(
         private readonly SourceImporterRegistry $registry,

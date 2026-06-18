@@ -17,7 +17,7 @@ use TYPO3\CMS\Core\Site\SiteFinder;
  *
  *  - {@see knownLanguages()} → union of every TYPO3 language
  *    declared on any site, formatted as `<uid> — <title>`. Used to
- *    populate language dropdowns in the helpdoc importer forms.
+ *    populate language dropdowns in the knowledge resource importer forms.
  *
  *  - {@see describeDesiredEmbedder()} / {@see describeRagConfig()}
  *    → pure view-side mappers from a Site's settings dictionary

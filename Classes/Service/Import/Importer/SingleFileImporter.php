@@ -4,22 +4,22 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Service\Import\Importer;
 
 use Psr\Http\Message\UploadedFileInterface;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\ImportResult;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 
 /**
  * Persists a single editor-uploaded document (PDF / DOCX / HTML / MD /
  * TXT / Office / EPUB — anything covered by
- * meilisearch.tika.allowedMimeTypes) as one helpdoc row.
+ * meilisearch.tika.allowedMimeTypes) as one knowledge resource row.
  *
  * Expected `$config`:
  *   - 'upload'    => UploadedFileInterface (required)
  *   - 'title'     => string (optional; falls back to file name)
  *   - 'abstract'  => string (optional)
  *   - 'language'  => int (default 0)
- *   - 'help_type' => string in {upload, concept, task, reference} (default 'upload')
+ *   - 'resource_type' => string in {upload, concept, task, reference} (default 'upload')
  *
  * Title + abstract are editor-controlled; Tika's text extraction populates
  * `body` so searches still find the content even when the editor doesn't
@@ -28,10 +28,10 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  * Identifier is `<sanitised-filename>-f<sysFileUid>` — two "report.pdf"
  * uploads no longer collide; the FAL uid suffix is stable across renames.
  */
-final class SingleFileImporter implements HelpDocSourceImporter
+final class SingleFileImporter implements KnowledgeResourceSourceImporter
 {
     public function __construct(
-        private readonly HelpDocRepository $repository,
+        private readonly KnowledgeResourceRepository $repository,
     ) {}
 
     public function name(): string
@@ -58,10 +58,10 @@ final class SingleFileImporter implements HelpDocSourceImporter
             ['name' => 'abstract', 'label' => 'Abstract', 'type' => 'textarea',
              'help' => 'Optional one-paragraph summary shown as the snippet in results.'],
             ['name' => 'language', 'label' => 'Language', 'type' => 'language', 'default' => 0],
-            ['name' => 'help_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'upload',
+            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'upload',
              'options' => ['upload' => 'upload', 'concept' => 'concept', 'task' => 'task', 'reference' => 'reference']],
             ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where the uploaded file lands in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder). The "uploads/" subfolder is added automatically.'],
+             'help' => 'Where the uploaded file lands in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). The "uploads/" subfolder is added automatically.'],
         ];
     }
 
@@ -84,9 +84,9 @@ final class SingleFileImporter implements HelpDocSourceImporter
         }
         $abstract = trim((string)($config['abstract'] ?? ''));
         $languageId = (int)($config['language'] ?? 0);
-        $helpType = trim((string)($config['help_type'] ?? 'upload'));
-        if (!in_array($helpType, ['upload', 'concept', 'task', 'reference'], true)) {
-            $helpType = 'upload';
+        $resourceType = trim((string)($config['resource_type'] ?? 'upload'));
+        if (!in_array($resourceType, ['upload', 'concept', 'task', 'reference'], true)) {
+            $resourceType = 'upload';
         }
 
         // Stage the upload to a temp file so FAL's addFile() can copy from
@@ -114,14 +114,14 @@ final class SingleFileImporter implements HelpDocSourceImporter
             $identifier = $this->repository->sanitiseIdentifier(pathinfo($clientFilename, PATHINFO_FILENAME))
                 . '-f' . $falFile->getUid();
 
-            $helpdocUid = $this->repository->insertHelpdoc([
+            $knowledgeResourceUid = $this->repository->insertKnowledgeResource([
                 'pid' => 0,
                 'sys_language_uid' => $languageId,
                 'identifier' => substr($identifier, 0, 190),
                 'title' => substr($title, 0, 512),
                 'abstract' => $abstract,
                 'body' => $body,
-                'help_type' => $helpType,
+                'resource_type' => $resourceType,
                 'parent_identifier' => '',
                 // FAL gives us the public URL post-creation; this avoids
                 // hardcoding "fileadmin/..." which would break for other
@@ -129,7 +129,7 @@ final class SingleFileImporter implements HelpDocSourceImporter
                 'source_path' => (string)$falFile->getPublicUrl(),
                 'media' => 0,
             ]);
-            $this->repository->attachMedia($falFile, $helpdocUid, $languageId, 0);
+            $this->repository->attachMedia($falFile, $knowledgeResourceUid, $languageId, 0);
 
             if ($onProgress !== null) {
                 $onProgress(1, 1, (string)$identifier);
@@ -139,14 +139,14 @@ final class SingleFileImporter implements HelpDocSourceImporter
                 imported: 1,
                 skipped: 0,
                 mediaCopied: 1,
-                message: sprintf('Uploaded "%s" (helpdoc #%d, FAL #%d, Tika %s)',
+                message: sprintf('Uploaded "%s" (knowledge_resource #%d, FAL #%d, Tika %s)',
                     $clientFilename,
-                    $helpdocUid,
+                    $knowledgeResourceUid,
                     $falFile->getUid(),
                     $extracted->status,
                 ),
                 extras: [
-                    'uid' => $helpdocUid,
+                    'uid' => $knowledgeResourceUid,
                     'falUid' => $falFile->getUid(),
                     'extractStatus' => $extracted->status,
                     'extractedChars' => mb_strlen($body),

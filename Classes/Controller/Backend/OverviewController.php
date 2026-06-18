@@ -21,7 +21,7 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
  *  1. The Overview tab (per-site index status + Reindex / Rebuild
  *     buttons) — small enough to live here.
  *  2. Top-level dispatch: `?action=` selects which sub-controller
- *     gets the request. Test, Diagnose and HelpDoc each own their
+ *     gets the request. Test, Diagnose and KnowledgeResource each own their
  *     dependency surface and helpers — kept out of this class so the
  *     entry-point stays a thin router.
  *
@@ -29,7 +29,7 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
  *   ?action=reindex POST             trigger reindex for one site
  *   ?action=test    GET              → TestController
  *   ?action=diagnose|repushEmbedder|pingRag → DiagnoseController
- *   ?action=helpdocs|runImporter|purgeHelpdocs → HelpDocController
+ *   ?action=knowledgeResources|runImporter|purgeKnowledgeResources → KnowledgeResourceController
  */
 #[AsController]
 final class OverviewController
@@ -43,7 +43,7 @@ final class OverviewController
         private readonly BackendContext $context,
         private readonly TestController $testController,
         private readonly DiagnoseController $diagnoseController,
-        private readonly HelpDocController $helpDocController,
+        private readonly KnowledgeResourceController $helpDocController,
         private readonly RagTestController $ragTestController,
     ) {}
 
@@ -55,7 +55,7 @@ final class OverviewController
             'test' => $this->testController->handle($request),
             'diagnose', 'repushEmbedder', 'pingRag' =>
                 $this->diagnoseController->handle($request, $action),
-            'helpdocs', 'runImporter', 'purgeHelpdocs' =>
+            'knowledgeResources', 'runImporter', 'purgeKnowledgeResources' =>
                 $this->helpDocController->handle($request, $action),
             'ragtests', 'runRagTest', 'runAllRagTests' =>
                 $this->ragTestController->handle($request, $action),

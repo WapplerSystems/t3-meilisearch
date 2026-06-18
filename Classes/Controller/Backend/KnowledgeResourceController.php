@@ -13,32 +13,32 @@ use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\SiteOverviewProvider;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
 
 /**
- * The Help-docs tab + every action that mutates tx_wsmeilisearch_helpdoc:
+ * The Help-docs tab + every action that mutates tx_wsmeilisearch_knowledge_resource:
  *
- *   - helpdocs    GET   stats table + one form per registered importer
+ *   - knowledgeResources GET   stats table + one form per registered importer
  *                       + purge-by-language form + List-module deep link
  *   - runImporter POST  generic dispatcher; reads the importer slug
  *                       from the form's hidden `_importer` field and
  *                       maps the rest onto the importer's
  *                       describeFields() schema (see buildImporterConfig)
- *   - purgeHelpdocs POST destructive purge for a single language with
+ *   - purgeKnowledgeResources POST destructive purge for a single language with
  *                       a confirmation checkbox guard
  *
  * Split out of OverviewController so importer-registry + repository +
  * folder-picker JS module live next to the only actions that use them.
  */
-final class HelpDocController
+final class KnowledgeResourceController
 {
     public function __construct(
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly BackendUriBuilder $backendUriBuilder,
         private readonly SourceImporterRegistry $importerRegistry,
-        private readonly HelpDocRepository $helpDocRepository,
+        private readonly KnowledgeResourceRepository $helpDocRepository,
         private readonly PageRenderer $pageRenderer,
         private readonly BackendContext $context,
         private readonly SiteOverviewProvider $siteOverviewProvider,
@@ -48,12 +48,12 @@ final class HelpDocController
     {
         return match ($action) {
             'runImporter'   => $this->runImporter($request),
-            'purgeHelpdocs' => $this->purge($request),
-            default         => $this->helpdocs($request),
+            'purgeKnowledgeResources' => $this->purge($request),
+            default         => $this->knowledgeResources($request),
         };
     }
 
-    private function helpdocs(ServerRequestInterface $request): ResponseInterface
+    private function knowledgeResources(ServerRequestInterface $request): ResponseInterface
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
         // The folder-importer form uses TYPO3's element-browser modal;
@@ -66,10 +66,10 @@ final class HelpDocController
         // has them set first. Iteration moved to SiteOverviewProvider
         // so the three lookups (sourceRoot, fileadminFolder,
         // knownLanguages) don't each open their own getAllSites loop.
-        $defaultSourceRoot = $this->siteOverviewProvider->firstNonEmpty('meilisearch.helpdoc.sourceRoot');
+        $defaultSourceRoot = $this->siteOverviewProvider->firstNonEmpty('meilisearch.knowledgeResource.sourceRoot');
         $defaultTargetFolder = $this->siteOverviewProvider->firstNonEmpty(
-            'meilisearch.helpdoc.fileadminFolder',
-            HelpDocRepository::DEFAULT_TARGET_FOLDER,
+            'meilisearch.knowledgeResource.fileadminFolder',
+            KnowledgeResourceRepository::DEFAULT_TARGET_FOLDER,
         );
         $knownLanguages = $this->siteOverviewProvider->knownLanguages();
 
@@ -84,10 +84,10 @@ final class HelpDocController
         // Deep-link into the standard List module for browse/edit.
         $listEditUrl = (string)$this->backendUriBuilder->buildUriFromRoute('web_list', [
             'id' => 0,
-            'table' => HelpDocRepository::HELPDOC_TABLE,
+            'table' => KnowledgeResourceRepository::HELPDOC_TABLE,
         ]);
 
-        // Render the importer cards: each registered HelpDocSourceImporter
+        // Render the importer cards: each registered KnowledgeResourceSourceImporter
         // contributes its own form via describeFields(). Adding a new
         // importer doesn't require any template change here.
         //
@@ -100,7 +100,7 @@ final class HelpDocController
         // mechanism baked into the importer contract.
         $fieldDefaults = [
             'path' => $defaultSourceRoot,
-            'targetFolder' => $defaultTargetFolder === HelpDocRepository::DEFAULT_TARGET_FOLDER
+            'targetFolder' => $defaultTargetFolder === KnowledgeResourceRepository::DEFAULT_TARGET_FOLDER
                 ? '' // leave the placeholder visible, don't prefill the literal fallback
                 : $defaultTargetFolder,
         ];
@@ -139,28 +139,28 @@ final class HelpDocController
             // Built server-side because the BE route is token-protected;
             // the JS module just opens this URL as an iframe modal.
             'folderBrowserUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
-            'purgeUrl' => $this->context->route('purgeHelpdocs'),
+            'purgeUrl' => $this->context->route('purgeKnowledgeResources'),
             ...$this->context->tabNavData(),
         ]);
-        return $moduleTemplate->renderResponse('Backend/Overview/HelpDocs');
+        return $moduleTemplate->renderResponse('Backend/Overview/KnowledgeResources');
     }
 
     /**
-     * Generic dispatcher for every registered HelpDocSourceImporter.
+     * Generic dispatcher for every registered KnowledgeResourceSourceImporter.
      * The form carries a hidden `_importer` field with the slug; this
      * action looks the importer up in the registry, maps form values
      * onto the importer's describeFields() schema, and runs it.
      */
     private function runImporter(ServerRequestInterface $request): ResponseInterface
     {
-        if ($wrong = $this->context->requirePost($request, 'helpdocs')) {
+        if ($wrong = $this->context->requirePost($request, 'knowledgeResources')) {
             return $wrong;
         }
         $body = (array)$request->getParsedBody();
         $slug = trim((string)($body['_importer'] ?? ''));
         if ($slug === '' || !$this->importerRegistry->has($slug)) {
             $this->context->addFlash(sprintf('Unknown importer "%s".', $slug), ContextualFeedbackSeverity::ERROR);
-            return $this->context->redirect('helpdocs');
+            return $this->context->redirect('knowledgeResources');
         }
         $importer = $this->importerRegistry->get($slug);
 
@@ -168,7 +168,7 @@ final class HelpDocController
             $config = $this->buildImporterConfig($importer, $body, $request->getUploadedFiles());
         } catch (\Throwable $e) {
             $this->context->addFlash(sprintf('%s: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
-            return $this->context->redirect('helpdocs');
+            return $this->context->redirect('knowledgeResources');
         }
 
         try {
@@ -193,7 +193,7 @@ final class HelpDocController
         } catch (\Throwable $e) {
             $this->context->addFlash(sprintf('%s failed: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
-        return $this->context->redirect('helpdocs');
+        return $this->context->redirect('knowledgeResources');
     }
 
     /**
@@ -210,7 +210,7 @@ final class HelpDocController
      * @return array<string, mixed>
      */
     private function buildImporterConfig(
-        HelpDocSourceImporter $importer,
+        KnowledgeResourceSourceImporter $importer,
         array $body,
         array $uploadedFiles,
     ): array {
@@ -257,29 +257,29 @@ final class HelpDocController
 
     private function purge(ServerRequestInterface $request): ResponseInterface
     {
-        if ($wrong = $this->context->requirePost($request, 'helpdocs')) {
+        if ($wrong = $this->context->requirePost($request, 'knowledgeResources')) {
             return $wrong;
         }
         $body = (array)$request->getParsedBody();
         $languageId = (int)($body['language'] ?? -1);
         if ($languageId < 0) {
             $this->context->addFlash('Language is required.', ContextualFeedbackSeverity::ERROR);
-            return $this->context->redirect('helpdocs');
+            return $this->context->redirect('knowledgeResources');
         }
         $confirmed = isset($body['confirm']) && (string)$body['confirm'] === '1';
         if (!$confirmed) {
             $this->context->addFlash('Purge skipped — confirmation checkbox was not ticked.', ContextualFeedbackSeverity::WARNING);
-            return $this->context->redirect('helpdocs');
+            return $this->context->redirect('knowledgeResources');
         }
         try {
             $deleted = $this->helpDocRepository->purgeLanguage($languageId);
             $this->context->addFlash(
-                sprintf('Purged %d helpdoc row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.', $deleted, $languageId),
+                sprintf('Purged %d knowledge resource row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.', $deleted, $languageId),
                 ContextualFeedbackSeverity::OK,
             );
         } catch (\Throwable $e) {
             $this->context->addFlash('Purge failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
         }
-        return $this->context->redirect('helpdocs');
+        return $this->context->redirect('knowledgeResources');
     }
 }

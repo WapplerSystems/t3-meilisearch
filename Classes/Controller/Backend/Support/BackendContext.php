@@ -18,7 +18,7 @@ use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
  * flash message dispatch, redirect-to-action.
  *
  * Extracted out of OverviewController so the four sub-controllers
- * (Index/Reindex, Test, Diagnose, HelpDoc) don't each carry their
+ * (Index/Reindex, Test, Diagnose, KnowledgeResource) don't each carry their
  * own copy of the same helpers.
  *
  * Why not a trait: the helpers need DI-injected dependencies
@@ -76,7 +76,7 @@ final class BackendContext
             'indexUrl' => $this->route(),
             'testUrl' => $this->route('test'),
             'diagnoseUrl' => $this->route('diagnose'),
-            'helpdocsUrl' => $this->route('helpdocs'),
+            'knowledgeResourcesUrl' => $this->route('knowledgeResources'),
             'ragTestsUrl' => $this->route('ragtests'),
             'token' => $this->formProtectionFactory
                 ->createForType('backend')
@@ -99,7 +99,7 @@ final class BackendContext
      * redirect (defaults to the Overview / index tab).
      *
      * Usage:
-     *   if ($r = $this->context->requirePost($request, 'helpdocs')) { return $r; }
+     *   if ($r = $this->context->requirePost($request, 'knowledgeResources')) { return $r; }
      */
     public function requirePost(ServerRequestInterface $request, ?string $redirectAction = null): ?ResponseInterface
     {

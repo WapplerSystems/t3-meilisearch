@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use WapplerSystems\Meilisearch\Middleware\HelpTopicMiddleware;
+use WapplerSystems\Meilisearch\Middleware\KnowledgeResourceTopicMiddleware;
 use WapplerSystems\Meilisearch\Middleware\RagStreamMiddleware;
 use WapplerSystems\Meilisearch\Middleware\SearchFragmentEndpoint;
 use WapplerSystems\Meilisearch\Middleware\SuggestEndpoint;
@@ -40,10 +40,10 @@ return [
         'wapplersystems/meilisearch/help-topic' => [
             // Serves /hilfe/<path> from the configured DITA-OT root which
             // lives outside public/. Runs after site resolution (so the
-            // middleware can read meilisearch.helpdoc.sourceRoot from
+            // middleware can read meilisearch.knowledgeResource.sourceRoot from
             // the site settings) and before page resolution so the URL
             // never hits TYPO3's slug router.
-            'target' => HelpTopicMiddleware::class,
+            'target' => KnowledgeResourceTopicMiddleware::class,
             'after' => ['typo3/cms-frontend/site'],
             'before' => [
                 'typo3/cms-frontend/page-resolver',

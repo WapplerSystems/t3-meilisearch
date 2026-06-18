@@ -132,6 +132,13 @@ final class SearchService implements LoggerAwareInterface
         ];
 
         $filter = $this->buildMeilisearchFilter((array)($options['filters'] ?? []));
+        // Knowledge resources are indexed for RAG-grounding but must not show
+        // up in the FE result list. Excluded by default; callers that need
+        // them (RAG retrieval) opt in via $options['includeKnowledgeResources'].
+        if (!($options['includeKnowledgeResources'] ?? false)) {
+            $exclude = 'type != "knowledge_resource"';
+            $filter = $filter !== '' ? '(' . $filter . ') AND ' . $exclude : $exclude;
+        }
         if ($filter !== '') {
             $params['filter'] = $filter;
         }

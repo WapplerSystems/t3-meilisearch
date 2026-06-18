@@ -20,20 +20,20 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
 
 /**
- * Persistence + filesystem helpers shared by every HelpDocSourceImporter.
+ * Persistence + filesystem helpers shared by every KnowledgeResourceSourceImporter.
  *
  * Owns the schema knowledge (which table, which fileadmin folder, the
  * FAL storage uid) so importers don't have to. They just call:
- *   - {@see insertHelpdoc()} to write a row
+ *   - {@see insertKnowledgeResource()} to write a row
  *   - {@see attachMedia()} to link a FAL file as the row's primary media
  *   - {@see purgeLanguage()} for purge-and-rebuild semantics
  *   - {@see stats()} for the BE dashboard
  *
  * Also exposes the Tika extraction wrapper + utility folder/path helpers.
  */
-final class HelpDocRepository
+final class KnowledgeResourceRepository
 {
-    public const HELPDOC_TABLE = 'tx_wsmeilisearch_helpdoc';
+    public const HELPDOC_TABLE = 'tx_wsmeilisearch_knowledge_resource';
     public const UPLOADS_SUBFOLDER = 'uploads';
     /**
      * Final fallback when no site is configured and the operator hasn't
@@ -51,7 +51,7 @@ final class HelpDocRepository
 
     /**
      * Resolve the default FAL target folder. Picks the first site that
-     * has `meilisearch.helpdoc.fileadminFolder` set and falls back to
+     * has `meilisearch.knowledgeResource.fileadminFolder` set and falls back to
      * {@see DEFAULT_TARGET_FOLDER}. The folder is auto-created on first
      * use so first imports work without manual fileadmin prep.
      */
@@ -59,7 +59,7 @@ final class HelpDocRepository
     {
         $identifier = self::DEFAULT_TARGET_FOLDER;
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $configured = trim((string)$site->getSettings()->get('meilisearch.helpdoc.fileadminFolder', ''));
+            $configured = trim((string)$site->getSettings()->get('meilisearch.knowledgeResource.fileadminFolder', ''));
             if ($configured !== '') {
                 $identifier = $configured;
                 break;
@@ -78,10 +78,10 @@ final class HelpDocRepository
     }
 
     /**
-     * @param array<string, mixed> $row complete helpdoc row, tstamp/crdate set by this method
+     * @param array<string, mixed> $row complete knowledge resource row, tstamp/crdate set by this method
      * @return int new uid
      */
-    public function insertHelpdoc(array $row): int
+    public function insertKnowledgeResource(array $row): int
     {
         $now = time();
         $row['tstamp'] = $now;
@@ -92,11 +92,11 @@ final class HelpDocRepository
     }
 
     /**
-     * Link an existing FAL file to a helpdoc row's `media` field.
+     * Link an existing FAL file to a knowledge resource row's `media` field.
      * Used by importers that already obtained a sys_file via
      * {@see addFileFromPath()} or {@see addFileFromUpload()}.
      */
-    public function attachMedia(FalFile $falFile, int $helpdocUid, int $languageId, int $pid): void
+    public function attachMedia(FalFile $falFile, int $knowledgeResourceUid, int $languageId, int $pid): void
     {
         $refConn = $this->connectionPool->getConnectionForTable('sys_file_reference');
         $now = time();
@@ -106,20 +106,20 @@ final class HelpDocRepository
             'crdate' => $now,
             'sys_language_uid' => $languageId,
             'uid_local' => $falFile->getUid(),
-            'uid_foreign' => $helpdocUid,
+            'uid_foreign' => $knowledgeResourceUid,
             'tablenames' => self::HELPDOC_TABLE,
             'fieldname' => 'media',
             'table_local' => 'sys_file',
             'sorting_foreign' => 1,
         ]);
         $this->connectionPool->getConnectionForTable(self::HELPDOC_TABLE)
-            ->update(self::HELPDOC_TABLE, ['media' => 1], ['uid' => $helpdocUid]);
+            ->update(self::HELPDOC_TABLE, ['media' => 1], ['uid' => $knowledgeResourceUid]);
     }
 
     /**
      * Copy a file from $sourceAbs into <root>/<identifier>/<filename>
      * (folder name sanitised). The root defaults to the site-configured
-     * `meilisearch.helpdoc.fileadminFolder`; pass `$rootIdentifier` to
+     * `meilisearch.knowledgeResource.fileadminFolder`; pass `$rootIdentifier` to
      * override per-call (e.g. operator picked a different folder in the
      * BE form). Used by the DITA importer for per-topic media folders.
      */
@@ -146,7 +146,7 @@ final class HelpDocRepository
 
     /**
      * Copy a file from $sourceAbs into <root>/uploads/. The root
-     * defaults to the site-configured `meilisearch.helpdoc.fileadminFolder`;
+     * defaults to the site-configured `meilisearch.knowledgeResource.fileadminFolder`;
      * pass `$rootIdentifier` to override per-call. Used by the
      * SingleFileImporter for editor BE uploads.
      */
@@ -237,7 +237,7 @@ final class HelpDocRepository
     public function stats(): array
     {
         $qb = $this->connectionPool->getQueryBuilderForTable(self::HELPDOC_TABLE);
-        $rows = $qb->select('sys_language_uid', 'help_type', 'media', 'tstamp')
+        $rows = $qb->select('sys_language_uid', 'resource_type', 'media', 'tstamp')
             ->from(self::HELPDOC_TABLE)
             ->where($qb->expr()->eq('deleted', 0))
             ->executeQuery()
@@ -258,7 +258,7 @@ final class HelpDocRepository
             if ((int)$row['media'] > 0) {
                 $out['languages'][$lang]['withMedia']++;
             }
-            $type = (string)$row['help_type'];
+            $type = (string)$row['resource_type'];
             if (!isset($out['languages'][$lang]['types'][$type])) {
                 $out['languages'][$lang]['types'][$type] = 0;
             }
@@ -290,7 +290,7 @@ final class HelpDocRepository
      * Like {@see resolveFolder()} but auto-creates the target if it
      * doesn't exist yet. Importers + the default-target resolver use
      * this so first-time setups don't need an operator to pre-create
-     * the helpdocs folder in the file list.
+     * the knowledge resources folder in the file list.
      */
     public function resolveOrCreateFolder(string $identifier): Folder
     {

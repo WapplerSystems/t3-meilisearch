@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service\Import\Importer;
 
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\ImportResult;
 
 /**
@@ -22,10 +22,10 @@ use WapplerSystems\Meilisearch\Service\Import\ImportResult;
  * idempotent and orphan-free without operators having to track which
  * topics disappeared between drops.
  */
-final class DitaOtImporter implements HelpDocSourceImporter
+final class DitaOtImporter implements KnowledgeResourceSourceImporter
 {
     public function __construct(
-        private readonly HelpDocRepository $repository,
+        private readonly KnowledgeResourceRepository $repository,
     ) {}
 
     public function name(): string
@@ -58,7 +58,7 @@ final class DitaOtImporter implements HelpDocSourceImporter
             ['name' => 'limit', 'label' => 'Limit', 'type' => 'text', 'default' => '0',
              'help' => 'Only import the first N topics. 0 = no limit.'],
             ['name' => 'targetFolder', 'label' => 'Target media folder', 'type' => 'folder',
-             'help' => 'Where the topic-specific media subfolders are created in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder).'],
+             'help' => 'Where the topic-specific media subfolders are created in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder).'],
         ];
     }
 
@@ -122,7 +122,7 @@ final class DitaOtImporter implements HelpDocSourceImporter
             $row['source_path'] = $this->relativeSourcePath($topicFile, $rootPath);
             $row['media'] = 0;
 
-            $uid = $this->repository->insertHelpdoc($row);
+            $uid = $this->repository->insertKnowledgeResource($row);
             $imported++;
 
             if ($mediaSourceAbs !== null && is_file($mediaSourceAbs)) {
@@ -197,7 +197,7 @@ final class DitaOtImporter implements HelpDocSourceImporter
             $title = $h1 instanceof \DOMElement ? trim($h1->textContent) : '';
         }
         $abstract = $this->metaContent($xp, 'abstract') ?: $this->metaContent($xp, 'description');
-        $helpType = $this->metaContent($xp, 'DC.type') ?: 'concept';
+        $resourceType = $this->metaContent($xp, 'DC.type') ?: 'concept';
         $body = $this->extractBody($xp);
         if ($title === '' && trim($body) === '') {
             return null;
@@ -208,7 +208,7 @@ final class DitaOtImporter implements HelpDocSourceImporter
             'title' => substr($title, 0, 512),
             'abstract' => $abstract,
             'body' => $body,
-            'help_type' => $helpType,
+            'resource_type' => $resourceType,
             '_mediaSourceAbs' => $mediaPath,
         ];
     }

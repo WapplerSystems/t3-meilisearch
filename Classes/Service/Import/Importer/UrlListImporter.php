@@ -4,13 +4,13 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Service\Import\Importer;
 
 use TYPO3\CMS\Core\Http\RequestFactory;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocRepository;
-use WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceRepository;
+use WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter;
 use WapplerSystems\Meilisearch\Service\Import\ImportResult;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 
 /**
- * Fetch a list of URLs over HTTP and turn each into a helpdoc. The
+ * Fetch a list of URLs over HTTP and turn each into a knowledge resource. The
  * downloaded payload lands in FAL (so search results can deep-link
  * to the original file), Tika extracts the body, and the URL itself
  * becomes the source_path.
@@ -31,7 +31,7 @@ use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
  * Input format: one URL per line. Blank lines and lines starting with
  * `#` are skipped (comments).
  */
-final class UrlListImporter implements HelpDocSourceImporter
+final class UrlListImporter implements KnowledgeResourceSourceImporter
 {
     /** Subfolder under the chosen target where downloads land. */
     private const URLS_SUBFOLDER = 'urls';
@@ -65,7 +65,7 @@ final class UrlListImporter implements HelpDocSourceImporter
     ];
 
     public function __construct(
-        private readonly HelpDocRepository $repository,
+        private readonly KnowledgeResourceRepository $repository,
         private readonly RequestFactory $requestFactory,
     ) {}
 
@@ -81,7 +81,7 @@ final class UrlListImporter implements HelpDocSourceImporter
 
     public function description(): string
     {
-        return 'Fetch a list of URLs and create one helpdoc per response — body via Tika, source kept in FAL.';
+        return 'Fetch a list of URLs and create one knowledge resource per response — body via Tika, source kept in FAL.';
     }
 
     public function describeFields(): array
@@ -90,10 +90,10 @@ final class UrlListImporter implements HelpDocSourceImporter
             ['name' => 'urls', 'label' => 'URLs', 'type' => 'textarea', 'required' => true,
              'help' => 'One URL per line. Only http/https. Blank lines and lines starting with # are skipped.'],
             ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'help_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
+            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
              'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
             ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where downloaded files land in fileadmin. Empty = site default (meilisearch.helpdoc.fileadminFolder). A "urls/" subfolder is added automatically.'],
+             'help' => 'Where downloaded files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "urls/" subfolder is added automatically.'],
             ['name' => 'timeout', 'label' => 'HTTP timeout (s)', 'type' => 'text', 'default' => (string)self::DEFAULT_TIMEOUT,
              'help' => 'Per-URL fetch timeout. Slow servers fail individually without wedging the whole batch.'],
             ['name' => 'maxSizeMb', 'label' => 'Max response size (MB)', 'type' => 'text', 'default' => (string)self::DEFAULT_MAX_SIZE_MB,
@@ -109,9 +109,9 @@ final class UrlListImporter implements HelpDocSourceImporter
             throw new \RuntimeException('No URLs to import (after stripping blanks and comments).');
         }
         $languageId = (int)($config['language'] ?? 0);
-        $helpType = trim((string)($config['help_type'] ?? 'reference'));
-        if (!in_array($helpType, ['reference', 'concept', 'task', 'upload'], true)) {
-            $helpType = 'reference';
+        $resourceType = trim((string)($config['resource_type'] ?? 'reference'));
+        if (!in_array($resourceType, ['reference', 'concept', 'task', 'upload'], true)) {
+            $resourceType = 'reference';
         }
         $targetRoot = trim((string)($config['targetFolder'] ?? ''));
         $timeout = max(1, (int)($config['timeout'] ?? self::DEFAULT_TIMEOUT));
@@ -171,19 +171,19 @@ final class UrlListImporter implements HelpDocSourceImporter
                 $identifier = $this->repository->sanitiseIdentifier(pathinfo($download['filename'], PATHINFO_FILENAME))
                     . '-f' . $falFile->getUid();
 
-                $helpdocUid = $this->repository->insertHelpdoc([
+                $knowledgeResourceUid = $this->repository->insertKnowledgeResource([
                     'pid' => 0,
                     'sys_language_uid' => $languageId,
                     'identifier' => substr($identifier, 0, 190),
                     'title' => substr($title, 0, 512),
                     'abstract' => '',
                     'body' => $body,
-                    'help_type' => $helpType,
+                    'resource_type' => $resourceType,
                     'parent_identifier' => '',
                     'source_path' => $url, // Original URL is the canonical source
                     'media' => 0,
                 ]);
-                $this->repository->attachMedia($falFile, $helpdocUid, $languageId, 0);
+                $this->repository->attachMedia($falFile, $knowledgeResourceUid, $languageId, 0);
                 $imported++;
                 $mediaCopied++;
             } catch (\Throwable $e) {
@@ -305,7 +305,7 @@ final class UrlListImporter implements HelpDocSourceImporter
     }
 
     /**
-     * Pull the <title> element from an HTML response so the helpdoc has
+     * Pull the <title> element from an HTML response so the knowledge resource has
      * a human-readable title instead of the URL tail. Returns '' if no
      * title is present.
      */

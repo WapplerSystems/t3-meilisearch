@@ -21,10 +21,10 @@ services:
       # Plain value objects: built by SearchConfigurationProvider /
       # ApplyMeilisearchSettingsCommand from Site Settings, never injected.
       - '../Classes/Configuration/Dto/*'
-      # ImportResult is a readonly DTO built by HelpDocSourceImporter
+      # ImportResult is a readonly DTO built by KnowledgeResourceSourceImporter
       # implementations; the interface itself stays out of the container.
       - '../Classes/Service/Import/ImportResult.php'
-      - '../Classes/Service/Import/HelpDocSourceImporter.php'
+      - '../Classes/Service/Import/KnowledgeResourceSourceImporter.php'
       # RagTestResult is a readonly DTO returned by RagTestRunner;
       # interface is a marker, not a service.
       - '../Classes/Service/RagTest/RagTestResult.php'
@@ -38,7 +38,7 @@ services:
       tags: ['ws_meilisearch.schema_provider']
     WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface:
       tags: ['ws_meilisearch.llm_provider']
-    WapplerSystems\Meilisearch\Service\Import\HelpDocSourceImporter:
+    WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter:
       tags: ['ws_meilisearch.source_importer']
     WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientInterface:
       tags: ['ws_meilisearch.embedding_client']

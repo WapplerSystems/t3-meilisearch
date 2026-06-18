@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Http\Stream;
  *   /hilfe/de/figures/X.png
  *   /hilfe/commonltr.css  etc.
  *
- * Configured per site via `meilisearch.helpdoc.sourceRoot` (absolute or
+ * Configured per site via `meilisearch.knowledgeResource.sourceRoot` (absolute or
  * relative to project root). Without configuration the middleware
  * short-circuits and lets normal TYPO3 routing handle the request — the
  * extension ships no default path on purpose so a fresh install never
@@ -34,7 +34,7 @@ use TYPO3\CMS\Core\Http\Stream;
  * MIME types are derived from the file extension — a small whitelist
  * keeps surprises out (no PHP execution, no fileadmin access).
  */
-final class HelpTopicMiddleware implements MiddlewareInterface
+final class KnowledgeResourceTopicMiddleware implements MiddlewareInterface
 {
     private const URL_PREFIX = '/hilfe';
 
@@ -113,7 +113,7 @@ final class HelpTopicMiddleware implements MiddlewareInterface
 
     /**
      * Resolve the on-disk root of the DITA corpus from the active site's
-     * settings (`meilisearch.helpdoc.sourceRoot`). Returns an empty
+     * settings (`meilisearch.knowledgeResource.sourceRoot`). Returns an empty
      * string when nothing is configured — caller treats that as
      * "feature disabled" and passes the request through.
      */
@@ -123,7 +123,7 @@ final class HelpTopicMiddleware implements MiddlewareInterface
         if ($site === null || !method_exists($site, 'getSettings')) {
             return '';
         }
-        $relative = trim((string)$site->getSettings()->get('meilisearch.helpdoc.sourceRoot', ''));
+        $relative = trim((string)$site->getSettings()->get('meilisearch.knowledgeResource.sourceRoot', ''));
         if ($relative === '') {
             return '';
         }

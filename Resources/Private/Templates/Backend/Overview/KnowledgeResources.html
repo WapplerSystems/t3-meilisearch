@@ -5,12 +5,12 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Help docs</h1>
-    <f:variable name="active" value="helpdocs"/>
+    <h1>Meilisearch — Wissens-Resourcen</h1>
+    <f:variable name="active" value="knowledgeResources"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="text-muted">
-        Help topics live in <code>tx_wsmeilisearch_helpdoc</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
+        Help topics live in <code>tx_wsmeilisearch_knowledge_resource</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
     </p>
 
     <!-- ============== STATS ============== -->
@@ -61,10 +61,10 @@
     <!-- ============== IMPORTERS ============== -->
     <h2 class="h5 mb-2">Run an importer</h2>
     <p class="text-muted small mb-3">
-        One card per registered <code>HelpDocSourceImporter</code>. New importers added in PHP appear here automatically — no template change needed.
+        One card per registered <code>KnowledgeResourceSourceImporter</code>. New importers added in PHP appear here automatically — no template change needed.
     </p>
     <f:for each="{importers}" as="importer">
-        <f:render partial="Backend/HelpDocs/ImporterForm"
+        <f:render partial="Backend/KnowledgeResources/ImporterForm"
                   arguments="{importer: importer, knownLanguages: knownLanguages, defaultTargetFolder: defaultTargetFolder, folderBrowserUrl: folderBrowserUrl, token: token, runImporterUrl: runImporterUrl}" />
     </f:for>
 
@@ -74,7 +74,7 @@
             <div class="card-header text-danger"><strong>Purge by language</strong></div>
             <div class="card-body">
                 <p class="small text-muted">
-                    Hard-deletes every helpdoc row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
+                    Hard-deletes every knowledge resource row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
                 </p>
                 <form action="{purgeUrl}" method="post">
                     <input type="hidden" name="token" value="{token}" />
@@ -92,7 +92,7 @@
                             <div class="form-check">
                                 <input type="checkbox" name="confirm" value="1" id="hd-confirm" class="form-check-input" />
                                 <label for="hd-confirm" class="form-check-label small">
-                                    I understand this drops <strong>all</strong> helpdoc rows for the selected language.
+                                    I understand this drops <strong>all</strong> knowledge resource rows for the selected language.
                                 </label>
                             </div>
                         </div>
@@ -112,7 +112,7 @@
             Individual records (boost field, hidden flag, manual overrides) are managed in the standard List module:
         </p>
         <a href="{listEditUrl}" class="btn btn-secondary btn-sm">
-            Open helpdocs in the List module
+            Open knowledge resources in the List module
         </a>
     </section>
 </f:section>

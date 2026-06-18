@@ -62,13 +62,21 @@
                                 `[id=…]` form, so a missing checkmark on a row
                                 doesn't mean the LLM didn't use it.
                             </f:comment>
-                            <f:if condition="{answer.sources}">
+                            <f:comment>
+                                {answer.publicSources} ist {answer.sources} ohne
+                                Treffer vom Typ knowledge_resource. Wissens-
+                                Resourcen grounden die Antwort (LLM bekommt sie
+                                im Prompt), aber wir machen sie hier nicht als
+                                Quelle sichtbar. Block bleibt komplett aus,
+                                wenn keine öffentliche Quelle übrig ist.
+                            </f:comment>
+                            <f:if condition="{answer.publicSources}">
                                 <section class="ws-meilisearch-rag-sources mb-4">
                                     <h3 class="h6 text-uppercase text-muted small fw-semibold mb-2">
                                         <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources"/>
                                     </h3>
                                     <ul class="list-group list-group-flush">
-                                        <f:for each="{answer.sources}" as="hit">
+                                        <f:for each="{answer.publicSources}" as="hit">
                                             <f:variable name="cited" value="0"/>
                                             <f:for each="{answer.citedIds}" as="cid">
                                                 <f:if condition="{cid} == {hit.id}"><f:variable name="cited" value="1"/></f:if>

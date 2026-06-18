@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Service\Import;
 
 /**
- * Dispatches to the right {@see HelpDocSourceImporter} by name. Built
+ * Dispatches to the right {@see KnowledgeResourceSourceImporter} by name. Built
  * once at container construction with the full tagged-iterator of
  * importers; lookups are O(1) after the first call.
  *
@@ -14,14 +14,14 @@ namespace WapplerSystems\Meilisearch\Service\Import;
  */
 final class SourceImporterRegistry
 {
-    /** @var array<string, HelpDocSourceImporter>|null memoised name → importer map */
+    /** @var array<string, KnowledgeResourceSourceImporter>|null memoised name → importer map */
     private ?array $byName = null;
 
-    /** @var list<HelpDocSourceImporter> */
+    /** @var list<KnowledgeResourceSourceImporter> */
     private array $importers;
 
     /**
-     * @param iterable<HelpDocSourceImporter> $importers DI tagged_iterator
+     * @param iterable<KnowledgeResourceSourceImporter> $importers DI tagged_iterator
      */
     public function __construct(iterable $importers)
     {
@@ -29,19 +29,19 @@ final class SourceImporterRegistry
     }
 
     /**
-     * @return list<HelpDocSourceImporter>
+     * @return list<KnowledgeResourceSourceImporter>
      */
     public function all(): array
     {
         return $this->importers;
     }
 
-    public function get(string $name): HelpDocSourceImporter
+    public function get(string $name): KnowledgeResourceSourceImporter
     {
         $map = $this->byName();
         if (!isset($map[$name])) {
             throw new \InvalidArgumentException(sprintf(
-                'No HelpDocSourceImporter registered for name "%s". Known: %s',
+                'No KnowledgeResourceSourceImporter registered for name "%s". Known: %s',
                 $name,
                 implode(', ', array_keys($map)),
             ));
@@ -55,7 +55,7 @@ final class SourceImporterRegistry
     }
 
     /**
-     * @return array<string, HelpDocSourceImporter>
+     * @return array<string, KnowledgeResourceSourceImporter>
      */
     private function byName(): array
     {

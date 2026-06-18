@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 return [
     'ctrl' => [
-        'title' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.title',
+        'title' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.title',
         'label' => 'title',
         'descriptionColumn' => 'abstract',
         'tstamp' => 'tstamp',
@@ -42,7 +42,7 @@ return [
             'label' => 'LLL:EXT:core/Resources/Private/Language/locallang_general.xlf:LGL.l18n_parent',
             'config' => [
                 'type' => 'group',
-                'allowed' => 'tx_wsmeilisearch_helpdoc',
+                'allowed' => 'tx_wsmeilisearch_knowledge_resource',
                 'size' => 1,
                 'maxitems' => 1,
                 'minitems' => 0,
@@ -68,7 +68,7 @@ return [
             ],
         ],
         'identifier' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.identifier',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.identifier',
             'config' => [
                 'type' => 'input',
                 'size' => 50,
@@ -78,7 +78,7 @@ return [
             ],
         ],
         'title' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.heading',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.heading',
             'config' => [
                 'type' => 'input',
                 'size' => 60,
@@ -87,7 +87,7 @@ return [
             ],
         ],
         'abstract' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.abstract',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.abstract',
             'config' => [
                 'type' => 'text',
                 'rows' => 3,
@@ -95,15 +95,15 @@ return [
             ],
         ],
         'body' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.body',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.body',
             'config' => [
                 'type' => 'text',
                 'rows' => 15,
                 'cols' => 60,
             ],
         ],
-        'help_type' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.helpType',
+        'resource_type' => [
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.resourceType',
             'config' => [
                 'type' => 'select',
                 'renderType' => 'selectSingle',
@@ -116,7 +116,7 @@ return [
             ],
         ],
         'parent_identifier' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.parentIdentifier',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.parentIdentifier',
             'config' => [
                 'type' => 'input',
                 'size' => 50,
@@ -125,7 +125,7 @@ return [
             ],
         ],
         'source_path' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.sourcePath',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.sourcePath',
             'config' => [
                 'type' => 'input',
                 'size' => 50,
@@ -135,7 +135,7 @@ return [
             ],
         ],
         'media' => [
-            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:helpdoc.media',
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:knowledgeResource.media',
             'config' => [
                 'type' => 'file',
                 'maxitems' => 1,
@@ -163,7 +163,7 @@ return [
     'types' => [
         '0' => [
             'showitem' => 'sys_language_uid, l10n_parent, hidden,
-                --div--;Content, identifier, help_type, title, abstract, body, media,
+                --div--;Content, identifier, resource_type, title, abstract, body, media,
                 --div--;Structure, parent_identifier, source_path,
                 --div--;Search, tx_wsmeilisearch_boost',
         ],

@@ -25,21 +25,21 @@ settings:
 
   meilisearch.indexedTables:
     label: 'Indexed record types'
-    description: 'Comma-separated list of TCA tables to index. Pages, tx_news and tx_wsmeilisearch_helpdoc (help topics imported via ws_meilisearch:import-help-docs) are wired by default.'
+    description: 'Comma-separated list of TCA tables to index. Pages, tx_news and tx_wsmeilisearch_knowledge_resource (knowledge resources imported via ws_meilisearch:import-knowledge-resources) are wired by default. Knowledge resources are indexed for RAG-grounding but hidden from the FE search result list and from the RAG answer''s "Sources" panel.'
     type: string
-    default: 'pages,tx_news_domain_model_news,tx_wsmeilisearch_helpdoc'
+    default: 'pages,tx_news_domain_model_news,tx_wsmeilisearch_knowledge_resource'
 
-  meilisearch.helpdoc.sourceRoot:
-    label: 'Help topic source root'
+  meilisearch.knowledgeResource.sourceRoot:
+    label: 'Knowledge resource source root'
     description: 'On-disk path (absolute or relative to the project root) of the DITA-OT XHTML corpus served under /hilfe/. Files outside this root are not reachable. Leave empty to disable the /hilfe/ middleware.'
     type: string
     default: ''
 
-  meilisearch.helpdoc.fileadminFolder:
-    label: 'Help topic FAL target folder'
-    description: 'Default FAL combined identifier (e.g. 1:/helpdocs/) where importers store uploaded files and extracted media. Operators can override per import via the BE folder picker. The folder is auto-created on first use.'
+  meilisearch.knowledgeResource.fileadminFolder:
+    label: 'Knowledge resource FAL target folder'
+    description: 'Default FAL combined identifier (e.g. 1:/knowledge/) where importers store uploaded files and extracted media. Operators can override per import via the BE folder picker. The folder is auto-created on first use.'
     type: string
-    default: '1:/helpdocs/'
+    default: '1:/knowledge/'
 
   # --- Quota check (ws_meilisearch:check-quotas) -----------------------
   # Run periodically (cron / scheduler) against Infomaniak / OpenAI /
