@@ -272,7 +272,7 @@
                 '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
                 ' data-suggest-item class="ws-meilisearch-suggest__item">',
                 '<a href="' + escapeAttr(linkFor(hit)) + '" class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
-                '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.type || '?') + '</span>',
+                '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.typeLabel || hit.type || '?') + '</span>',
                 '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
                 '</a>',
                 '</li>',

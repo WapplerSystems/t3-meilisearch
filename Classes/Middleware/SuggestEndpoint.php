@@ -8,7 +8,9 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
 /**
@@ -42,11 +44,18 @@ final class SuggestEndpoint implements MiddlewareInterface
 
     public function __construct(
         private readonly SearchService $searchService,
+        private readonly LanguageServiceFactory $languageServiceFactory,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if ($request->getUri()->getPath() !== self::PATH) {
+        // Accept both the bare path and the language-base-prefixed
+        // variant (`/de/_ws_meilisearch/suggest`). The frontend JS
+        // resolves the endpoint URL relative to the page it lives on,
+        // so multi-language sites with `/de/`, `/en/` etc. as language
+        // bases will hit the prefixed form.
+        $path = $request->getUri()->getPath();
+        if ($path !== self::PATH && !str_ends_with(rtrim($path, '/'), self::PATH)) {
             return $handler->handle($request);
         }
 
@@ -64,29 +73,95 @@ final class SuggestEndpoint implements MiddlewareInterface
             $query = mb_substr($query, 0, self::MAX_QUERY_LENGTH);
         }
 
+        // Scope to the active site language. Without this, a sys_file
+        // indexed under 8 language overlays appears 8× — same title,
+        // same uid — and fills the LIMIT=5 dropdown with duplicates.
+        // The full search controller has the same guard behind the
+        // `restrictToCurrentLanguage` setting; for the suggest dropdown
+        // the per-language scope is the only sensible default — a
+        // visitor on /de/ never wants English-only suggestions to
+        // dilute the list. Pull the over-fetch + dedupe still happens
+        // below as a defense against same-language metadata clones.
+        $filters = [];
+        $language = $request->getAttribute('language');
+        if ($language instanceof SiteLanguage) {
+            $filters['language'] = [(string)$language->getLanguageId()];
+        }
+
         // The suggest endpoint deliberately runs the keyword path even
         // when an embedder is configured. Live dropdowns benefit from
         // exact-prefix matches, which the keyword retriever is better at
         // than the semantic one for partial-token input ("sas" should
         // suggest "saskatchewan", not its nearest vector neighbour).
+        // Over-fetch so the post-dedupe still has enough rows to fill
+        // the LIMIT — same uid+type can still surface twice on metadata
+        // duplicates within one language.
         $result = $this->searchService->search($site, $query, [
-            'perPage' => self::LIMIT,
+            'perPage' => self::LIMIT * 4,
             'page' => 1,
             'hybrid' => false,
+            'filters' => $filters,
         ]);
 
+        // Build the LanguageService once for the active site language so
+        // type-label lookups are O(1) per hit instead of constructing
+        // the service per call. Localizes badges in the dropdown to
+        // match the FE search results partial.
+        $languageService = $this->languageServiceFactory->createFromSiteLanguage(
+            $language instanceof SiteLanguage ? $language : $site->getDefaultLanguage(),
+        );
+
         $hits = [];
+        $seen = [];
         foreach ($result->hits as $hit) {
+            $type = (string)($hit['type'] ?? '');
+            $uid = (int)($hit['uid'] ?? 0);
+            // Dedupe by (type, uid). Same source record indexed under
+            // multiple language overlays — or duplicate sys_file_metadata
+            // rows on the same uid — must not flood the dropdown.
+            $key = $type . ':' . $uid;
+            if ($uid > 0 && isset($seen[$key])) {
+                continue;
+            }
+            if ($uid > 0) {
+                $seen[$key] = true;
+            }
+            // Files store their URL as `publicUrl`, pages/news/knowledge_resource
+            // store it as `uri` — fall back to the alternate field so every
+            // hit in the dropdown becomes clickable. Strip the fragment
+            // (`#c123`) the EXT:index pipeline appends to page URIs since the
+            // dropdown wants the canonical page link, not a deep anchor.
+            $url = (string)($hit['publicUrl'] ?? '');
+            if ($url === '') {
+                $url = (string)($hit['uri'] ?? '');
+            }
+            if ($url !== '' && ($hashPos = strpos($url, '#')) !== false) {
+                $url = substr($url, 0, $hashPos);
+            }
+            // Pre-resolve the type badge label via the shared XLF so the
+            // dropdown JS doesn't need its own English-only map. Unknown
+            // types fall back to the raw key so an admin can still tell
+            // what they are.
+            $typeLabel = $type !== ''
+                ? (function (string $t) use ($languageService): string {
+                    $translated = $languageService->sL(
+                        'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.' . $t,
+                    );
+                    return $translated !== '' ? $translated : $t;
+                })($type)
+                : '';
             $hits[] = [
                 'id' => (string)($hit['id'] ?? ''),
                 'title' => (string)($hit['title'] ?? ''),
-                'type' => (string)($hit['type'] ?? ''),
-                'uid' => (int)($hit['uid'] ?? 0),
+                'type' => $type,
+                'typeLabel' => $typeLabel,
+                'uid' => $uid,
                 'language' => (int)($hit['language'] ?? 0),
-                'publicUrl' => isset($hit['publicUrl']) && $hit['publicUrl'] !== ''
-                    ? (string)$hit['publicUrl']
-                    : null,
+                'publicUrl' => $url !== '' ? $url : null,
             ];
+            if (count($hits) >= self::LIMIT) {
+                break;
+            }
         }
 
         return new JsonResponse([
