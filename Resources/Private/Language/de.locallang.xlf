@@ -35,6 +35,10 @@
                 <source>Ask</source>
                 <target>Fragen</target>
             </trans-unit>
+            <trans-unit id="rag.form.loading">
+                <source>Generating answer…</source>
+                <target>Antwort wird generiert…</target>
+            </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
                 <target>Neu beginnen</target>
@@ -134,6 +138,10 @@
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
                 <target>Inhaltselement</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.knowledge_resource">
+                <source>Knowledge resource</source>
+                <target>Wissens-Resource</target>
             </trans-unit>
             <trans-unit id="search.sort.label">
                 <source>Sort by</source>

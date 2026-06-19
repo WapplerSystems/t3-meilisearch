@@ -27,6 +27,9 @@
             <trans-unit id="rag.form.submit">
                 <source>Ask</source>
             </trans-unit>
+            <trans-unit id="rag.form.loading">
+                <source>Generating answer…</source>
+            </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
             </trans-unit>
@@ -101,6 +104,9 @@
             </trans-unit>
             <trans-unit id="facet.value.type.tt_content">
                 <source>Content element</source>
+            </trans-unit>
+            <trans-unit id="facet.value.type.knowledge_resource">
+                <source>Knowledge resource</source>
             </trans-unit>
             <trans-unit id="search.sort.label">
                 <source>Sort by</source>

@@ -139,11 +139,12 @@
                                 <tr>
                                     <td><code>{hit.id}</code></td>
                                     <td>
+                                        <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.{hit.type}" default="{hit.type}"/></f:variable>
                                         <f:switch expression="{hit.type}">
-                                            <f:case value="page"><span class="badge bg-primary">page</span></f:case>
-                                            <f:case value="news"><span class="badge bg-info">news</span></f:case>
-                                            <f:case value="file"><span class="badge bg-warning text-dark">file</span></f:case>
-                                            <f:defaultCase><span class="badge bg-secondary">{hit.type}</span></f:defaultCase>
+                                            <f:case value="page"><span class="badge bg-primary">{typeLabel -> f:format.trim()}</span></f:case>
+                                            <f:case value="news"><span class="badge bg-info">{typeLabel -> f:format.trim()}</span></f:case>
+                                            <f:case value="file"><span class="badge bg-warning text-dark">{typeLabel -> f:format.trim()}</span></f:case>
+                                            <f:defaultCase><span class="badge bg-secondary">{typeLabel -> f:format.trim()}</span></f:defaultCase>
                                         </f:switch>
                                     </td>
                                     <td>
