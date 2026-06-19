@@ -71,6 +71,15 @@ final class RagAnswer
      * visually consistent regardless of how the model groups its
      * citations. Original `id=` chrome and commas are dropped.
      *
+     * Citations referencing `knowledge_resource` sources are stripped
+     * entirely (including the surrounding bracket and a preceding
+     * space). Those sources are the internal RAG grounding corpus —
+     * already filtered out of the public sources panel — so leaving
+     * inline `[Title]` markers in the prose would expose them through
+     * the back door. Mixed brackets that reference both a knowledge-
+     * resource and another doc type keep the other doc type's link
+     * and drop the knowledge-resource portion.
+     *
      * Unknown tokens (something the parser sees but isn't in the
      * returned sources) keep the whole original block as plain text
      * — better safe than corrupting model output we don't understand.
@@ -98,27 +107,39 @@ final class RagAnswer
         if ($byId === []) {
             return $escaped;
         }
-        return (string)preg_replace_callback(
-            '/\[([^\[\]]+)\]/',
+        // Eat an optional single leading space so deleting a citation
+        // that follows a word doesn't leave a double space behind.
+        // `\s*` instead of ` ?` covers ` \n` etc. that the LLM
+        // occasionally emits before a citation.
+        $rewritten = (string)preg_replace_callback(
+            '/(\s*)\[([^\[\]]+)\]/',
             static function (array $block) use ($byId): string {
-                // Tokenise the inner content using the same regex as
-                // the citation parser. If at least one token is a
-                // known source id, rebuild as a sequence of one
-                // bracketed link per known token. Otherwise leave the
-                // original block intact (could be prose like `[NOTE]`).
-                if (!preg_match_all('/[A-Za-z0-9_:.\-]+/', $block[1], $tokens) || !isset($tokens[0])) {
+                $leadingWs = $block[1];
+                if (!preg_match_all('/[A-Za-z0-9_:.\-]+/', $block[2], $tokens) || !isset($tokens[0])) {
                     return $block[0];
                 }
                 $matched = [];
+                $knowledgeResourceMatches = 0;
                 foreach ($tokens[0] as $token) {
-                    if (isset($byId[$token])) {
-                        $matched[$token] = $byId[$token];
+                    if (!isset($byId[$token])) {
+                        continue;
                     }
+                    $src = $byId[$token];
+                    if ((string)($src['type'] ?? '') === 'knowledge_resource') {
+                        $knowledgeResourceMatches++;
+                        continue;
+                    }
+                    $matched[$token] = $src;
+                }
+                // Block contained only knowledge_resource tokens — strip
+                // it entirely along with any preceding whitespace.
+                if ($matched === [] && $knowledgeResourceMatches > 0) {
+                    return '';
                 }
                 if ($matched === []) {
-                    return $block[0]; // nothing recognised — leave alone
+                    return $block[0]; // nothing recognised — leave alone (prose like [NOTE])
                 }
-                $out = '';
+                $out = $leadingWs;
                 foreach ($matched as $id => $src) {
                     $title = trim((string)($src['title'] ?? '')) !== ''
                         ? trim((string)$src['title'])
@@ -145,5 +166,20 @@ final class RagAnswer
             },
             $escaped,
         );
+
+        // Markdown-light: render **bold** as <strong>. LLMs reach for
+        // emphasis frequently — leaving the literal asterisks in the
+        // FE looks like uninterpreted markup. Non-greedy, no newlines
+        // inside, no asterisks inside (so unrelated math/glob fragments
+        // like `foo * bar` or solo `*` markers aren't matched). Runs
+        // after the citation rewriter because htmlspecialchars left
+        // the `**` characters untouched (they're not HTML-special).
+        $rewritten = (string)preg_replace(
+            '/\*\*([^*\n]+?)\*\*/u',
+            '<strong>$1</strong>',
+            $rewritten,
+        );
+
+        return $rewritten;
     }
 }

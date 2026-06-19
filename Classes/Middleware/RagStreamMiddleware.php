@@ -9,6 +9,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\NullResponse;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
@@ -61,9 +62,19 @@ final class RagStreamMiddleware implements MiddlewareInterface
         }
 
         $conversation = $this->loadConversation($site, $request);
-        $stream = $this->ragService->askStreaming($site, $question, [
-            'conversation' => $conversation,
-        ]);
+        // Pin the LLM answer language to the active FE language so the
+        // model doesn't drift to English when context excerpts span
+        // multiple languages — matches the non-streaming controller.
+        $askOptions = ['conversation' => $conversation];
+        $language = $request->getAttribute('language');
+        if ($language instanceof SiteLanguage) {
+            $askOptions['language'] = $language->getLanguageId();
+            $restrict = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', true);
+            if ($restrict) {
+                $askOptions['filters'] = ['language' => [$language->getLanguageId()]];
+            }
+        }
+        $stream = $this->ragService->askStreaming($site, $question, $askOptions);
 
         $this->writeSseStream($stream, $site, $request, $question, $conversation);
 

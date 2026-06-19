@@ -101,6 +101,15 @@ final class RagController extends ActionController
         if ($restrict && $languageId !== null) {
             $options['filters'] = ['language' => [$languageId]];
         }
+        // Pin the LLM answer language to the active FE site language so
+        // the model doesn't drift to English when context excerpts come
+        // back in a mix of languages or when the question itself is
+        // short / language-ambiguous. Independent of the retrieval
+        // language filter above (a visitor on /de/ wants a German answer
+        // even when restrictToCurrentLanguage is off).
+        if ($languageId !== null) {
+            $options['language'] = $languageId;
+        }
 
         $answer = $this->ragService->ask($site, $q, $options);
 

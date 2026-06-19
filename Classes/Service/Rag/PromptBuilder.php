@@ -19,7 +19,45 @@ final class PromptBuilder
     private const FIELDS_PREFERRED = ['bodytext', 'description', 'abstract', 'teaser'];
 
     /**
+     * Map of ISO-639-1 language codes to English language names. Used to
+     * substitute `{{language}}` in the system prompt with a label every
+     * LLM reliably recognises ("German", not "de_DE.utf8" or "Deutsch")
+     * — the system message is in English by default, and answer-language
+     * pins land best when written in the same language as the prompt.
+     * Falls through to the locale name when a code isn't in the map.
+     */
+    private const ISO_639_1_TO_ENGLISH = [
+        'de' => 'German',
+        'en' => 'English',
+        'fr' => 'French',
+        'it' => 'Italian',
+        'es' => 'Spanish',
+        'nl' => 'Dutch',
+        'pl' => 'Polish',
+        'pt' => 'Portuguese',
+        'ru' => 'Russian',
+        'tr' => 'Turkish',
+        'cs' => 'Czech',
+        'sk' => 'Slovak',
+        'da' => 'Danish',
+        'sv' => 'Swedish',
+        'no' => 'Norwegian',
+        'fi' => 'Finnish',
+        'hu' => 'Hungarian',
+        'ro' => 'Romanian',
+        'bg' => 'Bulgarian',
+        'el' => 'Greek',
+        'ja' => 'Japanese',
+        'zh' => 'Chinese',
+        'ko' => 'Korean',
+        'ar' => 'Arabic',
+        'uk' => 'Ukrainian',
+    ];
+
+    /**
      * @param list<array<string,mixed>> $hits
+     * @param int|null $forcedLanguageId  Caller-provided active language id;
+     *     when null, falls back to the first hit's language (legacy path).
      *
      * @return list<array{role:string,content:string}>
      */
@@ -29,12 +67,26 @@ final class PromptBuilder
         array $hits,
         string $systemPrompt,
         int $maxContextChars,
+        ?int $forcedLanguageId = null,
     ): array {
-        $languageId = 0;
-        if ($hits !== [] && isset($hits[0]['language'])) {
+        if ($forcedLanguageId !== null) {
+            $languageId = $forcedLanguageId;
+        } elseif ($hits !== [] && isset($hits[0]['language'])) {
             $languageId = (int)$hits[0]['language'];
+        } else {
+            $languageId = 0;
         }
         $languageLabel = $this->resolveLanguageLabel($site, $languageId);
+        // Append an explicit language pin even when the prompt template
+        // doesn't include {{language}}. Site editors who tweak the
+        // systemPrompt setting commonly forget to keep the placeholder;
+        // the answer then falls back to whatever language the LLM
+        // defaults to (usually English with multilingual context). The
+        // pin is added once, so a prompt that already references
+        // {{language}} doesn't double up.
+        if (!str_contains($systemPrompt, '{{language}}')) {
+            $systemPrompt = rtrim($systemPrompt) . "\nAlways respond in {{language}}, regardless of the language used in the context excerpts.";
+        }
         $resolvedSystem = strtr($systemPrompt, ['{{language}}' => $languageLabel]);
 
         $contextBlocks = [];
@@ -84,8 +136,15 @@ final class PromptBuilder
         try {
             $language = $site->getLanguageById($languageId);
         } catch (\Throwable) {
-            return 'en';
+            return 'English';
         }
-        return $language->getLocale()->getName();
+        $iso = strtolower((string)$language->getLocale()->getLanguageCode());
+        if ($iso !== '' && isset(self::ISO_639_1_TO_ENGLISH[$iso])) {
+            return self::ISO_639_1_TO_ENGLISH[$iso];
+        }
+        // Fall back to the editor-chosen title (e.g. "Deutsch", "Englisch")
+        // which is at least a real human name, even if not English.
+        $title = trim((string)$language->getTitle());
+        return $title !== '' ? $title : 'English';
     }
 }

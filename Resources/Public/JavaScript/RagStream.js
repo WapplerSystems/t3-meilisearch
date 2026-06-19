@@ -72,6 +72,17 @@
                 answerEl.dataset.streaming = 'false';
                 try {
                     const payload = JSON.parse(ev.data);
+                    // Final pass on the assembled answer: convert **bold**
+                    // markdown to <strong>. The tokens were appended as
+                    // text nodes (safe), so we first escape the assembled
+                    // text and then replace the asterisks with safe tags
+                    // before swapping to innerHTML. Use payload.answer
+                    // when present so the conversion always sees the
+                    // complete text, even if a token frame was lost.
+                    const finalText = typeof payload.answer === 'string' && payload.answer !== ''
+                        ? payload.answer
+                        : answerEl.textContent;
+                    answerEl.innerHTML = renderMarkdownLight(finalText);
                     if (Array.isArray(payload.citedIds) && payload.citedIds.length > 0) {
                         markCitedSources(sourcesEl, payload.citedIds);
                     }
@@ -135,6 +146,14 @@
         return String(s).replace(/[&<>]/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
         });
+    }
+
+    // Tiny markdown-to-HTML pass for the streamed answer. Currently
+    // only **bold**; matches PHP RagAnswer::getAnswerHtml(). Escapes
+    // first, then injects the known-safe <strong> tag so the result
+    // is always safe to set as innerHTML.
+    function renderMarkdownLight(text) {
+        return escapeText(text).replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
     }
 
     function escapeAttr(s) {

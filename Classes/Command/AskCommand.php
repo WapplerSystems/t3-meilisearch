@@ -67,6 +67,10 @@ final class AskCommand extends Command
         $languageOption = $input->getOption('language');
         if ($languageOption !== '' && $languageOption !== null) {
             $options['filters'] = ['language' => [(int)$languageOption]];
+            // Pin the LLM answer to the same language as the retrieval
+            // filter so it doesn't drift to English on multi-language
+            // context. Matches the FE controller behaviour.
+            $options['language'] = (int)$languageOption;
         }
 
         $answer = $this->ragService->ask($site, $question, $options);

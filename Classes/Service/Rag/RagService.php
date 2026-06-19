@@ -110,6 +110,7 @@ final class RagService implements LoggerAwareInterface
             $hits,
             $systemPrompt,
             $maxChars,
+            $this->resolveLanguageId($options),
         );
 
         // Splice prior turns between the system prompt and the current
@@ -223,6 +224,7 @@ final class RagService implements LoggerAwareInterface
             $hits,
             $systemPrompt,
             $maxChars,
+            $this->resolveLanguageId($options),
         );
         $messages = $this->withConversation($currentTurnMessages, $conversation);
 
@@ -282,6 +284,29 @@ final class RagService implements LoggerAwareInterface
             citedIds: $citedIds,
             status: 'ok',
         )));
+    }
+
+    /**
+     * Pick the explicit `language` option (int site-language id) from the
+     * caller. Returns null if the caller didn't pass one; PromptBuilder
+     * then falls back to inferring from hits[0]. Accept ints and numeric
+     * strings since route params often arrive as strings.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function resolveLanguageId(array $options): ?int
+    {
+        if (!array_key_exists('language', $options)) {
+            return null;
+        }
+        $value = $options['language'];
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && $value !== '' && ctype_digit($value)) {
+            return (int)$value;
+        }
+        return null;
     }
 
     /**
