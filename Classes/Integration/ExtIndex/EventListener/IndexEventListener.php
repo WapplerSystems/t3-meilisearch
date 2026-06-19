@@ -61,8 +61,16 @@ final class IndexEventListener implements LoggerAwareInterface
         // cheap next to the rendering work EXT:index already did.
         $pageMeta = $this->fetchPageMeta($event->pageUid);
 
+        // Doc id MUST include the language for non-default languages —
+        // otherwise every language overlay of the same page overwrites
+        // the previous doc (same uid → same id). Matches the
+        // FileSchemaProvider convention: lang 0 keeps the legacy
+        // `pages-{uid}` form for backward compatibility, lang N gets
+        // `pages-{uid}-l{N}`.
+        $docId = 'pages-' . $event->pageUid
+            . ($event->language > 0 ? '-l' . $event->language : '');
         $document = [
-            'id' => 'pages-' . $event->pageUid,
+            'id' => $docId,
             'type' => 'page',
             'uid' => $event->pageUid,
             'pid' => $pageMeta['pid'],
