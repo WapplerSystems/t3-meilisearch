@@ -100,6 +100,9 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         if ($file->isMissing()) {
             return;
         }
+        if ($this->identifierIsExcluded((string)$file->getIdentifier(), $this->excludeIdentifierPrefixes($site))) {
+            return;
+        }
 
         // URL + metadata first (cheap, can't really fail). Body
         // extraction is best-effort — see the long comment in
@@ -135,12 +138,22 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             ? $this->normaliseExtensionList($site, 'meilisearch.indexing.excludeExtensions')
             : [];
         $minImageBytes = $this->minImageBytes($site);
+        $excludePrefixes = $this->excludeIdentifierPrefixes($site);
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
-        $result = $qb->select('uid')
+        $qb->select('uid')
             ->from('sys_file')
-            ->where($qb->expr()->eq('missing', 0))
-            ->executeQuery();
+            ->where($qb->expr()->eq('missing', 0));
+        // Filter generated artefacts (typo3temp chart PNGs, _processed_
+        // derivatives, …) at SQL level so we don't pay the FAL object
+        // hydration for rows we're about to drop. NOT LIKE per prefix
+        // — Doctrine has no `notStartsWith`, but the leading literal
+        // makes an index scan cheap regardless.
+        foreach ($excludePrefixes as $prefix) {
+            $param = $qb->createNamedParameter($this->escapeLikePrefix($prefix) . '%');
+            $qb->andWhere($qb->expr()->notLike('identifier', $param));
+        }
+        $result = $qb->executeQuery();
 
         while ($row = $result->fetchAssociative()) {
             $fileUid = (int)$row['uid'];
@@ -388,6 +401,54 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     {
         $kb = (int)$site->getSettings()->get('meilisearch.indexing.minImageSizeKb', 0);
         return max(0, $kb) * 1024;
+    }
+
+    /**
+     * Read the list of sys_file identifier prefixes that should be kept
+     * out of the index. Used to drop generated artefacts (typo3temp
+     * charts, _processed_ derivatives) that surface as PNG/JPG search
+     * hits without ever being useful results.
+     *
+     * @return list<string>
+     */
+    private function excludeIdentifierPrefixes(Site $site): array
+    {
+        $raw = $site->getSettings()->get('meilisearch.indexing.excludeIdentifierPrefixes', []);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $prefix) {
+            $prefix = (string)$prefix;
+            if ($prefix !== '') {
+                $out[] = $prefix;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<string> $prefixes
+     */
+    private function identifierIsExcluded(string $identifier, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($identifier, $prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Escape LIKE wildcards in a literal prefix so user-supplied paths
+     * containing `_` or `%` (legal in filesystem names) don't broaden
+     * the NOT LIKE filter. Backslash-escape works on both MySQL and
+     * MariaDB with the default LIKE escape char.
+     */
+    private function escapeLikePrefix(string $prefix): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $prefix);
     }
 
     /**

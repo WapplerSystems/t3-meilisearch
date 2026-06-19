@@ -218,6 +218,13 @@ settings:
     type: int
     default: 0
 
+  meilisearch.indexing.excludeIdentifierPrefixes:
+    label: 'Excluded sys_file identifier prefixes'
+    description: 'Sys_file rows whose identifier starts with any of these prefixes are skipped. Use to keep generated artefacts out of the search corpus — e.g. `/typo3temp/` (chart PNGs, cached previews) or `/_processed_/` (FAL-generated derivatives). Leading slash matters; matched with str_starts_with, case-sensitive. Default: [/typo3temp/].'
+    type: stringlist
+    default:
+      - '/typo3temp/'
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
