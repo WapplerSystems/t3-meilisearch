@@ -8,6 +8,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
@@ -28,6 +29,7 @@ final class RagController extends ActionController
         private readonly RagService $ragService,
         private readonly SiteFinder $siteFinder,
         private readonly ConversationStore $conversationStore,
+        private readonly AccessControlFilter $accessControlFilter,
     ) {}
 
     private function resolveSite(): ?Site
@@ -110,6 +112,14 @@ final class RagController extends ActionController
         if ($languageId !== null) {
             $options['language'] = $languageId;
         }
+        // FE-access-control: retrieval is scoped to docs the visitor is
+        // allowed to see, so the LLM never grounds in restricted
+        // material it then re-emits as a citation. Same filter the FE
+        // search uses; uses the global PSR-7 request because Extbase
+        // strips request attributes before the controller sees them.
+        $accessReq = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $existingFilters = isset($options['filters']) && is_array($options['filters']) ? $options['filters'] : [];
+        $options['filters'] = $this->accessControlFilter->applyTo($existingFilters, $site, $accessReq);
 
         $answer = $this->ragService->ask($site, $q, $options);
 

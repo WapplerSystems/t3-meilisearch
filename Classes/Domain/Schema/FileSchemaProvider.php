@@ -258,6 +258,14 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             // dedupes by name, so adding it here costs nothing and keeps the
             // Files schema self-describing.
             new TextField('bodytext', searchable: true),
+            // Cross-type FE-access-control field. Holds the per-doc allowed
+            // fe_group ids (TYPO3 convention: empty = public; -2 = any logged-in
+            // user; -1 = only anonymous; positive = that specific group). The
+            // AccessControlFilter service consumes this at search time to
+            // hide restricted docs from visitors who don't carry a matching
+            // group id. Declared here once; the merged schema applies to all
+            // doc types.
+            new IntegerField('accessGroups', multiple: true, searchable: false, filterable: true),
         ];
     }
 
@@ -307,9 +315,36 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             'extension' => (string)$file->getExtension(),
             'fileSize' => (int)$file->getSize(),
             'publicUrl' => $publicUrl,
+            // FAL access control: sys_file_metadata.fe_groups (longtext,
+            // CSV of group ids) — empty/null → public, otherwise the
+            // visitor must carry one of those ids. Per-reference fe_group
+            // (sys_file_reference) is NOT honoured here because a single
+            // sys_file can be referenced from many records with differing
+            // restrictions; that lookup would need a separate index path.
+            'accessGroups' => self::parseFeGroups((string)($metadata['fe_groups'] ?? '')),
             // sys_file has no editor-curated boost TCA — type-level only.
             'boost' => $this->boostCalculator->compositeFor($site, 'file', null),
         ];
+    }
+
+    /**
+     * Parse a TYPO3 fe_group(s) CSV into an int[]; treats empty / '0' as
+     * "no restriction" and drops 0 entries so the empty-array semantics
+     * match across all doc types.
+     *
+     * @return list<int>
+     */
+    private static function parseFeGroups(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '' || $raw === '0') {
+            return [];
+        }
+        $ids = array_map(
+            static fn (string $g): int => (int) trim($g),
+            explode(',', $raw),
+        );
+        return array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
     }
 
     /**
@@ -323,7 +358,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
     {
         if ($languageId > 0) {
             $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
-            $row = $qb->select('title', 'description', 'keywords', 'alternative')
+            $row = $qb->select('title', 'description', 'keywords', 'alternative', 'fe_groups')
                 ->from('sys_file_metadata')
                 ->where(
                     $qb->expr()->eq('file', $qb->createNamedParameter($fileUid, \Doctrine\DBAL\ParameterType::INTEGER)),
@@ -337,7 +372,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         }
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
-        $row = $qb->select('title', 'description', 'keywords', 'alternative')
+        $row = $qb->select('title', 'description', 'keywords', 'alternative', 'fe_groups')
             ->from('sys_file_metadata')
             ->where(
                 $qb->expr()->eq('file', $qb->createNamedParameter($fileUid, \Doctrine\DBAL\ParameterType::INTEGER)),

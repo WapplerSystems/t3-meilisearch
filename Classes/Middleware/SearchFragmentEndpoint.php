@@ -15,6 +15,7 @@ use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Core\View\ViewInterface;
 use TYPO3\CMS\Extbase\Mvc\ExtbaseRequestParameters;
 use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
+use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\SearchResult;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
@@ -42,6 +43,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         private readonly SearchService $searchService,
         private readonly ViewFactoryInterface $viewFactory,
         private readonly SearchConfigurationProvider $configProvider,
+        private readonly AccessControlFilter $accessControlFilter,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -89,6 +91,10 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
                 static fn (string $f): bool => $f !== 'language',
             ));
         }
+
+        // FE-access-control: visitor only sees public docs + their
+        // group-restricted docs. AND-conjoined with the user filters.
+        $filters = $this->accessControlFilter->applyTo($filters, $site, $request);
 
         $result = $this->searchService->search($site, $q, [
             'page' => $page,

@@ -10,6 +10,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\NullResponse;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
@@ -42,6 +43,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly RagService $ragService,
         private readonly ConversationStore $conversationStore,
+        private readonly AccessControlFilter $accessControlFilter,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -74,6 +76,11 @@ final class RagStreamMiddleware implements MiddlewareInterface
                 $askOptions['filters'] = ['language' => [$language->getLanguageId()]];
             }
         }
+        // FE-access-control on retrieval: same filter the non-streaming
+        // RagController applies. Restricted docs never reach the LLM,
+        // never appear as citations.
+        $existingFilters = isset($askOptions['filters']) && is_array($askOptions['filters']) ? $askOptions['filters'] : [];
+        $askOptions['filters'] = $this->accessControlFilter->applyTo($existingFilters, $site, $request);
         $stream = $this->ragService->askStreaming($site, $question, $askOptions);
 
         $this->writeSseStream($stream, $site, $request, $question, $conversation);

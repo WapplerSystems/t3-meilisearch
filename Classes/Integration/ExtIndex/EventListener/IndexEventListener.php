@@ -124,6 +124,12 @@ final class IndexEventListener implements LoggerAwareInterface
             // Files have no per-record TCA boost (sys_file isn't editor-
             // curated for ranking purposes) — type-level multiplier only.
             'boost' => $this->boostCalculator->compositeFor($event->site, 'file', null),
+            // FAL access control: look up sys_file_metadata.fe_groups for
+            // the resolved sys_file uid. Files outside sys_file (hash-id
+            // path) default to public — that path covers external files
+            // EXT:index discovered but FAL doesn't know about, so per-doc
+            // restrictions can't be reasoned about anyway.
+            'accessGroups' => $sysFileUid !== null ? $this->fetchFileAccessGroups($sysFileUid) : [],
             'fileIdentifier' => $event->fileIdentifier,
             'site' => $event->site->getIdentifier(),
             'indexProcessId' => $event->indexProcessId,
@@ -212,5 +218,44 @@ final class IndexEventListener implements LoggerAwareInterface
             ]);
             return $empty;
         }
+    }
+
+    /**
+     * Resolve `sys_file_metadata.fe_groups` for a sys_file uid. Empty/null
+     * → public. Reads only the default-language metadata row; per-language
+     * fe_groups overrides on file metadata are not honoured (FAL doesn't
+     * use them in its access-checking either).
+     *
+     * @return list<int>
+     */
+    private function fetchFileAccessGroups(int $fileUid): array
+    {
+        try {
+            $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
+            $row = $qb->select('fe_groups')
+                ->from('sys_file_metadata')
+                ->where(
+                    $qb->expr()->eq('file', $qb->createNamedParameter($fileUid, \Doctrine\DBAL\ParameterType::INTEGER)),
+                    $qb->expr()->eq('sys_language_uid', 0),
+                )
+                ->setMaxResults(1)
+                ->executeQuery()
+                ->fetchAssociative();
+        } catch (\Throwable $e) {
+            $this->logger?->debug('EXT:index-integration could not fetch file fe_groups for {uid}: {message}', [
+                'uid' => $fileUid,
+                'message' => $e->getMessage(),
+            ]);
+            return [];
+        }
+        $raw = trim((string)($row['fe_groups'] ?? ''));
+        if ($raw === '' || $raw === '0') {
+            return [];
+        }
+        $ids = array_map(
+            static fn (string $g): int => (int) trim($g),
+            explode(',', $raw),
+        );
+        return array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
     }
 }

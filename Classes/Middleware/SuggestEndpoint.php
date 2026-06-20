@@ -11,6 +11,7 @@ use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
 /**
@@ -45,6 +46,7 @@ final class SuggestEndpoint implements MiddlewareInterface
     public function __construct(
         private readonly SearchService $searchService,
         private readonly LanguageServiceFactory $languageServiceFactory,
+        private readonly AccessControlFilter $accessControlFilter,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -87,6 +89,10 @@ final class SuggestEndpoint implements MiddlewareInterface
         if ($language instanceof SiteLanguage) {
             $filters['language'] = [(string)$language->getLanguageId()];
         }
+        // FE-access-control: hide docs whose accessGroups don't match
+        // the visitor's effective groupIds. Public docs (accessGroups
+        // empty) always pass through.
+        $filters = $this->accessControlFilter->applyTo($filters, $site, $request);
 
         // The suggest endpoint deliberately runs the keyword path even
         // when an embedder is configured. Live dropdowns benefit from

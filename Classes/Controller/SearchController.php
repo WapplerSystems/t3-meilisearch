@@ -9,6 +9,7 @@ use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
+use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
 final class SearchController extends ActionController
@@ -17,6 +18,7 @@ final class SearchController extends ActionController
         private readonly SearchService $searchService,
         private readonly SiteFinder $siteFinder,
         private readonly SearchConfigurationProvider $configProvider,
+        private readonly AccessControlFilter $accessControlFilter,
     ) {}
 
     /**
@@ -129,6 +131,13 @@ final class SearchController extends ActionController
         // for relevance-only ranking. The SearchService accepts a list
         // — wrap the scalar; it handles "" / null gracefully.
         $sortOption = trim($sort);
+
+        // FE-access-control: visitor only sees public docs + their
+        // group-restricted docs. Use the global PSR-7 request because
+        // Extbase wraps + strips request attributes by the time the
+        // controller sees them.
+        $accessReq = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $filters = $this->accessControlFilter->applyTo($filters, $site, $accessReq);
 
         $result = $this->searchService->search($site, $q, [
             'page' => max(1, $page),

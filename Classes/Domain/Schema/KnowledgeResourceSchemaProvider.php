@@ -163,6 +163,12 @@ final class KnowledgeResourceSchemaProvider implements SchemaProviderInterface
             'imageUrl' => $imageUrl,
             'parentTitle' => $parent['title'] ?? '',
             'parentUid' => $parent['uid'] ?? 0,
+            // Knowledge resources are editor-curated DITA topics — no
+            // per-record fe_group column, so they default to public. The
+            // attribute is still emitted so the search-time access
+            // filter behaves uniformly (`accessGroups IS EMPTY` covers
+            // these docs).
+            'accessGroups' => [],
             'boost' => $this->boostCalculator->compositeFor($site, 'knowledge_resource', $recordBoost),
         ];
     }

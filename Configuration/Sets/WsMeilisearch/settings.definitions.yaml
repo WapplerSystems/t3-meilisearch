@@ -522,3 +522,9 @@ settings:
     description: 'When true, indexers read the editor-set boost field on pages and news records and multiply it into the document boost. Disable to ignore the BE control and rely on per-type defaults only.'
     type: bool
     default: true
+
+  meilisearch.accessControl.enabled:
+    label: 'Filter search results by FE-user groups'
+    description: 'When true, every search / suggest / RAG call adds a `(accessGroups IS EMPTY OR accessGroups IN [<visitor groupIds>])` filter so docs marked with fe_group restrictions only surface for visitors with a matching group. Indexers write the accessGroups int[] on every doc (page fe_group, sys_file_metadata.fe_groups, tx_news_domain_model_news.fe_group; knowledge_resource is always public). Disable for BE-style indexes where editors must see everything regardless of visitor.'
+    type: bool
+    default: true

@@ -86,7 +86,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
      */
     private function columnsToSelect(): array
     {
-        return ['uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'tx_wsmeilisearch_boost'];
+        return ['uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'fe_group', 'tx_wsmeilisearch_boost'];
     }
 
     public function getAdditionalFields(): array
@@ -123,7 +123,33 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             'bodytext' => $bodytext,
             'content' => trim($teaser . "\n\n" . $bodytext),
             'datetime' => (int)$row['datetime'],
+            // FE-access-control: tx_news_domain_model_news.fe_group is a
+            // CSV varchar ('0' / '1,5'); empty/zero → public, otherwise
+            // the visitor needs one of these group ids in their context
+            // groupIds to see the news item. Filter is applied at search
+            // time by the AccessControlFilter service.
+            'accessGroups' => self::parseFeGroups((string)($row['fe_group'] ?? '')),
             'boost' => $this->boostCalculator->compositeFor($site, 'news', $recordBoost),
         ];
+    }
+
+    /**
+     * Parse a TYPO3 fe_group CSV (e.g. "1,5") into an int[]; treats '' and '0'
+     * as "no restriction" (= public). Drops 0 entries (no-restriction marker)
+     * so the empty list semantics match across all doc types.
+     *
+     * @return list<int>
+     */
+    private static function parseFeGroups(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '' || $raw === '0') {
+            return [];
+        }
+        $ids = array_map(
+            static fn (string $g): int => (int) trim($g),
+            explode(',', $raw),
+        );
+        return array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
     }
 }

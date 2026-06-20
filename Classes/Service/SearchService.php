@@ -297,6 +297,21 @@ final class SearchService implements LoggerAwareInterface
     private function buildMeilisearchFilter(array $filters): string
     {
         $parts = [];
+        // Reserved key: AccessControlFilter (and any future caller that
+        // needs a compound expression like `accessGroups IS EMPTY OR
+        // accessGroups IN […]`) stores raw Meilisearch filter strings
+        // under `__rawFilters`. They're emitted verbatim, AND-conjoined
+        // with the regular field=value filters and with each other.
+        $rawFilters = $filters['__rawFilters'] ?? null;
+        unset($filters['__rawFilters']);
+        if (is_array($rawFilters)) {
+            foreach ($rawFilters as $expression) {
+                $expression = trim((string)$expression);
+                if ($expression !== '') {
+                    $parts[] = $expression;
+                }
+            }
+        }
         foreach ($filters as $field => $value) {
             $field = (string)$field;
             if ($field === '') {
