@@ -146,6 +146,11 @@ final class DiagnoseController
                     'model' => (string)$settings->get('meilisearch.rag.model', ''),
                     'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
                     'url' => (string)$settings->get('meilisearch.rag.url', ''),
+                    // Vendor-specific tenant id — InfomaniakProvider needs
+                    // it to build the base URL when no explicit `url` is
+                    // configured. Generic providers ignore it. Mirrors
+                    // the option set RagService::ask() passes.
+                    'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
                     'temperature' => 0.0,
                     'maxTokens' => 16,
                 ],
