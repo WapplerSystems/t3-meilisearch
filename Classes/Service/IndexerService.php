@@ -7,6 +7,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Domain\Schema\PreReindexCleanupInterface;
 use WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface;
 use WapplerSystems\Meilisearch\Event\AfterDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
@@ -71,6 +72,34 @@ final class IndexerService implements LoggerAwareInterface
             return 0;
         }
         $indexName = $this->engineFactory->getIndexName($site);
+
+        // Pre-reindex orphan cleanup: providers that implement
+        // PreReindexCleanupInterface (currently only FileSchemaProvider,
+        // for the excludeIdentifierPrefixes site setting) get a chance to
+        // drop docs that USED to be eligible but no longer are. Without
+        // this, the iterator can't reach them — they'd stay orphaned
+        // forever. Skip when a fresh client isn't available (site without
+        // url config) since cleanup needs the raw Meilisearch client to
+        // call delete-by-filter (SEAL doesn't expose it).
+        $client = $this->engineFactory->createClientForSite($site);
+        if ($client !== null) {
+            foreach ($this->schemaProviders as $provider) {
+                if (!$provider instanceof PreReindexCleanupInterface) {
+                    continue;
+                }
+                $deleted = $provider->cleanupBeforeReindex($site, $client, $indexName);
+                if ($deleted > 0) {
+                    $this->logger?->info(
+                        'Pre-reindex cleanup: {provider} removed {count} orphan docs from site {site}',
+                        [
+                            'provider' => $provider::class,
+                            'count' => $deleted,
+                            'site' => $site->getIdentifier(),
+                        ],
+                    );
+                }
+            }
+        }
 
         $count = 0;
         foreach ($this->schemaProviders as $provider) {

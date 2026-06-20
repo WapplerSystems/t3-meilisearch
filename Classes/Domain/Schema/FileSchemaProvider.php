@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Domain\Schema;
 
 use CmsIg\Seal\Schema\Field\IntegerField;
 use CmsIg\Seal\Schema\Field\TextField;
+use Meilisearch\Client;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -39,7 +40,7 @@ use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
  *    from a page belonging to the current site. Strict per-site results,
  *    no cross-site leakage.
  */
-final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareInterface
+final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCleanupInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
@@ -528,5 +529,58 @@ final class FileSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             $map[$site->getIdentifier()][(int)$row['uid_local']] = true;
         }
         return $map;
+    }
+
+    /**
+     * Pre-reindex eviction of file documents that match the operator's
+     * current `excludeIdentifierPrefixes` site setting. Without this,
+     * docs that USED to be eligible but no longer pass the filter stay
+     * orphaned in the index (iterateDocuments only yields the new
+     * eligible set; it cannot reach docs outside its own iteration).
+     *
+     * Uses Meilisearch's `uri CONTAINS "<prefix>"` filter to drop them
+     * in a single delete-task per prefix. CONTAINS is an experimental
+     * filter operator — Meilisearch returns `Using `CONTAINS` requires
+     * enabling the `contains filter` experimental feature` if the flag
+     * isn't enabled site-wide. The cleanup catches that case + logs a
+     * warning, never failing the reindex.
+     */
+    public function cleanupBeforeReindex(Site $site, Client $client, string $indexName): int
+    {
+        $prefixes = $this->excludeIdentifierPrefixes($site);
+        if ($prefixes === []) {
+            return 0;
+        }
+        $total = 0;
+        foreach ($prefixes as $prefix) {
+            // Escape embedded double quotes in the literal (FAL paths
+            // generally don't contain them, but the filter syntax has to
+            // be defensive). Backslash-escape works in Meilisearch's
+            // expression grammar.
+            $literal = '"' . str_replace('"', '\\"', $prefix) . '"';
+            $filter = sprintf('uri CONTAINS %s', $literal);
+            try {
+                $task = $client->index($indexName)->deleteDocuments(['filter' => $filter]);
+                // Wait briefly so the operator sees the actual count in
+                // the reindex output; pre-reindex evictions are bounded
+                // (a few thousand at most), so blocking up to ~30s is
+                // acceptable here even with a big index.
+                if (method_exists($client, 'waitForTask')) {
+                    $result = $client->waitForTask($task['taskUid'] ?? null, timeoutInMs: 30000);
+                    $deleted = (int)($result['details']['deletedDocuments'] ?? 0);
+                } else {
+                    // Older SDK shape — fire-and-forget.
+                    $deleted = 0;
+                }
+            } catch (\Throwable $e) {
+                $this->logger?->warning(
+                    'FileSchemaProvider pre-reindex cleanup failed for prefix {prefix}: {message}',
+                    ['prefix' => $prefix, 'message' => $e->getMessage()],
+                );
+                continue;
+            }
+            $total += $deleted;
+        }
+        return $total;
     }
 }
