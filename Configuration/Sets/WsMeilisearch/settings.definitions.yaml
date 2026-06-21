@@ -57,6 +57,28 @@ settings:
     type: string
     default: ''
 
+  # Stuck-task watchdog (ws_meilisearch:abort-stuck-tasks): cancels
+  # Meilisearch tasks that have been in enqueued/processing state past
+  # the threshold (typical cause: rate-limited embedder backend retrying
+  # in a loop) so the index recovers without operator intervention.
+  meilisearch.watchdog.stuckThresholdMinutes:
+    label: 'Stuck-task threshold (minutes)'
+    description: 'A Meilisearch task enqueued or processing for longer than this is treated as stuck and cancelled. 30 covers normal large-reindex peaks without false positives; lower it if your embedder is fast and the watchdog cron runs frequently.'
+    type: int
+    default: 30
+
+  meilisearch.watchdog.recipient:
+    label: 'Watchdog notification recipient'
+    description: 'Email recipient for the stuck-task watchdog. Empty falls back to meilisearch.quota.recipient so operators only need to configure one inbox. Single address or comma-separated list.'
+    type: string
+    default: ''
+
+  meilisearch.watchdog.resetEmbedderOnStuck:
+    label: 'Reset embedder after cancelling stuck tasks'
+    description: 'When true, the watchdog also clears the embedder configuration after cancelling — so the next document push falls back to keyword-only indexing instead of immediately re-triggering the same upstream failure. Operator must re-run ws_meilisearch:reindex once the upstream issue is resolved. Default off (conservative).'
+    type: bool
+    default: false
+
   # OpenAI's usage endpoint needs an Admin API key (sk-admin-…), NOT the
   # completion key used by the RAG provider — separate scope, separate
   # storage so a key rotation on one doesn't blast the other.
