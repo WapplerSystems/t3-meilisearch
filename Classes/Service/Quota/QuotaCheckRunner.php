@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Service\Quota;
 
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Symfony\Component\Mailer\MailerInterface;
 use TYPO3\CMS\Core\Mail\MailMessage;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -37,6 +38,7 @@ final class QuotaCheckRunner implements LoggerAwareInterface
     public function __construct(
         iterable $providers,
         private readonly SiteFinder $siteFinder,
+        private readonly MailerInterface $mailer,
     ) {
         $this->providers = is_array($providers) ? array_values($providers) : iterator_to_array($providers, false);
     }
@@ -140,7 +142,10 @@ final class QuotaCheckRunner implements LoggerAwareInterface
                 ->to($recipient)
                 ->subject($subject)
                 ->text($body);
-            $message->send();
+            // TYPO3 v14 removed MailMessage::send(); the canonical path
+            // is the Symfony MailerInterface (DI-injected). Same fix the
+            // watchdog uses.
+            $this->mailer->send($message);
             return true;
         } catch (\Throwable $e) {
             $this->logger?->error('Failed to send quota warning to {to}: {error}', [

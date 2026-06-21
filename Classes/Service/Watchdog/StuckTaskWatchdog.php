@@ -8,6 +8,7 @@ use Meilisearch\Contracts\CancelTasksQuery;
 use Meilisearch\Contracts\TasksQuery;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Symfony\Component\Mailer\MailerInterface;
 use TYPO3\CMS\Core\Mail\MailMessage;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -44,6 +45,7 @@ final class StuckTaskWatchdog implements LoggerAwareInterface
     public function __construct(
         private readonly SiteFinder $siteFinder,
         private readonly SearchEngineFactory $engineFactory,
+        private readonly MailerInterface $mailer,
     ) {}
 
     /**
@@ -230,7 +232,10 @@ final class StuckTaskWatchdog implements LoggerAwareInterface
                 ->to($report->recipient)
                 ->subject($subject)
                 ->text($body);
-            $message->send();
+            // TYPO3 v14 removed MailMessage::send(); go through the
+            // MailerInterface (DI-injected) which uses the configured
+            // transport from $GLOBALS['TYPO3_CONF_VARS']['MAIL'].
+            $this->mailer->send($message);
             return true;
         } catch (\Throwable $e) {
             $this->logger?->error('Failed to send watchdog notification to {to}: {error}', [
