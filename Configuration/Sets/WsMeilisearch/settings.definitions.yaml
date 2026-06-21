@@ -348,6 +348,18 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.semanticRatio:
+    label: 'RAG retrieval: semantic ratio'
+    description: 'Per-RAG override for `meilisearch.embedder.semanticRatio`. RAG questions usually need a small semantic kick to bridge morphological gaps ("gebe ... frei" → "freigeben") that pure keyword retrieval misses, but too much semantic weight drowns the actually-relevant KR title under generic-sounding neighbours. 0.3 has tested best on a German LINEAR corpus with mini_lm_l12_v2; raise carefully and monitor regressions with the RAG test suite. Falls back to the embedder default when unset.'
+    type: number
+    default: 0.3
+
+  meilisearch.rag.restrictToKnowledgeResources:
+    label: 'RAG: restrict retrieval to knowledge_resource'
+    description: 'When true, the RAG retriever filters context to `type = knowledge_resource`. Use when the site has a curated Knowledge Resources corpus (DITA-OT import) — keeps files / pages / news from outranking purpose-built grounding docs. Default off so the feature works on installs without a Knowledge Resources corpus.'
+    type: bool
+    default: false
+
   meilisearch.rag.conversation.enabled:
     label: 'Multi-turn conversation memory'
     description: 'When enabled, the RAG plugin keeps the last N (question, answer) pairs in the anonymous frontend user session and feeds them back to the LLM, so visitors can ask follow-ups without restating context. Default: disabled — each question is independent.'

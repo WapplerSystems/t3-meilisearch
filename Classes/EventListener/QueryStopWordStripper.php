@@ -43,6 +43,15 @@ final class QueryStopWordStripper
         if ($event->site === null || trim($event->query) === '') {
             return;
         }
+        // Callers can opt out by setting `stripStopWords => false` in
+        // the search options. RAG retrieval uses this — the stripped
+        // form "gebe Lizenz frei" provides too few context tokens for
+        // multi-word synonyms ("gebe frei" → "freigeben") to expand
+        // correctly. Meilisearch's own stop-words handling does fine on
+        // the full natural-language question.
+        if (($event->options['stripStopWords'] ?? true) === false) {
+            return;
+        }
         $stopWords = $this->configProvider->indexSettings($event->site)->stopWords;
         if ($stopWords === []) {
             return;

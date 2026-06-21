@@ -85,14 +85,10 @@ final class RagService implements LoggerAwareInterface
             $conversation = Conversation::empty();
         }
 
-        $event = new BeforeRagQueryEvent($question, array_merge([
-            'perPage' => $maxHits,
-            'hybrid' => $useHybrid,
-            // Knowledge resources are the primary grounding corpus and must
-            // be retrieved here even though they're hidden from the public
-            // FE search results.
-            'includeKnowledgeResources' => true,
-        ], $options));
+        $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
+            $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
+            $options,
+        ));
         $this->eventDispatcher->dispatch($event);
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
@@ -197,11 +193,10 @@ final class RagService implements LoggerAwareInterface
             $conversation = Conversation::empty();
         }
 
-        $event = new BeforeRagQueryEvent($question, array_merge([
-            'perPage' => $maxHits,
-            'hybrid' => $useHybrid,
-            'includeKnowledgeResources' => true,
-        ], $options));
+        $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
+            $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
+            $options,
+        ));
         $this->eventDispatcher->dispatch($event);
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
@@ -284,6 +279,91 @@ final class RagService implements LoggerAwareInterface
             citedIds: $citedIds,
             status: 'ok',
         )));
+    }
+
+    /**
+     * Build the search-retrieval option set RAG uses to fetch grounding
+     * context. Shared between ask() and askStreaming() so behaviour stays
+     * consistent. Honours two RAG-specific tunables:
+     *
+     *  - meilisearch.rag.semanticRatio — per-RAG semantic-vs-keyword
+     *    mix (defaults higher than the FE search; questions like "Wie
+     *    gebe ich eine Lizenz frei?" need the vector retriever to bridge
+     *    the morphological gap to a KR titled "Lizenzen freigeben").
+     *  - meilisearch.rag.restrictToKnowledgeResources — when true, the
+     *    retriever filters to `type = knowledge_resource`, keeping
+     *    Tika-extracted file bodies from outranking the curated DITA
+     *    grounding corpus.
+     *
+     * Caller-supplied $options merge OVER these defaults via the
+     * surrounding array_merge in ask()/askStreaming(), so explicit
+     * overrides (CLI flags, BeforeRagQueryEvent listeners) still win.
+     *
+     * @return array<string,mixed>
+     */
+    private function buildRetrievalOptions(Site $site, object $settings, bool $useHybrid, int $maxHits): array
+    {
+        $opts = [
+            'perPage' => $maxHits,
+            'hybrid' => $useHybrid,
+            // Knowledge resources are the primary grounding corpus and
+            // must be retrieved here even though they're hidden from
+            // the public FE search results.
+            'includeKnowledgeResources' => true,
+            // Skip the client-side stop-word stripping for RAG. The
+            // stripped form provides too few context tokens for
+            // multi-word synonyms (e.g. "gebe frei" → "freigeben") to
+            // expand properly; Meilisearch's own stop-word handling
+            // tokenises the full natural-language question better.
+            'stripStopWords' => false,
+        ];
+        // Default 0.3 mirrors the settings.definitions.yaml default;
+        // hard-coding it here too means sites that never opt into a
+        // Site Set still get the RAG-tuned ratio (without it, the
+        // embedder.semanticRatio fallback at 0.5 in SearchService
+        // is too aggressive — generic semantic neighbours drown the
+        // actually-relevant KR title).
+        $semanticRatio = $settings->get('meilisearch.rag.semanticRatio', 0.3);
+        if ($semanticRatio !== null && is_numeric($semanticRatio)) {
+            $opts['semanticRatio'] = (float)$semanticRatio;
+        }
+        if ((bool)$settings->get('meilisearch.rag.restrictToKnowledgeResources', false)) {
+            $opts['filters'] = ['type' => ['knowledge_resource']];
+        }
+        return $opts;
+    }
+
+    /**
+     * Merge RAG defaults with caller-supplied options. Plain top-level keys
+     * follow array_merge semantics (caller wins). The `filters` key needs
+     * special handling — the controller's language + access filters must
+     * combine with the RAG `type` filter, not replace it. Keys collected
+     * under `filters` are unioned; `__rawFilters` (used by
+     * AccessControlFilter) keeps both sides' raw expressions.
+     *
+     * @param array<string,mixed> $defaults
+     * @param array<string,mixed> $caller
+     * @return array<string,mixed>
+     */
+    private function mergeRetrievalOptions(array $defaults, array $caller): array
+    {
+        $defaultFilters = isset($defaults['filters']) && is_array($defaults['filters']) ? $defaults['filters'] : [];
+        $callerFilters = isset($caller['filters']) && is_array($caller['filters']) ? $caller['filters'] : [];
+        unset($defaults['filters'], $caller['filters']);
+        $merged = array_merge($defaults, $caller);
+        if ($defaultFilters !== [] || $callerFilters !== []) {
+            $rawFilters = array_merge(
+                (array)($defaultFilters['__rawFilters'] ?? []),
+                (array)($callerFilters['__rawFilters'] ?? []),
+            );
+            unset($defaultFilters['__rawFilters'], $callerFilters['__rawFilters']);
+            $filters = array_merge($defaultFilters, $callerFilters);
+            if ($rawFilters !== []) {
+                $filters['__rawFilters'] = $rawFilters;
+            }
+            $merged['filters'] = $filters;
+        }
+        return $merged;
     }
 
     /**
