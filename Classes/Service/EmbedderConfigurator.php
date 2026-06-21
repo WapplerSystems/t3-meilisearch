@@ -212,14 +212,23 @@ final class EmbedderConfigurator implements LoggerAwareInterface
             // mini_lm_l12_v2), not the dashed style Infomaniak advertises in
             // its docs for the chat endpoint.
             'url' => 'https://api.infomaniak.com/1/ai/' . rawurlencode($productId) . '/openai/v1/embeddings',
+            // Single-text-per-request, NOT the batch `['{{text}}', '{{..}}']`
+            // form. Reason: Infomaniak rejects batches of ≥100 items with
+            // HTTP 422 (`The input list must have less than 100 items`), and
+            // Meilisearch chooses its own batch size with no documented knob
+            // to cap it. Empirically, large indexes with bge_multilingual_gemma2
+            // pegged the batch above 100 and the entire settingsUpdate stuck
+            // in retry-loop hell — task `processing` for 30+ min without a
+            // single vector landing. The single-text form is slower per call
+            // (1 HTTP roundtrip per doc instead of ~50) but bounded and
+            // predictable; Meilisearch fans them out in parallel anyway.
             'request' => [
                 'model' => $model,
-                'input' => ['{{text}}', '{{..}}'],
+                'input' => '{{text}}',
             ],
             'response' => [
                 'data' => [
                     ['embedding' => '{{embedding}}'],
-                    '{{..}}',
                 ],
             ],
         ];
