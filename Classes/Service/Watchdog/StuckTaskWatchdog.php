@@ -111,20 +111,34 @@ final class StuckTaskWatchdog implements LoggerAwareInterface
      */
     private function findStuckTasks(Client $client, string $indexName, int $thresholdMin): array
     {
+        // Only `processing` is meaningfully "stuck" — `enqueued` tasks are
+        // just waiting their turn behind the current batch (large reindex
+        // runs legitimately queue tens of thousands of doc-add tasks),
+        // and the API returns newest-first with no server-side sort by
+        // age, so a 100-result window would miss an actually-hung
+        // settingsUpdate buried under 50k legitimate enqueues. Meilisearch
+        // processes a handful of tasks concurrently, so `processing` list
+        // is always small — checking that catches every real hang.
         $cutoff = time() - ($thresholdMin * 60);
         $query = (new TasksQuery())
             ->setIndexUids([$indexName])
-            ->setStatuses(['enqueued', 'processing'])
-            ->setLimit(100);
+            ->setStatuses(['processing'])
+            ->setLimit(50);
         $tasks = $client->getTasks($query)->getResults();
 
         $stuck = [];
         foreach ($tasks as $task) {
-            $enqueued = $task['enqueuedAt'] ?? null;
-            if (!is_string($enqueued)) {
+            // Prefer `startedAt` — the relevant age for a processing task
+            // is "how long has it been actually running", not "how long
+            // ago was it enqueued". Fall back to enqueuedAt for safety
+            // when startedAt is missing.
+            $started = isset($task['startedAt']) ? (string)$task['startedAt'] : null;
+            $enqueued = isset($task['enqueuedAt']) ? (string)$task['enqueuedAt'] : null;
+            $referenceTime = $started ?? $enqueued;
+            if (!is_string($referenceTime) || $referenceTime === '') {
                 continue;
             }
-            $ts = strtotime($enqueued);
+            $ts = strtotime($referenceTime);
             if ($ts === false || $ts > $cutoff) {
                 continue;
             }
@@ -132,8 +146,8 @@ final class StuckTaskWatchdog implements LoggerAwareInterface
                 'uid' => (int)($task['uid'] ?? 0),
                 'type' => (string)($task['type'] ?? ''),
                 'status' => (string)($task['status'] ?? ''),
-                'enqueuedAt' => $enqueued,
-                'startedAt' => isset($task['startedAt']) ? (string)$task['startedAt'] : null,
+                'enqueuedAt' => (string)($enqueued ?? ''),
+                'startedAt' => $started,
                 'ageMinutes' => (int)floor((time() - $ts) / 60),
             ];
         }
