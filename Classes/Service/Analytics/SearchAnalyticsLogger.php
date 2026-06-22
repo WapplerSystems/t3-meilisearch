@@ -101,9 +101,8 @@ final class SearchAnalyticsLogger implements LoggerAwareInterface
 
     private function normalizeQuery(string $query): string
     {
-        // Lowercase + collapse whitespace so "Linear  building" and
-        // "linear building" aggregate as the same row in the BE
-        // top-queries panel.
+        // Lowercase + collapse whitespace so "Foo  Bar" and "foo bar"
+        // aggregate as the same row in the BE top-queries panel.
         $normalized = preg_replace('/\s+/u', ' ', mb_strtolower(trim($query))) ?? '';
         if (mb_strlen($normalized) > self::MAX_QUERY_LENGTH) {
             $normalized = mb_substr($normalized, 0, self::MAX_QUERY_LENGTH);

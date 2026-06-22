@@ -133,7 +133,7 @@ settings:
 
   meilisearch.rag.fallback.contactName:
     label: 'Contact name / organisation'
-    description: 'Optional heading above the contact details (e.g. "LINEAR Support" or "Anna Beispiel"). Empty hides the heading.'
+    description: 'Optional heading above the contact details (e.g. "Acme Support" or "Anna Beispiel"). Empty hides the heading.'
     type: string
     default: ''
 
@@ -327,7 +327,7 @@ settings:
 
   meilisearch.rag.stopWords:
     label: 'RAG-specific stop-words'
-    description: 'Override the index-wide stopWords for RAG-retrieval stripping. Use this to keep brand / domain tokens ("linear", "building", "freigeben") in the query while still removing generic question / function words ("wie", "kann", "ich", "der", "die", …). Leave empty to reuse the index-side list. The override is consulted only when meilisearch.rag.stripStopWords is on.'
+    description: 'Override the index-wide stopWords for RAG-retrieval stripping. Use this to keep brand / product / domain-verb tokens in the query while still removing generic question / function words ("wie", "kann", "ich", "der", "die", …). Leave empty to reuse the index-side list. The override is consulted only when meilisearch.rag.stripStopWords is on.'
     type: stringlist
     default: []
 
@@ -339,7 +339,7 @@ settings:
 
   meilisearch.search.matchingStrategy:
     label: 'FE search matching strategy'
-    description: 'Meilisearch matchingStrategy used by frontend search. "all" requires every query token (strict AND) — matches user intent for short brand/product queries like "linear building" where a doc that only mentions "linear" should NOT appear. "last" (Meilisearch default) drops trailing tokens, behaving OR-like and surfacing partially-matching docs. Set to empty string to inherit the Meilisearch index default.'
+    description: 'Meilisearch matchingStrategy used by frontend search. "all" requires every query token (strict AND) — matches user intent for short brand/product queries (e.g. a two-word brand) where a doc that only mentions one of the tokens should NOT appear. "last" (Meilisearch default) drops trailing tokens, behaving OR-like and surfacing partially-matching docs. Set to empty string to inherit the Meilisearch index default.'
     type: string
     default: 'all'
 
@@ -468,7 +468,7 @@ settings:
 
   meilisearch.rag.semanticRatio:
     label: 'RAG retrieval: semantic ratio'
-    description: 'Per-RAG override for `meilisearch.embedder.semanticRatio`. RAG questions usually need a small semantic kick to bridge morphological gaps ("gebe ... frei" → "freigeben") that pure keyword retrieval misses, but too much semantic weight drowns the actually-relevant KR title under generic-sounding neighbours. 0.3 has tested best on a German LINEAR corpus with mini_lm_l12_v2; raise carefully and monitor regressions with the RAG test suite. Falls back to the embedder default when unset.'
+    description: 'Per-RAG override for `meilisearch.embedder.semanticRatio`. RAG questions usually need a small semantic kick to bridge morphological gaps ("gebe ... frei" → "freigeben") that pure keyword retrieval misses, but too much semantic weight drowns the actually-relevant KR title under generic-sounding neighbours. 0.3 has tested well on a German technical-documentation corpus with mini_lm_l12_v2; raise carefully and monitor regressions with the RAG test suite. Falls back to the embedder default when unset.'
     type: number
     default: 0.3
 
@@ -548,7 +548,7 @@ settings:
 
   meilisearch.defaults.typoTolerance.disableOnWords:
     label: 'Typo tolerance: disable on words'
-    description: 'Words that must NEVER be fuzzy-matched (treated as exact-only). Use for brand / product / domain tokens visitors type intentionally — e.g. ["LINEAR", "Building", "AutoCAD"]. Without this, "LINER" would match "LINEAR" via 1 typo (length ≥5) and bury the actual hits under near-misses. Tokens are case-insensitive and apply to indexing-time tokenisation, so the corpus does not need to be re-indexed to add a new word.'
+    description: 'Words that must NEVER be fuzzy-matched (treated as exact-only). Use for brand / product / domain tokens visitors type intentionally — e.g. your own brand name, product family names, and any third-party tool names that appear in your content. Without this, a 1-typo near-spelling can match the brand token (length ≥5) and bury the actual hits under unrelated near-misses. Tokens are case-insensitive and apply to indexing-time tokenisation, so the corpus does not need to be re-indexed to add a new word.'
     type: stringlist
     default: []
 

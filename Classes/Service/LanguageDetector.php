@@ -35,9 +35,10 @@ final class LanguageDetector implements LoggerAwareInterface
     use LoggerAwareTrait;
 
     /**
-     * Below this many characters detection becomes noisy ("LINEAR"
-     * alone matches a dozen languages). Returns "" for shorter input
-     * so the indexer doesn't poison the corpus with random codes.
+     * Below this many characters detection becomes noisy — a single
+     * brand token or short title matches a dozen languages with low
+     * confidence. Returns "" for shorter input so the indexer doesn't
+     * poison the corpus with random codes.
      */
     private const MIN_CHARS = 80;
 

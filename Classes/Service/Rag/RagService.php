@@ -394,8 +394,9 @@ final class RagService implements LoggerAwareInterface
         // RAG-specific stop-words override: narrow the strip set down to
         // generic question / function words. Without this override the
         // FE-tuned index-side stopWords would also nuke brand / domain
-        // tokens ("linear", "building", "freigeben") and the query goes
-        // empty for short product questions like "Was ist LINEAR Building?".
+        // tokens (a vendor's brand name, a product family, a domain
+        // verb) and the query goes empty for short product questions
+        // like "Was ist <BrandName> <ProductName>?".
         $ragStopWords = $settings->get('meilisearch.rag.stopWords', null);
         if (is_array($ragStopWords) && $ragStopWords !== []) {
             $opts['stopWords'] = array_values(array_map('strval', $ragStopWords));

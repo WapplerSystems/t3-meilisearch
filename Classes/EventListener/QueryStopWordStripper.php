@@ -53,10 +53,9 @@ final class QueryStopWordStripper
             return;
         }
         // Per-call stop-word override — RAG retrieval supplies its own
-        // narrower list to avoid stripping brand / domain tokens
-        // ("linear", "building", "freigeben") that the global index
-        // stopWords carry for FE-search tuning. When unset, fall back
-        // to the index-wide list.
+        // narrower list to avoid stripping brand / domain tokens that
+        // the global index stopWords carry for FE-search tuning. When
+        // unset, fall back to the index-wide list.
         $override = $event->options['stopWords'] ?? null;
         $stopWords = is_array($override)
             ? array_values(array_filter(array_map('strval', $override), static fn($w) => $w !== ''))

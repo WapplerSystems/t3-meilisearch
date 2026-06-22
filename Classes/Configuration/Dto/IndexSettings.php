@@ -61,16 +61,16 @@ final readonly class IndexSettings
                 ],
                 'disableOnAttributes' => $this->typoDisableOnAttributes,
                 // disableOnWords prevents Meilisearch from treating these
-                // tokens as fuzzy-match candidates. Indispensable for brand
-                // / product tokens ("LINEAR", "Building") that visitors
-                // type intentionally — without this, "LINER" would match
-                // "LINEAR" (1 typo, length ≥5) and bury the actual hit
-                // under unrelated near-matches.
+                // tokens as fuzzy-match candidates. Indispensable for
+                // brand / product tokens that visitors type intentionally
+                // — without this, a near-spelling ("acmestore" vs the
+                // actual brand "acme") would match via 1 typo (length ≥5)
+                // and bury the genuine hit under unrelated near-matches.
                 'disableOnWords' => $this->typoDisableOnWords,
                 // disableOnNumbers (Meilisearch v1.12+): when true, never
                 // fuzzy-match tokens that are pure digits. Pragmatic for
-                // version numbers / SKUs ("LINEAR 24.1" shouldn't match
-                // "LINEAR 14.1" via 1-digit typo).
+                // version numbers / SKUs ("Foo 24.1" must not match
+                // "Foo 14.1" via a 1-digit typo).
                 'disableOnNumbers' => $this->typoDisableOnNumbers,
             ],
             'stopWords' => $this->stopWords,

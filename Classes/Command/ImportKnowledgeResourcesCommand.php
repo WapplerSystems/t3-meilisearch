@@ -15,7 +15,7 @@ use WapplerSystems\Meilisearch\Service\Import\SourceImporterRegistry;
 /**
  * Dispatch-CLI for any registered {@see KnowledgeResourceSourceImporter}. The
  * `--importer=` slug picks the implementation (default: dita-ot for
- * backwards compatibility with the original LINEAR-Solutions workflow);
+ * backwards compatibility with the original DITA-OT XHTML workflow);
  * every other option is interpreted via the importer's `describeFields()`
  * schema. That way new importers (zip-bundle, url-crawl, …) become
  * usable on the CLI without touching this shell.

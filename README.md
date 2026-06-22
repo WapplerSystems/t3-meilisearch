@@ -5,48 +5,119 @@ TYPO3 v14 extension providing Meilisearch-backed full-text search via the
 search backend stays swappable (Meilisearch today, Typesense / Elasticsearch
 tomorrow) without rewriting templates or services.
 
-## Status
+## Features at a glance
 
-**All five phases wired and working.** Pages, news, and FAL files
-(PDF / Office / RTF / EPUB / plain text via Apache Tika) all share a
-single unified per-site index, faceted by `type`. Frontend Search
-plugin renders GET forms with typo-tolerant search + click-to-filter
-facets. Hybrid (keyword + semantic vector) search is available when
-an embedder is configured. A second Extbase plugin exposes
-Retrieval-Augmented Generation: search → context → LLM → cited answer,
-with OpenAI, Anthropic, Ollama, and generic OpenAI-compatible REST
-providers selectable per site. A backend module under System →
-Meilisearch shows per-site index status, exposes Reindex / Rebuild
-buttons, and includes an ad-hoc Search + RAG test form. A scheduler
-task runs `indexAll` (news + files) against one or all sites on a
-cron.
+**Indexing**
 
-A generic **help-doc** record type (`tx_wsmeilisearch_helpdoc`) gives
-operators a place to drop curated content beyond the core auto-indexed
-sources. Five built-in importers (`dita-ot`, `single-file`, `folder`,
-`zip-bundle`, `url-list`) populate it from DITA-OT XHTML drops, single
-uploads, FAL folder walks, ZIP archives, and HTTP-fetched URL lists —
-all sharing a single `HelpDocSourceImporter` contract so third-party
-extensions can add their own source formats via DI auto-tagging.
+- Single unified per-site index, faceted by document `type`.
+- Built-in schema providers: **pages** (via `lochmueller/index`), **news** (`tx_news`),
+  **FAL files** (Tika-extracted PDF / Office / RTF / EPUB / plain text), and
+  **knowledge resources** (curated DITA-OT / ZIP / URL imports).
+- **Per-doc embeddings** stored under `_vectors.default` for hybrid search.
+  Either Meilisearch fetches them via its REST embedder (auto-batched) or
+  the extension precomputes them in PHP and pushes them with the document.
+- **Content language detection** (n-gram, ISO 639-1) on every indexed
+  document — a German PDF appearing in an EN-overlay gets `contentLanguage=de`
+  and is filtered out for EN visitors.
+- **Zero-downtime reindex** (opt-in): writes to a `<index>_draft` index and
+  atomically swaps it into the primary on completion, so visitors never see
+  a blank search during a reindex.
+- **sys_file existence sweep** CLI to flag dead FAL rows `missing=1` before
+  reindex — keeps the indexer from spending hours on AWS-SDK retries against
+  tombstoned bucket objects.
 
-A **RAG quality-assurance** layer ships alongside the runtime: editor-
-maintained (question, expected answer) pairs in
-`tx_wsmeilisearch_ragtest` are scored against the actual RAG answer
-via embedding cosine similarity (Ollama / OpenAI / Infomaniak), with
-per-test thresholds, rolling 100-run history, BE tab + per-test
-sparklines, CLI + scheduler task. A separate
-`ws_meilisearch:check-quotas` CLI watches commercial provider usage
-(OpenAI / Anthropic / Infomaniak) and emails a warning above the
-configured threshold.
+**Search**
 
-Page indexing is delegated to `lochmueller/index` (hard composer
-dependency). The integration ships under `Classes/Integration/ExtIndex/`
-and consumes `IndexPageEvent`/`IndexFileEvent`, writing through this
-extension's SEAL engine. Set up an EXT:index `Configuration` record per
-site (`technology=database`, `partial_indexing=datamap,cmdmap` for live
-updates — `ws_meilisearch:setup-index-config <site>` does this for you)
-and queue page indexing with `vendor/bin/typo3 index:queue` +
-`messenger:consume index`.
+- **Typo tolerance** with per-attribute and per-word exclusion
+  (`disableOnAttributes`, `disableOnWords`, `disableOnNumbers`) — keep brand
+  / product tokens and version numbers exact.
+- **Hybrid keyword + semantic** search when an embedder is configured.
+- **Phrase search** (`"two words"`) and **negation** (`-token`) work out of
+  the box.
+- **Matching strategy** per call: `last` (drop trailing), `frequency` (drop
+  most-frequent tokens first), `all` (strict AND — default for FE search).
+- **Synonyms**, **stop-words** (with per-call override for RAG queries),
+  **custom ranking rules**, **distinct attribute**, **searchCutoffMs**.
+- **Faceted navigation** with disjunctive faceting for active facet
+  attributes.
+- **Restrict to active site language** + **contentLanguage filter** both
+  applied on the search controller when opted in.
+
+**Frontend surfaces**
+
+- **`tx_wsmeilisearch_search`** Extbase plugin — Bootstrap-styled GET form
+  with click-to-filter facets, AJAX result-fragment refresh, configurable
+  per-plugin via FlexForm.
+- **`tx_wsmeilisearch_rag`** Extbase plugin — RAG chat with cited sources,
+  streaming token-by-token answer, conversation memory bounded per session.
+- **Live suggest dropdown** — `/_ws_meilisearch/suggest?q=…` JSON endpoint
+  + `suggest.js` widget, auto-attached to any FE input via a configurable
+  CSS selector when the layout doesn't render the search-plugin template.
+- **Similar documents** — `/_ws_meilisearch/similar?id=…` endpoint + Fluid
+  ViewHelper `<ws:similarDocuments sourceId="…" as="…">` for "Related
+  content" widgets.
+- **Optional floating chat-widget bubble** — bottom-right, opens the RAG
+  plugin in a slide-up panel; target page configured via `pageUid` so it
+  follows the active language overlay.
+
+**Retrieval-Augmented Generation (RAG)**
+
+- Cited-source chat answers grounded in Meilisearch hits.
+- **Provider-agnostic LLM layer**: OpenAI, Anthropic, Mistral / Scaleway,
+  Ollama, Infomaniak, and generic OpenAI-compatible REST endpoints. Switch
+  via `meilisearch.rag.provider`.
+- **Configurable retrieval ladder**: per-RAG `matchingStrategy`,
+  `stripStopWords` with per-RAG word list, `semanticRatio`, three-stage
+  fallback (frequency → last → drop-leading-token) so verb-led questions
+  ("Wie gebe ich …?") never collapse to `no_context`.
+- **Conversation memory** per browser session, bounded so the prompt
+  stays within token budget.
+- **Streaming responses** via Messenger / SSE — the visitor sees the
+  answer being typed, not a 30 s spinner.
+
+**Quality assurance**
+
+- **RAG regression tests** — editor-maintained (question, expected) pairs
+  in `tx_wsmeilisearch_ragtest`, scored via embedding cosine similarity.
+  Per-test threshold, rolling 100-run history, sparklines in the BE tab.
+- **"Adopt actual as expected"** button — index drift across reindexes
+  produces minor wording changes that the cosine scorer punishes;
+  operators promote a manually-OK'd actual as the new baseline instead of
+  lowering the threshold globally.
+- **Stuck-task watchdog** — cancels Meilisearch tasks parked in
+  `processing` past a configurable threshold and emails the operator.
+- **Quota checks** for commercial AI providers (Anthropic, OpenAI,
+  Infomaniak) — email warning above the configured monthly threshold.
+
+**Operations**
+
+- **Backend module** under *System → Meilisearch* with tabs:
+  Overview · Test search & RAG · Diagnostics · Knowledge resources ·
+  RAG tests · **Analytics**.
+- **Analytics** tab: top queries, zero-result queries, source breakdown
+  (search / suggest / similar), hybrid-vs-keyword rate, with 1/7/30/90-day
+  windows. Opt-in per site; stores only aggregable signals — no IPs, no
+  session ids, no user agents.
+- **Throttled reindex** via `meilisearch.indexing.requestsPerMinute`
+  (token bucket) when the embedding provider rate-limits per minute.
+- **CLI commands**: `reindex`, `apply-settings`, `setup-index-config`,
+  `doctor`, `ask`, `document`, `tika-probe`, `abort-stuck-tasks`,
+  `check-quotas`, `import-knowledge-resources`, `run-rag-tests`,
+  `sys-file-sweep`.
+
+## System requirements
+
+| Component | Version | Notes |
+|---|---|---|
+| **TYPO3** | `^14.0` | uses v14 PSR-7 attribute container, Site Settings typed identifiers, Locale value object |
+| **PHP** | `^8.2` | readonly properties, enums, `mixed` returns |
+| **Meilisearch** | `>= 1.12` | needs `/similar`, `disableOnWords`, `disableOnNumbers`, swap-indexes; v1.47+ recommended for stable embedder pipeline |
+| **Apache Tika** | optional, `>= 2.x` recommended | required only for FAL text extraction (PDF / Office / RTF / EPUB) |
+| **Composer deps** | `cmsig/seal ^0.12`, `cmsig/seal-meilisearch-adapter ^0.12`, `meilisearch/meilisearch-php ^1.10`, `lochmueller/index ^2.0`, `patrickschur/language-detection ^5.3` | pulled in via this package's `composer.json` |
+| **Embedder** (optional) | any OpenAI-compatible `/v1/embeddings` endpoint | tested with Scaleway Generative APIs, Infomaniak AI Tools, OpenAI, Ollama, Mistral La Plateforme |
+| **LLM** (optional, for RAG) | OpenAI-compatible `/v1/chat/completions` | OpenAI, Anthropic, Mistral / Scaleway, Ollama, Infomaniak |
+| **Database** | MariaDB 10.5+ / MySQL 8.0+ | uses JSON columns + utf8mb4 collation; standard TYPO3 v14 baseline |
+| **DDEV** (local dev) | `>= 1.22` | ships `.ddev/docker-compose.meilisearch.yaml` + `docker-compose.tika.yaml` |
 
 ## Installation
 
@@ -790,61 +861,72 @@ factory dedupes by field name across providers.
 
 ## Roadmap
 
-- **Phase 1** ✅ basic indexing + Fluid plugin with typo tolerance & facets
-- **Phase 2** ✅ FAL/Tika indexing (PDF / Office / RTF / EPUB / plain text)
-- **Phase 3** ✅ Hybrid search + auto-embeddings (OpenAI / HF / Ollama / REST / userProvided)
-- **Phase 4** ✅ RAG module with configurable LLM provider (OpenAI / Anthropic / Ollama / REST)
-- **Phase 5** ✅ Backend module + scheduler task
-- **Phase 6** ✅ Help-doc importers (DITA-OT / single-file / FAL folder / ZIP bundle / URL list) with shared plugin contract + FAL folder picker
-- **Phase 7** ✅ RAG quality-assurance suite (regression tests with cosine-similarity scoring, BE tab + sparklines, scheduler task) + commercial-provider quota checks with email warnings
+Done:
 
-## Known Phase 2 limitations
+- Basic indexing + Fluid plugin with typo tolerance & facets
+- FAL / Tika indexing (PDF / Office / RTF / EPUB / plain text)
+- Hybrid search + auto-embeddings (OpenAI / HuggingFace / Ollama / REST / userProvided / Scaleway / Infomaniak presets)
+- PHP-precomputed embeddings (`meilisearch.embedder.precompute`) with token-bucket throttle against rate-limited providers
+- RAG module with configurable LLM provider (OpenAI / Anthropic / Mistral / Scaleway / Ollama / Infomaniak / REST)
+- Backend module (Overview, Diagnostics, Test, Knowledge resources, RAG tests, Analytics) + scheduler tasks
+- Knowledge-resource importers (DITA-OT / single-file / FAL folder / ZIP bundle / URL list) with shared plugin contract
+- RAG regression tests with cosine-similarity scoring, BE tab + sparklines, **adopt-actual-as-expected** baseline promotion
+- Commercial-provider quota checks with email warnings
+- Content-language detection (n-gram, ISO 639-1) + content-language filter
+- Live suggestions endpoint + JS dropdown with optional auto-attach
+- Similar documents endpoint, middleware, Fluid ViewHelper
+- Zero-downtime reindex via atomic index swap
+- Search analytics (top / zero-result / source breakdown / hybrid rate)
+- Stuck-task watchdog
 
+Open / under consideration:
 
-## Known Phase 3 limitations
+- Search-analytics retention cleanup task (currently rows accumulate indefinitely; manual `DELETE` works)
+- Click-tracking + CTR per query (analytics rows currently cover query-side only)
+- Layout-level search-form auto-attach with shipped CSS (selector setting is in place, no default selector yet)
+- Locales (per-field language tokenizer hint) — Meilisearch 1.13+
+- Index swap probe job to verify swap pipeline end-to-end before first production use
 
-- **Meilisearch `vectorStore` experimental feature must be enabled** (one
-  PATCH on `/experimental-features`, see "Hybrid search" above). Sending
-  `embedders` settings to a server with the feature off returns a 400
-  and aborts the reindex.
-- **`userProvided` source requires every document to ship its own vectors**
-  in `_vectors.default`. The default schema providers don't do that —
-  use `userProvided` only as an integration point for downstream code
-  that already has vectors, not for general-purpose search.
-- **API-key rotation isn't auto-detected** — Meilisearch redacts the
-  key on read-back, so the configurator can't diff "new" vs "redacted"
-  to decide whether to PATCH. Touch any other embedder setting (or run
+## Limitations
+
+**Hybrid / embedder**
+
+- Meilisearch's `vectorStore` experimental feature must be enabled (one
+  PATCH on `/experimental-features`). Sending `embedders` settings to a
+  server with the feature off returns a 400 and aborts the reindex.
+- `userProvided` embedder requires every document to ship its own
+  vector in `_vectors.default`. The `precompute` mode handles this
+  automatically; if you turn precompute off and select `userProvided`
+  directly, the schema providers won't fill the vector field.
+- API-key rotation isn't auto-detected — Meilisearch redacts the key
+  on read-back, so the configurator can't diff "new" vs "redacted" to
+  decide whether to PATCH. Touch any other embedder setting (or run
   `--rebuild`) to force a re-push after key rotation.
-- **Hybrid result hits skip the SEAL adapter** — frontend code that
+- Hybrid result hits skip the SEAL adapter — frontend code that
   inspects fields beyond the unified schema may see slightly different
   shapes between keyword and hybrid results.
 
-## Known Phase 4 limitations
+**RAG**
 
-- **Streaming requires unbuffered hosting.** The
-  `/_ws_meilisearch/rag/stream` SSE endpoint works out of the box in
-  the DDEV stack, but production behind Nginx needs `proxy_buffering
-  off` / `fastcgi_buffering off` on that path. See
-  [`Examples/11-rag-streaming.md`](Examples/11-rag-streaming.md) for
-  webserver config.
-- **Conversation memory is opt-in.** When
-  `meilisearch.rag.conversation.enabled=false` (the default), each
-  `ask` is stateless. Set it to `true` to enable the multi-turn flow
-  documented under "Retrieval-Augmented Generation (Phase 4)" — the
-  anonymous frontend session holds the last N (Q, A) pairs and the
-  controller splices them into every subsequent LLM call.
-- **Citation extraction is regex-based.** Models that wrap markers in
-  prose ("see [id=foo and id=bar]") only get the first id captured;
-  models that ignore the citation instruction yield zero `citedIds`.
+- Streaming requires unbuffered hosting. The
+  `/_ws_meilisearch/rag/stream` SSE endpoint works in DDEV out of the
+  box, but production behind Nginx needs `proxy_buffering off` /
+  `fastcgi_buffering off` on that path.
+- Conversation memory is opt-in via
+  `meilisearch.rag.conversation.enabled = true`. Default is stateless.
+- Citation extraction is regex-based — models that wrap markers in
+  prose ("see [id=foo and id=bar]") only get the first id captured.
   Tune the system prompt per model.
-- **No token budgeting.** `maxContextHits` × `maxContextChars` is a
-  rough cap. A very long question or many large hits can blow past
-  small-model context windows; provider returns the underlying API
-  error, surfaced through `RagAnswer::failed`.
-- **No cost / rate-limit guard.** Every frontend submission triggers an
-  LLM call. Pair with `BeforeLlmCallEvent` listeners (response cache,
-  per-session rate limit) for production deployments.
-- **Retrieval query = user question, verbatim.** Verbose questions
-  (e.g. "What is X about?") often miss the keyword retriever. Enable
-  the hybrid path (`useHybrid: true` + configured embedder) or insert
-  a query-rewriting `BeforeRagQueryEvent` listener.
+- No token budgeting on `maxContextHits` × `maxContextChars`; a very
+  long question + many large hits can blow past small-model context
+  windows.
+- No cost / rate-limit guard on the FE — pair with a
+  `BeforeLlmCallEvent` listener (response cache, per-session rate
+  limit) for production deployments.
+
+**Indexing**
+
+- DataHandler hooks during a zero-downtime reindex write to the live
+  primary; the swap then overwrites those updates. Editorial changes
+  made during a multi-hour reindex may need a follow-up record-level
+  reindex.

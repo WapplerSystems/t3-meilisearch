@@ -162,8 +162,8 @@ final class SearchService implements LoggerAwareInterface
         // "which tokens may be dropped if the corpus has no document
         // matching all of them?" behaviour. Three modes:
         //  - "last"      (Meilisearch default): drop trailing tokens.
-        //                FE-search returns "linear OR building"-style
-        //                matches for the query "linear building", which
+        //                FE-search returns "tokenA OR tokenB"-style
+        //                matches for a two-word query like "foo bar", which
         //                surfaces docs that only mention one of the
         //                words — confusing for users who typed a 2-word
         //                product name expecting an exact-phrase intent.
