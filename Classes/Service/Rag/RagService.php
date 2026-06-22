@@ -93,20 +93,8 @@ final class RagService implements LoggerAwareInterface
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
-        if ($hits === [] && ($event->options['matchingStrategy'] ?? '') !== 'last') {
-            // Primary retrieval (default: matchingStrategy=frequency)
-            // returned nothing. Frequency drops the most-frequent tokens
-            // first, which is right for verb-led question shapes ("gebe
-            // …") — but on long natural-language questions ("Wie gebe
-            // ich eine nicht mehr benötigte LINEAR Lizenz wieder frei?")
-            // it can drop the only fach-tokens that anchor the match
-            // and return zero hits. Fall back to "last" — strict
-            // trailing-token drop — which keeps the leading fach-tokens
-            // ("Lizenz") and surfaces "Lizenzen freigeben" again.
-            $retryOpts = $event->options;
-            $retryOpts['matchingStrategy'] = 'last';
-            $searchResult = $this->searchService->search($site, $event->question, $retryOpts);
-            $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === []) {
+            $hits = $this->retrieveWithFallbacks($site, $event->question, $event->options, $maxHits);
         }
         if ($hits === []) {
             $answer = RagAnswer::noContext();
@@ -221,13 +209,12 @@ final class RagService implements LoggerAwareInterface
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
-        if ($hits === [] && ($event->options['matchingStrategy'] ?? '') !== 'last') {
-            // See the long comment in ask() — same frequency-→-last
-            // fallback so streaming RAG matches non-streaming behaviour.
-            $retryOpts = $event->options;
-            $retryOpts['matchingStrategy'] = 'last';
-            $searchResult = $this->searchService->search($site, $event->question, $retryOpts);
-            $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === []) {
+            // Reuse the same retrieval-fallback ladder ask() uses
+            // (frequency → last → drop-leading-verb-token) so the
+            // streaming RAG path doesn't degrade differently than
+            // non-streaming on identical questions.
+            $hits = $this->retrieveWithFallbacks($site, $event->question, $event->options, $maxHits);
         }
         if ($hits === []) {
             yield RagStreamChunk::noContext();
@@ -334,6 +321,48 @@ final class RagService implements LoggerAwareInterface
      *
      * @return array<string,mixed>
      */
+    /**
+     * Multi-stage retrieval fallback for the no-hits case. Tried in
+     * order until one returns hits or all are exhausted:
+     *   1) matchingStrategy=last (drop trailing tokens)
+     *   2) drop the leading 1-2 tokens (catches verb-led questions
+     *      where "gebe"/"siehe"/"nimm" at position 0 prevent
+     *      Meilisearch from finding any match, since `last` never
+     *      drops leading tokens and `frequency` drops the wrong ones).
+     *
+     * Skipped when the caller already passed matchingStrategy=last
+     * (the loop's stage 1 is then a no-op duplicate) — stage 2 still
+     * runs because the token-drop is orthogonal.
+     *
+     * @param array<string,mixed> $options
+     * @return list<array<string,mixed>>
+     */
+    private function retrieveWithFallbacks(Site $site, string $question, array $options, int $maxHits): array
+    {
+        $primaryStrategy = (string)($options['matchingStrategy'] ?? '');
+        $tried = [];
+        if ($primaryStrategy !== 'last') {
+            $tried[] = ['q' => $question, 'opts' => ['matchingStrategy' => 'last'] + $options];
+        }
+        // Token-drop variants. Pre-split on whitespace so "Was ist?" → ["Was","ist?"]
+        // tokens count is the same as the human-readable count.
+        $tokens = preg_split('/\s+/u', trim($question)) ?: [];
+        if (\count($tokens) >= 3) {
+            $tried[] = ['q' => implode(' ', \array_slice($tokens, 1)), 'opts' => ['matchingStrategy' => 'last'] + $options];
+        }
+        if (\count($tokens) >= 5) {
+            $tried[] = ['q' => implode(' ', \array_slice($tokens, 2)), 'opts' => ['matchingStrategy' => 'last'] + $options];
+        }
+        foreach ($tried as $attempt) {
+            $r = $this->searchService->search($site, $attempt['q'], $attempt['opts']);
+            $hits = array_values(array_slice($r->hits, 0, $maxHits));
+            if ($hits !== []) {
+                return $hits;
+            }
+        }
+        return [];
+    }
+
     private function buildRetrievalOptions(Site $site, object $settings, bool $useHybrid, int $maxHits): array
     {
         $opts = [
