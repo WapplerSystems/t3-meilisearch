@@ -49,6 +49,34 @@
         </div>
     </div>
 
+    <!-- ============== INLINE SUBMIT SCRIPT ============== -->
+    <!--
+        Each Run-form's submit triggers a synchronous BE round-trip
+        (the RAG provider call alone takes several seconds). Without
+        feedback the operator clicks again, getting a parallel request
+        and a confused flash queue. Show a spinner + disable the button
+        on submit. The form still submits the regular HTTP POST — JS is
+        progressive enhancement only; if it errors out the button works
+        the same as before.
+    -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.ws-rag-run-form').forEach(function (form) {
+                form.addEventListener('submit', function () {
+                    var btn = form.querySelector('.ws-rag-run-btn');
+                    if (!btn || btn.disabled) {
+                        return;
+                    }
+                    btn.disabled = true;
+                    var spinner = btn.querySelector('.ws-rag-run-spinner');
+                    if (spinner) {
+                        spinner.classList.remove('d-none');
+                    }
+                });
+            });
+        });
+    </script>
+
     <!-- ============== TEST LIST ============== -->
     <f:if condition="{tests}">
         <f:then>
@@ -125,10 +153,18 @@
                                     </f:if>
                                 </td>
                                 <td class="text-end">
-                                    <form action="{runOneUrl}" method="post" class="d-inline">
+                                    <form action="{runOneUrl}" method="post" class="d-inline ws-rag-run-form">
                                         <input type="hidden" name="token" value="{token}" />
                                         <input type="hidden" name="uid" value="{t.uid}" />
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">Run</button>
+                                        <button type="submit"
+                                                class="btn btn-sm btn-primary ws-rag-run-btn"
+                                                data-uid="{t.uid}"
+                                                title="Run this test now (calls the RAG provider once).">
+                                            <span class="ws-rag-run-icon" aria-hidden="true">▶</span>
+                                            <span class="ws-rag-run-label">Run</span>
+                                            <span class="ws-rag-run-spinner spinner-border spinner-border-sm ms-1 d-none"
+                                                  role="status" aria-hidden="true"></span>
+                                        </button>
                                     </form>
                                 </td>
                             </tr>
