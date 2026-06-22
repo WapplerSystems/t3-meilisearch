@@ -7,14 +7,13 @@ use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
 use TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper;
-use TYPO3Fluid\Fluid\Core\ViewHelper\Traits\CompileWithRenderStatic;
 use WapplerSystems\Meilisearch\Service\SimilarDocumentsService;
 
 /**
  * Server-rendered "related content" list for a given document id.
- * Returns the hit array; the calling template renders the layout.
+ * Returns the hit array (when used without `as`) or renders children
+ * with the hits bound to the `as` variable.
  *
  * Usage:
  *   <ws:similarDocuments sourceId="help-3684" limit="5" types="knowledge_resource" as="related">
@@ -37,11 +36,14 @@ use WapplerSystems\Meilisearch\Service\SimilarDocumentsService;
  * feedback_v14_sitelanguage_locale.md), and FE access control runs
  * via SimilarDocumentsService → AccessControlFilter against the
  * current PSR-7 request.
+ *
+ * Fluid 4 path: the CompileWithRenderStatic trait is gone in TYPO3
+ * v14; ViewHelpers implement render() directly. escapeOutput/Children
+ * are properties (still honoured) and the rendering context is
+ * fetched via $this->renderingContext.
  */
 final class SimilarDocumentsViewHelper extends AbstractViewHelper
 {
-    use CompileWithRenderStatic;
-
     protected $escapeOutput = false;
     protected $escapeChildren = false;
 
@@ -53,35 +55,25 @@ final class SimilarDocumentsViewHelper extends AbstractViewHelper
         $this->registerArgument('as', 'string', 'Variable name to expose hits under. When empty, the array is returned directly.', false, '');
     }
 
-    /**
-     * @param array{sourceId:string, limit:int, types:string, as:string} $arguments
-     */
-    public static function renderStatic(
-        array $arguments,
-        \Closure $renderChildrenClosure,
-        RenderingContextInterface $renderingContext,
-    ): mixed {
-        $sourceId = trim((string)($arguments['sourceId'] ?? ''));
-        $as = trim((string)$arguments['as']);
+    public function render(): mixed
+    {
+        $sourceId = trim((string)$this->arguments['sourceId']);
+        $as = trim((string)$this->arguments['as']);
         if ($sourceId === '') {
-            return $as === '' ? [] : $renderChildrenClosure();
+            return $as === '' ? [] : $this->renderChildren();
         }
 
-        // Pull the active ServerRequest. v14 Fluid carries it on the
-        // RenderingContext via the request attribute container; older
-        // standalone-Fluid setups fall back to the global request.
-        // GeneralUtility::makeInstance keeps DI working in either case.
         $serverRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
         if (!$serverRequest instanceof ServerRequestInterface) {
-            return $as === '' ? [] : $renderChildrenClosure();
+            return $as === '' ? [] : $this->renderChildren();
         }
         $site = $serverRequest->getAttribute('site');
         if (!$site instanceof Site) {
-            return $as === '' ? [] : $renderChildrenClosure();
+            return $as === '' ? [] : $this->renderChildren();
         }
 
         $types = [];
-        $rawTypes = trim((string)$arguments['types']);
+        $rawTypes = trim((string)$this->arguments['types']);
         if ($rawTypes !== '') {
             $types = array_values(array_filter(array_map('trim', explode(',', $rawTypes))));
         }
@@ -95,7 +87,7 @@ final class SimilarDocumentsViewHelper extends AbstractViewHelper
 
         $service = GeneralUtility::makeInstance(SimilarDocumentsService::class);
         $hits = $service->findSimilar($site, $sourceId, [
-            'limit' => (int)$arguments['limit'],
+            'limit' => (int)$this->arguments['limit'],
             'types' => $types,
             'language' => $languageId,
             'contentLanguageIso' => $iso,
@@ -105,9 +97,9 @@ final class SimilarDocumentsViewHelper extends AbstractViewHelper
         if ($as === '') {
             return $hits;
         }
-        $variableProvider = $renderingContext->getVariableProvider();
+        $variableProvider = $this->renderingContext->getVariableProvider();
         $variableProvider->add($as, $hits);
-        $output = $renderChildrenClosure();
+        $output = $this->renderChildren();
         $variableProvider->remove($as);
         return $output;
     }
