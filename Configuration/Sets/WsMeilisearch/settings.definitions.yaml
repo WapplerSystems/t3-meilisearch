@@ -180,6 +180,24 @@ settings:
     type: string
     default: ''
 
+  meilisearch.analytics.enabled:
+    label: 'Search analytics'
+    description: 'When true, every non-trivial FE search is recorded in tx_wsmeilisearch_search_log so the BE analytics tab can show top queries / zero-result queries / hybrid-usage over time. Stores only {site, language, query, count, source, hybrid, timestamp} — no IPs, no session ids, no user agents.'
+    type: bool
+    default: false
+
+  meilisearch.analytics.minQueryLength:
+    label: 'Analytics: minimum query length to log'
+    description: 'Queries shorter than this are not logged. Defaults to 2 to drop suggest-dropdown keystrokes that would otherwise generate one row per character typed.'
+    type: int
+    default: 2
+
+  meilisearch.analytics.retentionDays:
+    label: 'Analytics: retention (days)'
+    description: 'How many days the analytics rows are kept before the cleanup task prunes them. 0 disables pruning. Defaults to 90 — enough for monthly trend reports without unbounded table growth.'
+    type: int
+    default: 90
+
   meilisearch.suggest.autoAttachInputSelector:
     label: 'Suggest: auto-attach CSS selector'
     description: 'CSS selector for layout-level search inputs (header bar, off-canvas, mobile menu) that should get the live-suggestion dropdown without rendering the ws_meilisearch_search Fluid template themselves. Leave empty to disable auto-attach — only inputs inside [data-ws-meilisearch-suggest] wrappers get the dropdown then. Example: "header input[type=\"search\"], .site-search input[type=\"search\"]".'

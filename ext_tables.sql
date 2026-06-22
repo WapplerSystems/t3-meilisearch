@@ -88,6 +88,34 @@ CREATE TABLE tx_wsmeilisearch_ragtest (
     KEY parent (pid)
 );
 
+-- Search analytics: one row per non-empty FE-search query. Stores
+-- aggregable, non-PII signals only (query text, result count, site,
+-- language, hybrid-yes-no, source — fragment / suggest / standard).
+-- No IP, no user id, no session cookie — by design so the table
+-- needs zero DSGVO ceremony beyond an optional retention sweep.
+-- Driven by SearchAnalyticsLogger off the AfterSearchEvent and gated
+-- on meilisearch.analytics.enabled per site.
+CREATE TABLE tx_wsmeilisearch_search_log (
+    uid             INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    crdate          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    site_identifier VARCHAR(64) DEFAULT '' NOT NULL,
+    language_id     INT(11) DEFAULT 0 NOT NULL,
+    -- Lowercased + trimmed query — analytics aggregation is case-
+    -- insensitive, otherwise "Linear" and "linear" split the histogram.
+    query           VARCHAR(255) DEFAULT '' NOT NULL,
+    result_count    INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    -- Discriminator so analytics can separate FE-search hits from
+    -- suggest-dropdown probes (typed fragments) and RAG queries.
+    source          VARCHAR(32) DEFAULT 'search' NOT NULL,
+    -- Whether the query was hybrid (keyword + semantic).
+    hybrid          TINYINT(1) UNSIGNED DEFAULT 0 NOT NULL,
+
+    PRIMARY KEY (uid),
+    KEY site_lang_crdate (site_identifier, language_id, crdate),
+    KEY query_idx (query),
+    KEY zero_results (result_count, crdate)
+);
+
 -- One row per RagTestRunner invocation per test. Drives the
 -- score-history sparkline in the BE tab + lets operators eyeball
 -- the trend after a model rotation. Pruned to RagTestRunner::HISTORY_KEEP

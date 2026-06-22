@@ -63,7 +63,7 @@ final class SearchService implements LoggerAwareInterface
 
         if ($this->engineFactory->createClientForSite($site) === null) {
             $empty = SearchResult::empty();
-            $this->eventDispatcher->dispatch(new AfterSearchEvent($before->query, $before->options, $empty));
+            $this->eventDispatcher->dispatch(new AfterSearchEvent($before->query, $before->options, $empty, $site));
             return $empty;
         }
 
@@ -84,7 +84,7 @@ final class SearchService implements LoggerAwareInterface
             $result = SearchResult::empty();
         }
 
-        $after = new AfterSearchEvent($before->query, $before->options, $result);
+        $after = new AfterSearchEvent($before->query, $before->options, $result, $site);
         $this->eventDispatcher->dispatch($after);
         return $after->result;
     }

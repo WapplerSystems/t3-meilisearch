@@ -107,6 +107,11 @@ final class SuggestEndpoint implements MiddlewareInterface
             'page' => 1,
             'hybrid' => false,
             'filters' => $filters,
+            // Tag for SearchAnalyticsLogger so the BE analytics tab
+            // can show suggest-probe volume separately from real
+            // search-result-page hits. Underscore-prefixed → never
+            // passed to Meilisearch.
+            '__analyticsSource' => 'suggest',
         ]);
 
         // Build the LanguageService once for the active site language so
