@@ -10,6 +10,7 @@ use TYPO3\CMS\Backend\Routing\UriBuilder as BackendUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
 use WapplerSystems\Meilisearch\Service\RagTest\RagTestResult;
@@ -39,6 +40,7 @@ final class RagTestController
         private readonly ConnectionPool $connectionPool,
         private readonly RagTestRunner $runner,
         private readonly BackendContext $context,
+        private readonly PageRenderer $pageRenderer,
     ) {}
 
     public function handle(ServerRequestInterface $request, string $action): ResponseInterface
@@ -53,6 +55,22 @@ final class RagTestController
     private function index(ServerRequestInterface $request): ResponseInterface
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
+
+        // Run-button spinner + click-debounce. Loaded via PageRenderer
+        // so the script tag inherits the CSP nonce — inline <script>
+        // in the Fluid template would be stripped by strict CSP.
+        $this->pageRenderer->addJsFile(
+            'EXT:meilisearch/Resources/Public/JavaScript/Backend/RagTestsRun.js',
+            'text/javascript',
+            false, // compress
+            false, // forceOnTop
+            '', // allWrap
+            false, // excludeFromConcatenation
+            '|', // splitChar
+            false, // async
+            '', // integrity
+            true, // defer
+        );
 
         $rows = $this->loadRows();
         $summary = $this->summarise($rows);

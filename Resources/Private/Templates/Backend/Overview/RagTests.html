@@ -49,34 +49,6 @@
         </div>
     </div>
 
-    <!-- ============== INLINE SUBMIT SCRIPT ============== -->
-    <!--
-        Each Run-form's submit triggers a synchronous BE round-trip
-        (the RAG provider call alone takes several seconds). Without
-        feedback the operator clicks again, getting a parallel request
-        and a confused flash queue. Show a spinner + disable the button
-        on submit. The form still submits the regular HTTP POST — JS is
-        progressive enhancement only; if it errors out the button works
-        the same as before.
-    -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.ws-rag-run-form').forEach(function (form) {
-                form.addEventListener('submit', function () {
-                    var btn = form.querySelector('.ws-rag-run-btn');
-                    if (!btn || btn.disabled) {
-                        return;
-                    }
-                    btn.disabled = true;
-                    var spinner = btn.querySelector('.ws-rag-run-spinner');
-                    if (spinner) {
-                        spinner.classList.remove('d-none');
-                    }
-                });
-            });
-        });
-    </script>
-
     <!-- ============== TEST LIST ============== -->
     <f:if condition="{tests}">
         <f:then>
