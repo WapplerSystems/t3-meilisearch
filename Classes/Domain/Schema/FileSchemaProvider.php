@@ -59,6 +59,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         private readonly TextExtractor $textExtractor,
         private readonly SiteFinder $siteFinder,
         private readonly BoostCalculator $boostCalculator,
+        private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
     ) {}
 
     public function getTable(): string
@@ -341,6 +342,11 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             'accessGroups' => self::parseFeGroups((string)($metadata['fe_groups'] ?? '')),
             // sys_file has no editor-curated boost TCA — type-level only.
             'boost' => $this->boostCalculator->compositeFor($site, 'file', null),
+            // Detected content language (ISO 639-1). A file gets indexed
+            // under every site-language overlay with identical body bytes,
+            // so the only signal of "what language is this PDF actually
+            // written in?" is the extracted text itself.
+            'contentLanguage' => $this->languageDetector->detect($site, $bodytext),
         ];
     }
 

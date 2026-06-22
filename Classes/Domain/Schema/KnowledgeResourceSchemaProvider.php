@@ -29,6 +29,7 @@ final class KnowledgeResourceSchemaProvider implements SchemaProviderInterface
         private readonly ConnectionPool $connectionPool,
         private readonly ResourceFactory $resourceFactory,
         private readonly BoostCalculator $boostCalculator,
+        private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
     ) {}
 
     public function getTable(): string
@@ -170,6 +171,7 @@ final class KnowledgeResourceSchemaProvider implements SchemaProviderInterface
             // these docs).
             'accessGroups' => [],
             'boost' => $this->boostCalculator->compositeFor($site, 'knowledge_resource', $recordBoost),
+            'contentLanguage' => $this->languageDetector->detect($site, trim($title . "\n\n" . $abstract . "\n\n" . $body)),
         ];
     }
 

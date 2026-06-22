@@ -118,9 +118,23 @@ final class SearchController extends ActionController
             if ($currentLanguageId !== null) {
                 $filters['language'] = [$currentLanguageId];
             }
+            // Layer the detected CONTENT language on top so a file
+            // indexed under every overlay (file-X-l0 / -l1 / …) but
+            // with German bytes only shows up on the German site, not
+            // on the English one. Empty `contentLanguage` (detection
+            // declined as low-confidence) is also accepted — we'd
+            // rather over-show than hide a doc whose language we
+            // genuinely don't know.
+            $isoCode = $this->resolveCurrentLanguageIsoCode();
+            if ($isoCode !== '') {
+                $filters['__rawFilters'][] = sprintf(
+                    '(contentLanguage = "%s" OR contentLanguage IS NULL OR contentLanguage IS EMPTY)',
+                    str_replace('"', '\\"', $isoCode),
+                );
+            }
             $facetList = array_values(array_filter(
                 $facetList,
-                static fn (string $f): bool => $f !== 'language',
+                static fn (string $f): bool => $f !== 'language' && $f !== 'contentLanguage',
             ));
         }
 
@@ -276,6 +290,27 @@ final class SearchController extends ActionController
             }
         }
         return null;
+    }
+
+    /**
+     * Lowercase two-letter ISO code of the current site language, or
+     * empty string when no SiteLanguage is in the request context.
+     * Used to filter on the LanguageDetector-populated
+     * `contentLanguage` field at search time — see the
+     * restrictToCurrentLanguage block above.
+     */
+    private function resolveCurrentLanguageIsoCode(): string
+    {
+        $language = $this->request->getAttribute('language');
+        if (!($language instanceof SiteLanguage)) {
+            $globalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+            $language = $globalRequest?->getAttribute('language');
+        }
+        if (!($language instanceof SiteLanguage)) {
+            return '';
+        }
+        $iso = strtolower((string)$language->getTwoLetterIsoCode());
+        return $iso;
     }
 
     private function resolveLanguageLabel(Site $site, int $languageId): string

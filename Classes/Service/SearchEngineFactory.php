@@ -133,6 +133,15 @@ final class SearchEngineFactory
             'uid'         => new IntegerField('uid', filterable: true),
             'pid'         => new IntegerField('pid', filterable: true),
             'language'    => new IntegerField('language', filterable: true, facet: true),
+            // ISO 639-1 language code of the document CONTENT, detected
+            // at index time by LanguageDetector. Distinct from `language`
+            // above (which carries the TYPO3 language-overlay id of the
+            // record the document was indexed under). A German PDF
+            // indexed in the EN-overlay still gets contentLanguage="de"
+            // here, so a filter can hide it from EN visitors. Empty
+            // string when detection is uncertain — the SearchController
+            // treats "" as "unknown, let it through".
+            'contentLanguage' => new TextField('contentLanguage', searchable: false, filterable: true, facet: true),
             'title'       => new TextField('title', searchable: true),
             'subtitle'    => new TextField('subtitle', searchable: true),
             'description' => new TextField('description', searchable: true),

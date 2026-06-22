@@ -17,6 +17,7 @@ use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
+use WapplerSystems\Meilisearch\Service\LanguageDetector;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
@@ -45,6 +46,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly ConnectionPool $connectionPool,
         private readonly BoostCalculator $boostCalculator,
         private readonly EmbeddingPrecomputer $embeddingPrecomputer,
+        private readonly LanguageDetector $languageDetector,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -88,6 +90,7 @@ final class IndexEventListener implements LoggerAwareInterface
             'site' => $event->site->getIdentifier(),
             'indexProcessId' => $event->indexProcessId,
             'accessGroups' => $event->accessGroups,
+            'contentLanguage' => $this->languageDetector->detect($event->site, $this->normalize($event->content)),
         ];
 
         $this->save($engine, $indexName, $document, new ExtIndexOrigin('pages'), $event->site);
@@ -135,6 +138,7 @@ final class IndexEventListener implements LoggerAwareInterface
             'fileIdentifier' => $event->fileIdentifier,
             'site' => $event->site->getIdentifier(),
             'indexProcessId' => $event->indexProcessId,
+            'contentLanguage' => $this->languageDetector->detect($event->site, $this->normalize($event->content)),
         ];
 
         $this->save($engine, $indexName, $document, new ExtIndexOrigin('sys_file'), $event->site);

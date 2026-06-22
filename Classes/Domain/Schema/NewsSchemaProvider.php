@@ -15,6 +15,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly BoostCalculator $boostCalculator,
+        private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
     ) {}
 
     public function getTable(): string
@@ -130,6 +131,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             // time by the AccessControlFilter service.
             'accessGroups' => self::parseFeGroups((string)($row['fe_group'] ?? '')),
             'boost' => $this->boostCalculator->compositeFor($site, 'news', $recordBoost),
+            'contentLanguage' => $this->languageDetector->detect($site, trim($teaser . "\n\n" . $bodytext)),
         ];
     }
 

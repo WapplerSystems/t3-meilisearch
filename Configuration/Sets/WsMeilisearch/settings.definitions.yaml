@@ -259,6 +259,12 @@ settings:
     type: bool
     default: false
 
+  meilisearch.indexing.contentLanguageAllowList:
+    label: 'Allowed detected content languages'
+    description: 'ISO 639-1 codes (lowercase, e.g. ["de", "en", "fr", "nl"]) the LanguageDetector is allowed to assign. A detection landing outside this list is dropped to "" (unknown), so a fluke "ko" or "klingon" guess on short text never poisons the index. Leave empty to accept any detected code.'
+    type: stringlist
+    default: []
+
   meilisearch.indexing.skipFalForBrokenStorage:
     label: 'Skip FAL indexing on broken storage'
     description: 'Emergency bypass: when true, the FileSchemaProvider returns no documents at all. Use this when the FAL storage backend has tombstoned/missing objects (NoSuchKey / 404) for many sys_file rows — each broken row otherwise triggers AWS-SDK retries and stalls the reindex for hours before News / KR / Pages get a chance. Turn off again once sys_file is cleaned up.'
