@@ -16,6 +16,7 @@ use WapplerSystems\Meilisearch\Event\AfterDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
+use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
@@ -43,6 +44,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly ResourceFactory $resourceFactory,
         private readonly ConnectionPool $connectionPool,
         private readonly BoostCalculator $boostCalculator,
+        private readonly EmbeddingPrecomputer $embeddingPrecomputer,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -88,7 +90,7 @@ final class IndexEventListener implements LoggerAwareInterface
             'accessGroups' => $event->accessGroups,
         ];
 
-        $this->save($engine, $indexName, $document, new ExtIndexOrigin('pages'));
+        $this->save($engine, $indexName, $document, new ExtIndexOrigin('pages'), $event->site);
     }
 
     #[AsEventListener('ws-meilisearch-ext-index-file')]
@@ -135,20 +137,45 @@ final class IndexEventListener implements LoggerAwareInterface
             'indexProcessId' => $event->indexProcessId,
         ];
 
-        $this->save($engine, $indexName, $document, new ExtIndexOrigin('sys_file'));
+        $this->save($engine, $indexName, $document, new ExtIndexOrigin('sys_file'), $event->site);
     }
 
     /**
      * @param array<string,mixed> $document
      */
-    private function save(object $engine, string $indexName, array $document, ExtIndexOrigin $origin): void
-    {
+    private function save(
+        object $engine,
+        string $indexName,
+        array $document,
+        ExtIndexOrigin $origin,
+        \TYPO3\CMS\Core\Site\Entity\Site $site,
+    ): void {
         try {
             $before = new BeforeDocumentIndexedEvent($origin, $document);
             $this->eventDispatcher->dispatch($before);
-            /** @phpstan-ignore-next-line — SEAL Engine type is known at runtime */
-            $engine->saveDocument($indexName, $before->document);
-            $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($origin, $before->document));
+            $doc = $before->document;
+            if ($this->embeddingPrecomputer->isEnabledForSite($site)) {
+                // Precompute mode: attach the vector and push via the raw
+                // Meilisearch client. SEAL's marshaller drops fields not
+                // declared in the schema — `_vectors` is special-cased by
+                // Meilisearch but not a SEAL schema field, so routing
+                // through saveDocument() would silently strip the vector
+                // and Meilisearch would reject every page with
+                // "no vectors provided for document" against the
+                // userProvided embedder. Same fix as in IndexerService.
+                $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
+                $client = $this->engineFactory->createClientForSite($site);
+                if ($client !== null) {
+                    $client->index($indexName)->addDocuments([$doc], 'id');
+                } else {
+                    /** @phpstan-ignore-next-line — SEAL Engine type is known at runtime */
+                    $engine->saveDocument($indexName, $doc);
+                }
+            } else {
+                /** @phpstan-ignore-next-line — SEAL Engine type is known at runtime */
+                $engine->saveDocument($indexName, $doc);
+            }
+            $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($origin, $doc));
         } catch (\Throwable $e) {
             $this->logger?->error('EXT:index-integration failed to index document {id}: {message}', [
                 'id' => $document['id'] ?? '?',
