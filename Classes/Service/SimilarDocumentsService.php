@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service;
 
+use Meilisearch\Contracts\SimilarDocumentsQuery;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Http\Message\ServerRequestInterface;
@@ -107,19 +108,23 @@ final class SimilarDocumentsService implements LoggerAwareInterface
             $clauses,
         ));
 
-        $payload = [
-            'id' => $sourceDocId,
-            'embedder' => EmbedderConfigurator::EMBEDDER_NAME,
-            'limit' => $limit,
-            'attributesToRetrieve' => $attributes,
-        ];
+        // The meilisearch-php SDK exposes /similar via the typed
+        // SimilarDocumentsQuery — array shorthand is not accepted.
+        $query = (new SimilarDocumentsQuery($sourceDocId, EmbedderConfigurator::EMBEDDER_NAME))
+            ->setLimit($limit)
+            ->setAttributesToRetrieve($attributes);
         if ($filter !== null) {
-            $payload['filter'] = $filter;
+            // The SDK's setFilter signature wants array<int,array|string>;
+            // a single composite expression as a one-item list works
+            // (Meilisearch joins inner arrays with OR, top-level with
+            // AND — passing one string-clause produces the same
+            // expression we'd send over raw HTTP).
+            $query->setFilter([$filter]);
         }
 
         try {
-            $response = $client->index($indexName)->getSimilarDocuments($payload);
-            $raw = is_array($response) ? $response : $response->toArray();
+            $response = $client->index($indexName)->searchSimilarDocuments($query);
+            $raw = $response->toArray();
             $hits = $raw['hits'] ?? [];
             // Defensive — the engine returns the source doc itself in
             // older Meilisearch versions when it shouldn't. Filter it
