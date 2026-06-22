@@ -158,6 +158,21 @@ final class SearchService implements LoggerAwareInterface
             $params['hybrid'] = $hybridParams;
         }
 
+        // matchingStrategy lets the caller switch Meilisearch's
+        // "which tokens may be dropped if the corpus has no document
+        // matching all of them?" behaviour. Index default is "last"
+        // (drop trailing tokens) which fails on long natural-language
+        // RAG queries where the FIRST token ("gebe", "wie") doesn't
+        // appear in any KR — Meilisearch refuses to drop a leading
+        // token and returns zero hits even though "Lizenzen freigeben"
+        // is right there in the corpus. RAG retrieval passes
+        // "frequency" so the highest-frequency tokens (function
+        // words, generic verbs) get dropped first.
+        $strategy = (string)($options['matchingStrategy'] ?? '');
+        if ($strategy !== '') {
+            $params['matchingStrategy'] = $strategy;
+        }
+
         $sort = [];
         foreach ($this->normalizeSort($options['sort'] ?? null) as [$field, $direction]) {
             $sort[] = $field . ':' . $direction;

@@ -331,6 +331,13 @@ final class RagService implements LoggerAwareInterface
             // becomes too short for synonym expansion ("gebe frei" →
             // "freigeben") to fire.
             'stripStopWords' => (bool)$settings->get('meilisearch.rag.stripStopWords', true),
+            // Drop the most frequent tokens before "last" Meilisearch would
+            // otherwise drop the trailing ones. Important for question-shaped
+            // queries where the first token is a verb form not present in
+            // any KR title ("gebe", "wie") — "last" returns zero hits even
+            // though the answer document is right there. Operator can
+            // restore the Meilisearch default ("last") via the setting.
+            'matchingStrategy' => (string)$settings->get('meilisearch.rag.matchingStrategy', 'frequency'),
         ];
         // RAG-specific stop-words override: narrow the strip set down to
         // generic question / function words. Without this override the

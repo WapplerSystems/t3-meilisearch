@@ -289,6 +289,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.matchingStrategy:
+    label: 'RAG matching strategy'
+    description: 'Meilisearch matchingStrategy used by RAG retrieval. "frequency" drops the highest-frequency tokens first — needed for verb-led question queries ("Wie gebe ich …", "Was ist …") where the leading token does not appear in any KR title. "last" (Meilisearch default) drops only trailing tokens and returns zero hits when the leading token is the misfit. Set to empty string to inherit the Meilisearch index default.'
+    type: string
+    default: 'frequency'
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
