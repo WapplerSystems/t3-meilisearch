@@ -247,6 +247,18 @@ settings:
     default:
       - '/typo3temp/'
 
+  meilisearch.indexing.requestsPerMinute:
+    label: 'Reindex throttle (requests / minute)'
+    description: 'Token-bucket cap on embedding API calls during reindex when meilisearch.embedder.precompute is on. 0 = unthrottled (legacy fire-and-forget). Match this to the embedding provider quota: Scaleway Generative APIs default is 300 RPM, Infomaniak free tier is 60.'
+    type: int
+    default: 0
+
+  meilisearch.embedder.precompute:
+    label: 'Precompute embeddings in PHP'
+    description: 'When true, PHP fetches the embedding from the configured provider before saveDocument and writes it into _vectors.default. The embedder on the Meilisearch index is registered as `userProvided`. Use this when the provider rate-limits per minute and Meilisearch internal auto-batching would otherwise burst past the cap. Pairs with meilisearch.indexing.requestsPerMinute.'
+    type: bool
+    default: false
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
