@@ -45,6 +45,7 @@ final class OverviewController
         private readonly DiagnoseController $diagnoseController,
         private readonly KnowledgeResourceController $helpDocController,
         private readonly RagTestController $ragTestController,
+        private readonly AnalyticsController $analyticsController,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -59,6 +60,7 @@ final class OverviewController
                 $this->helpDocController->handle($request, $action),
             'ragtests', 'runRagTest', 'runAllRagTests', 'adoptActualAsExpected' =>
                 $this->ragTestController->handle($request, $action),
+            'analytics' => $this->analyticsController->handle($request),
             default => $this->indexAction($request),
         };
     }

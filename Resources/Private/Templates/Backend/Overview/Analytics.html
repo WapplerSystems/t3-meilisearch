@@ -1,0 +1,181 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Analytics</h1>
+    <f:variable name="active" value="analytics"/>
+    <f:render partial="Backend/TabNav" arguments="{_all}" />
+
+    <p class="text-muted">
+        Aggregierte FE-Suchanfragen aus <code>tx_wsmeilisearch_search_log</code>.
+        Nur opt-in pro Site via <code>meilisearch.analytics.enabled = true</code>.
+        Es werden ausschließlich {Query, Trefferzahl, Site, Sprache, Quelle, Zeitstempel} gespeichert — keine IPs, keine User-IDs.
+    </p>
+
+    <f:if condition="!{analyticsEnabled}">
+        <div class="alert alert-warning">
+            Analytics ist aktuell auf keiner Site aktiviert. Setze <code>meilisearch.analytics.enabled: true</code> im Site-Setting,
+            damit zukünftige Such-Aufrufe protokolliert werden.
+        </div>
+    </f:if>
+
+    <!-- ============== FILTER BAR ============== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="{baseUrl}" method="get" class="d-flex align-items-center gap-3 flex-wrap">
+                <input type="hidden" name="route" value="" />
+                <label class="m-0 fw-semibold">Zeitraum:</label>
+                <div class="btn-group btn-group-sm" role="group">
+                    <f:for each="{0:1, 1:7, 2:30, 3:90}" as="d">
+                        <button type="submit" name="days" value="{d}"
+                                class="btn {f:if(condition: '{windowDays} == {d}', then: 'btn-primary', else: 'btn-outline-primary')}">
+                            {d} Tag(e)
+                        </button>
+                    </f:for>
+                </div>
+                <label class="m-0 fw-semibold ms-3">Site:</label>
+                <select name="site" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="">— alle —</option>
+                    <f:for each="{availableSites}" as="s">
+                        <option value="{s}" {f:if(condition: '{siteFilter} == {s}', then: 'selected="selected"')}>{s}</option>
+                    </f:for>
+                </select>
+                <input type="hidden" name="days" value="{windowDays}" />
+            </form>
+        </div>
+    </div>
+
+    <!-- ============== TOTALS ============== -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Suchanfragen ({windowDays}d)</div>
+                    <div class="display-6">{totals.rows}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Unterschiedliche Queries</div>
+                    <div class="display-6">{totals.distinctQueries}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 {f:if(condition: '{totals.zeroResultRows} > 0', then: 'border-warning')}">
+                <div class="card-body">
+                    <div class="text-muted small">Davon ohne Treffer</div>
+                    <div class="display-6 {f:if(condition: '{totals.zeroResultRows} > 0', then: 'text-warning')}">{totals.zeroResultRows}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============== TOP QUERIES + ZERO-RESULTS ============== -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><strong>Top-Queries</strong> <small class="text-muted">(häufigste, Top 20)</small></div>
+                <div class="card-body p-0">
+                    <f:if condition="{topQueries}">
+                        <f:then>
+                            <table class="table table-sm m-0">
+                                <thead>
+                                    <tr><th>Query</th><th class="text-end">Hits</th><th class="text-end">Ø Treffer</th></tr>
+                                </thead>
+                                <tbody>
+                                    <f:for each="{topQueries}" as="q">
+                                        <tr>
+                                            <td><code>{q.query -> f:format.htmlspecialchars()}</code></td>
+                                            <td class="text-end">{q.hits}</td>
+                                            <td class="text-end font-monospace small">{q.avgResults}</td>
+                                        </tr>
+                                    </f:for>
+                                </tbody>
+                            </table>
+                        </f:then>
+                        <f:else>
+                            <div class="p-3 text-muted small">Keine Daten im gewählten Zeitraum.</div>
+                        </f:else>
+                    </f:if>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100 {f:if(condition: '{zeroResultQueries}', then: 'border-warning')}">
+                <div class="card-header">
+                    <strong>Zero-Result-Queries</strong>
+                    <small class="text-muted">(Top 20 — Kandidaten für Synonyme / Content)</small>
+                </div>
+                <div class="card-body p-0">
+                    <f:if condition="{zeroResultQueries}">
+                        <f:then>
+                            <table class="table table-sm m-0">
+                                <thead>
+                                    <tr><th>Query</th><th class="text-end">Hits</th></tr>
+                                </thead>
+                                <tbody>
+                                    <f:for each="{zeroResultQueries}" as="q">
+                                        <tr>
+                                            <td><code>{q.query -> f:format.htmlspecialchars()}</code></td>
+                                            <td class="text-end">{q.hits}</td>
+                                        </tr>
+                                    </f:for>
+                                </tbody>
+                            </table>
+                        </f:then>
+                        <f:else>
+                            <div class="p-3 text-muted small">Keine Queries ohne Treffer — alles wird gefunden.</div>
+                        </f:else>
+                    </f:if>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============== SOURCE / HYBRID BREAKDOWN ============== -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><strong>Quelle</strong> <small class="text-muted">(Verteilung)</small></div>
+                <div class="card-body p-0">
+                    <f:if condition="{sourceBreakdown}">
+                        <f:then>
+                            <table class="table table-sm m-0">
+                                <tbody>
+                                    <f:for each="{sourceBreakdown}" as="s">
+                                        <tr>
+                                            <td><code>{s.source -> f:format.htmlspecialchars()}</code></td>
+                                            <td class="text-end">{s.count}</td>
+                                        </tr>
+                                    </f:for>
+                                </tbody>
+                            </table>
+                        </f:then>
+                        <f:else>
+                            <div class="p-3 text-muted small">—</div>
+                        </f:else>
+                    </f:if>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><strong>Hybrid vs Keyword</strong> <small class="text-muted">(Anteil)</small></div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>{hybridRate.hybridPct}%</strong> der Anfragen nutzen Hybrid-Modus.</p>
+                    <ul class="list-unstyled small mb-0">
+                        <li><strong>Hybrid:</strong> {hybridRate.hybrid}</li>
+                        <li><strong>Keyword:</strong> {hybridRate.keyword}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</f:section>
+</html>
