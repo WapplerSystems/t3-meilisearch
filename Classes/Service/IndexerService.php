@@ -30,7 +30,32 @@ final class IndexerService implements LoggerAwareInterface
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly EmbedderConfigurator $embedderConfigurator,
         private readonly EmbeddingPrecomputer $embeddingPrecomputer,
+        private readonly IndexSettingsApplier $indexSettingsApplier,
     ) {}
+
+    /**
+     * Site-setting–driven choice of where the next indexAll() writes:
+     *  - false (default): primary index, drop-and-rebuild semantics.
+     *    Visitors get `no_context` / blank search results during reindex.
+     *  - true: draft index, swapped in atomically at the end. Search
+     *    keeps serving the previous corpus until the swap second.
+     */
+    private function zeroDowntimeEnabled(Site $site): bool
+    {
+        return (bool)$site->getSettings()->get('meilisearch.indexing.zeroDowntime', false);
+    }
+
+    /**
+     * Resolve where the next indexing run should write documents.
+     * Same as getIndexName() in the legacy mode; suffix-_draft in
+     * zero-downtime mode.
+     */
+    private function writeTargetIndexName(Site $site): string
+    {
+        return $this->zeroDowntimeEnabled($site)
+            ? $this->engineFactory->getDraftIndexName($site)
+            : $this->engineFactory->getIndexName($site);
+    }
 
     public function ensureSchema(Site $site, bool $rebuild = false, bool $skipEmbedder = false): bool
     {
@@ -38,7 +63,8 @@ final class IndexerService implements LoggerAwareInterface
         if ($engine === null) {
             return false;
         }
-        $indexName = $this->engineFactory->getIndexName($site);
+        $writeTarget = $this->writeTargetIndexName($site);
+        $zeroDowntime = $this->zeroDowntimeEnabled($site);
 
         // Wait for index + settings tasks to finish — Meilisearch processes
         // `createIndex` and `updateSettings` asynchronously, and indexing
@@ -46,18 +72,35 @@ final class IndexerService implements LoggerAwareInterface
         // "Invalid facet distribution" errors on the first searches.
         $options = ['return_slow_promise_result' => true];
 
-        if ($rebuild && $engine->existIndex($indexName)) {
-            $engine->dropIndex($indexName, $options)?->wait();
+        // In zero-downtime mode the draft index is always recreated from
+        // scratch — there's no point inheriting a half-finished previous
+        // attempt, and the visitor-facing primary index keeps serving
+        // the old corpus until the swap happens at the end of indexAll().
+        // In legacy mode --rebuild controls the drop, and an already-
+        // existing primary is left alone (overwrite-in-place reindex).
+        if ($zeroDowntime) {
+            if ($engine->existIndex($writeTarget)) {
+                $engine->dropIndex($writeTarget, $options)?->wait();
+            }
+        } elseif ($rebuild && $engine->existIndex($writeTarget)) {
+            $engine->dropIndex($writeTarget, $options)?->wait();
         }
-        if (!$engine->existIndex($indexName)) {
-            $engine->createIndex($indexName, $options)?->wait();
+        if (!$engine->existIndex($writeTarget)) {
+            $engine->createIndex($writeTarget, $options)?->wait();
         }
+
+        // Push the full index settings (rankingRules, filterableAttributes,
+        // sortableAttributes, typoTolerance, …) to the WRITE TARGET so the
+        // draft index is search-ready the moment the swap happens. Without
+        // this the swap would promote an empty-settings index to primary
+        // and effectively roll back all relevance tuning.
+        $this->indexSettingsApplier->applyTo($site, $writeTarget);
 
         // Push embedder settings *after* the index exists. Operator can
         // suppress this with --skip-embedder when troubleshooting a wedged
         // embedder config — the rest of the index keeps working.
         if (!$skipEmbedder) {
-            $this->embedderConfigurator->ensureForSite($site);
+            $this->embedderConfigurator->ensureForSite($site, $writeTarget);
         }
         return true;
     }
@@ -72,16 +115,21 @@ final class IndexerService implements LoggerAwareInterface
             );
             return 0;
         }
-        $indexName = $this->engineFactory->getIndexName($site);
+        $primaryName = $this->engineFactory->getIndexName($site);
+        $writeTarget = $this->writeTargetIndexName($site);
+        $zeroDowntime = $this->zeroDowntimeEnabled($site);
+        // Document-push path uses $writeTarget so zero-downtime writes
+        // land in the draft index; everything below treats $indexName
+        // as the write destination.
+        $indexName = $writeTarget;
 
-        // Pre-reindex orphan cleanup: providers that implement
-        // PreReindexCleanupInterface (currently only FileSchemaProvider,
-        // for the excludeIdentifierPrefixes site setting) get a chance to
-        // drop docs that USED to be eligible but no longer are. Without
-        // this, the iterator can't reach them — they'd stay orphaned
-        // forever. Skip when a fresh client isn't available (site without
-        // url config) since cleanup needs the raw Meilisearch client to
-        // call delete-by-filter (SEAL doesn't expose it).
+        // Pre-reindex orphan cleanup runs against the WRITE TARGET. In
+        // legacy mode that's the primary, so we evict stale docs that
+        // the iterator no longer reaches. In zero-downtime mode the
+        // draft was just recreated empty by ensureSchema(), so cleanup
+        // is a no-op there — but the loop is cheap (it's the
+        // FileSchemaProvider checking its own filter setting), so we
+        // let it run for symmetry.
         $client = $this->engineFactory->createClientForSite($site);
         if ($client !== null) {
             foreach ($this->schemaProviders as $provider) {
@@ -142,6 +190,45 @@ final class IndexerService implements LoggerAwareInterface
                 $count++;
             }
         }
+
+        // Zero-downtime cutover: swap the draft (where we just wrote
+        // $count docs) with the primary, then drop the now-stale old
+        // draft. Meilisearch's swap-indexes API runs atomically — the
+        // visitor-facing primary keeps serving the old corpus until
+        // the swap second, and after the swap returns the engine has
+        // already promoted the new corpus to the primary name.
+        // Safety: only swap when at least one document landed in the
+        // draft. An empty draft would atomically wipe a working
+        // primary, and that's almost certainly a regression we want
+        // to surface loudly rather than silently swap to.
+        if ($zeroDowntime && $client !== null && $count > 0) {
+            try {
+                $task = $client->swapIndexes([['indexes' => [$primaryName, $writeTarget]]]);
+                $taskUid = (int)($task['taskUid'] ?? 0);
+                if ($taskUid > 0) {
+                    $client->waitForTask($taskUid);
+                }
+                // After swap, $writeTarget holds the OLD corpus. Drop
+                // it so the next reindex starts from a clean slate and
+                // disk usage doesn't accumulate.
+                $client->deleteIndex($writeTarget);
+                $this->logger?->info(
+                    'Zero-downtime swap complete for site {site}: primary {primary} now holds {count} freshly-indexed documents',
+                    ['site' => $site->getIdentifier(), 'primary' => $primaryName, 'count' => $count],
+                );
+            } catch (\Throwable $e) {
+                $this->logger?->error(
+                    'Zero-downtime swap failed for site {site}: {msg} — draft index {draft} retained for inspection',
+                    ['site' => $site->getIdentifier(), 'msg' => $e->getMessage(), 'draft' => $writeTarget, 'exception' => $e],
+                );
+            }
+        } elseif ($zeroDowntime && $count === 0) {
+            $this->logger?->warning(
+                'Zero-downtime reindex produced 0 documents for site {site} — skipping swap to protect the primary index',
+                ['site' => $site->getIdentifier()],
+            );
+        }
+
         return $count;
     }
 

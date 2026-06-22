@@ -90,6 +90,18 @@ final class SearchEngineFactory
     }
 
     /**
+     * Draft index name used by the zero-downtime reindex flow: the
+     * IndexerService writes the new corpus here, then calls
+     * Meilisearch's swap-indexes API to atomically promote it. Suffix
+     * "_draft" so it's instantly recognisable to operators inspecting
+     * the engine via the Meilisearch dashboard.
+     */
+    public function getDraftIndexName(Site $site): string
+    {
+        return $this->getIndexName($site) . '_draft';
+    }
+
+    /**
      * SEAL schema for a site. ApplyMeilisearchSettingsCommand uses this to
      * push the field-flag-derived attributes (searchable/filterable/sortable)
      * alongside the integrator-configured index settings — SEAL itself only

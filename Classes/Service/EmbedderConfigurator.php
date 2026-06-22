@@ -40,13 +40,16 @@ final class EmbedderConfigurator implements LoggerAwareInterface
      *  - 'disabled'  — site has no embedder configured; existing one (if any) was cleared
      *  - 'skipped'   — site has no Meilisearch backend at all
      */
-    public function ensureForSite(Site $site): string
+    public function ensureForSite(Site $site, ?string $indexName = null): string
     {
         $client = $this->engineFactory->createClientForSite($site);
         if ($client === null) {
             return 'skipped';
         }
-        $indexName = $this->engineFactory->getIndexName($site);
+        // Allow the caller to override the index name — IndexerService's
+        // zero-downtime flow writes to a draft index and needs the embedder
+        // settings pushed there, not to the live primary.
+        $indexName ??= $this->engineFactory->getIndexName($site);
         $index = $client->index($indexName);
 
         $desired = $this->buildDesiredEmbedders($site);

@@ -277,6 +277,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.indexing.zeroDowntime:
+    label: 'Zero-downtime reindex (atomic index swap)'
+    description: 'When true, ws_meilisearch:reindex writes into a `<index>_draft` index and atomically swaps it into the primary on completion. Visitors keep seeing the previous corpus throughout the reindex — no `no_context` window. Disabled by default: the legacy drop-and-rebuild on the primary is simpler and uses less disk (draft + primary briefly coexist while writing). Enable on production sites where the reindex takes long enough that visitor-facing blank-result windows are unacceptable.'
+    type: bool
+    default: false
+
   meilisearch.indexing.skipFalForBrokenStorage:
     label: 'Skip FAL indexing on broken storage'
     description: 'Emergency bypass: when true, the FileSchemaProvider returns no documents at all. Use this when the FAL storage backend has tombstoned/missing objects (NoSuchKey / 404) for many sys_file rows — each broken row otherwise triggers AWS-SDK retries and stalls the reindex for hours before News / KR / Pages get a chance. Turn off again once sys_file is cleaned up.'
