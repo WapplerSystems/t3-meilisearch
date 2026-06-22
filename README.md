@@ -1,4 +1,4 @@
-# ws_meilisearch — Meilisearch Search Backend for TYPO3
+# ws_meilisearch — Meilisearch — Search, Hybrid & RAG
 
 TYPO3 v14 extension providing Meilisearch-backed full-text search via the
 [SEAL](https://github.com/php-cmsig/search) abstraction. Designed so the
