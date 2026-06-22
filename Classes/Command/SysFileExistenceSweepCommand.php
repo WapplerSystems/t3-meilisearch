@@ -57,7 +57,8 @@ final class SysFileExistenceSweepCommand extends Command
         $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Cap the number of rows probed (0 = all).', '0')
             ->addOption('storage', null, InputOption::VALUE_REQUIRED, 'Restrict to a single storage uid.', '0')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Report counts without setting missing=1.')
-            ->addOption('batch-size', null, InputOption::VALUE_REQUIRED, 'How many uids to UPDATE at a time.', '500');
+            ->addOption('batch-size', null, InputOption::VALUE_REQUIRED, 'How many uids to UPDATE at a time.', '500')
+            ->addOption('debug', null, InputOption::VALUE_NONE, 'Diagnose mode: do NOT suppress driver warnings, print the first 5 verdicts (uid + identifier + alive/dead).');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -67,6 +68,7 @@ final class SysFileExistenceSweepCommand extends Command
         $storageFilter = max(0, (int)$input->getOption('storage'));
         $batchSize = max(50, (int)$input->getOption('batch-size'));
         $dryRun = (bool)$input->getOption('dry-run');
+        $debug = (bool)$input->getOption('debug');
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
         $qb->select('uid', 'storage', 'identifier')
@@ -88,43 +90,63 @@ final class SysFileExistenceSweepCommand extends Command
         // and would otherwise spam the TYPO3 log with one entry per
         // dead row. We still capture the "did it exist?" signal from
         // the driver's return value.
-        $previousHandler = set_error_handler(static function (int $errno, string $errstr): bool {
-            if (str_contains($errstr, 'NoSuchKey') || str_contains($errstr, 'AWS HTTP error')) {
-                return true; // swallow
-            }
-            return false; // let PHP handle anything unrelated
-        }, E_USER_WARNING | E_WARNING);
+        $previousHandler = null;
+        if (!$debug) {
+            $previousHandler = set_error_handler(static function (int $errno, string $errstr): bool {
+                if (str_contains($errstr, 'NoSuchKey') || str_contains($errstr, 'AWS HTTP error')) {
+                    return true; // swallow
+                }
+                return false; // let PHP handle anything unrelated
+            }, E_USER_WARNING | E_WARNING);
+        }
 
         $deadUids = [];
         $stats = ['alive' => 0, 'dead' => 0, 'error' => 0];
-        $progress = $io->createProgressBar($total);
-        $progress->setRedrawFrequency(max(1, (int)($total / 200)));
-        $progress->start();
+        $verdictLog = [];
+        $progress = $debug ? null : $io->createProgressBar($total);
+        $progress?->setRedrawFrequency(max(1, (int)($total / 200)));
+        $progress?->start();
         try {
             foreach ($rows as $row) {
                 $storageUid = (int)$row['storage'];
                 $identifier = (string)$row['identifier'];
                 try {
                     $storage = $this->storageRepository->findByUid($storageUid);
+                    $verdict = 'dead';
                     if ($storage === null) {
                         $stats['error']++;
+                        $verdict = 'errored (storage missing)';
                     } elseif ($storage->getDriver()->fileExists($identifier)) {
                         $stats['alive']++;
+                        $verdict = 'alive';
                     } else {
                         $stats['dead']++;
                         $deadUids[] = (int)$row['uid'];
                     }
-                } catch (\Throwable) {
+                } catch (\Throwable $e) {
                     // Driver threw — treat as dead. Better safe than
                     // leaving an unprobeable row to crash the reindex.
                     $stats['dead']++;
                     $deadUids[] = (int)$row['uid'];
+                    $verdict = 'dead (' . $e->getMessage() . ')';
                 }
-                $progress->advance();
+                if ($debug && count($verdictLog) < 5) {
+                    $verdictLog[] = sprintf('uid=%d storage=%d identifier=%s → %s', (int)$row['uid'], $storageUid, $identifier, $verdict);
+                }
+                $progress?->advance();
             }
         } finally {
-            $progress->finish();
-            restore_error_handler();
+            $progress?->finish();
+            if ($previousHandler !== null) {
+                restore_error_handler();
+            }
+        }
+        if ($debug) {
+            $io->newLine();
+            $io->writeln('Verdicts:');
+            foreach ($verdictLog as $line) {
+                $io->writeln('  ' . $line);
+            }
         }
         $io->newLine(2);
         $io->writeln(sprintf(
