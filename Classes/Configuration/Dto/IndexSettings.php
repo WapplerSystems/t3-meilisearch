@@ -21,6 +21,7 @@ final readonly class IndexSettings
      * @param array<string, list<string>>  $synonyms
      * @param list<string>                 $displayedAttributes
      * @param list<string>                 $typoDisableOnAttributes
+     * @param list<string>                 $typoDisableOnWords
      */
     public function __construct(
         public array  $rankingRules,
@@ -28,6 +29,8 @@ final readonly class IndexSettings
         public int    $typoMinWordSizeForOneTypo,
         public int    $typoMinWordSizeForTwoTypos,
         public array  $typoDisableOnAttributes,
+        public array  $typoDisableOnWords,
+        public bool   $typoDisableOnNumbers,
         public array  $stopWords,
         public array  $synonyms,
         public ?string $distinctAttribute,
@@ -57,6 +60,18 @@ final readonly class IndexSettings
                     'twoTypos' => $this->typoMinWordSizeForTwoTypos,
                 ],
                 'disableOnAttributes' => $this->typoDisableOnAttributes,
+                // disableOnWords prevents Meilisearch from treating these
+                // tokens as fuzzy-match candidates. Indispensable for brand
+                // / product tokens ("LINEAR", "Building") that visitors
+                // type intentionally — without this, "LINER" would match
+                // "LINEAR" (1 typo, length ≥5) and bury the actual hit
+                // under unrelated near-matches.
+                'disableOnWords' => $this->typoDisableOnWords,
+                // disableOnNumbers (Meilisearch v1.12+): when true, never
+                // fuzzy-match tokens that are pure digits. Pragmatic for
+                // version numbers / SKUs ("LINEAR 24.1" shouldn't match
+                // "LINEAR 14.1" via 1-digit typo).
+                'disableOnNumbers' => $this->typoDisableOnNumbers,
             ],
             'stopWords' => $this->stopWords,
             // Meilisearch expects an OBJECT for `synonyms` ({}), not an array ([]).

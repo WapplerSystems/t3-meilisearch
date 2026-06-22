@@ -510,6 +510,18 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.defaults.typoTolerance.disableOnWords:
+    label: 'Typo tolerance: disable on words'
+    description: 'Words that must NEVER be fuzzy-matched (treated as exact-only). Use for brand / product / domain tokens visitors type intentionally — e.g. ["LINEAR", "Building", "AutoCAD"]. Without this, "LINER" would match "LINEAR" via 1 typo (length ≥5) and bury the actual hits under near-misses. Tokens are case-insensitive and apply to indexing-time tokenisation, so the corpus does not need to be re-indexed to add a new word.'
+    type: stringlist
+    default: []
+
+  meilisearch.defaults.typoTolerance.disableOnNumbers:
+    label: 'Typo tolerance: disable on numeric tokens'
+    description: 'When true, Meilisearch never fuzzy-matches tokens that are pure digits — useful for version numbers / SKUs / part numbers where "24" and "14" must be distinguishable. Requires Meilisearch v1.12 or later; ignored on older engines.'
+    type: bool
+    default: false
+
   meilisearch.defaults.stopWords:
     label: 'Stop words'
     description: 'Words ignored during indexing and querying. Use the site language(s) — e.g. "der, die, das, und, oder, mit" for German.'

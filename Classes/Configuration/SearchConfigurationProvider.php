@@ -33,6 +33,8 @@ final class SearchConfigurationProvider
             typoMinWordSizeForOneTypo:   (int)$s->get('meilisearch.defaults.typoTolerance.minWordSizeForOneTypo', 5),
             typoMinWordSizeForTwoTypos:  (int)$s->get('meilisearch.defaults.typoTolerance.minWordSizeForTwoTypos', 9),
             typoDisableOnAttributes:     $this->stringList($this->getNested($site, 'meilisearch.defaults.typoTolerance.disableOnAttributes')),
+            typoDisableOnWords:           $this->stringList($this->getNested($site, 'meilisearch.defaults.typoTolerance.disableOnWords')),
+            typoDisableOnNumbers:        (bool)$s->get('meilisearch.defaults.typoTolerance.disableOnNumbers', false),
             stopWords:                   $this->stringList($this->getNested($site, 'meilisearch.defaults.stopWords')),
             synonyms:                    $this->synonymsMap($this->getNested($site, 'meilisearch.defaults.synonyms')),
             distinctAttribute:           $this->nullableString($s->get('meilisearch.defaults.distinctAttribute')),
