@@ -107,6 +107,16 @@ final class IndexerService implements LoggerAwareInterface
         // sits inside EmbeddingPrecomputer (token bucket against the
         // provider); the Meilisearch side gets pre-vectorized documents,
         // so there is no embedder fan-out to worry about here.
+        //
+        // We also bypass the SEAL engine's saveDocument for precompute
+        // docs and push directly via the raw Meilisearch client:
+        // SEAL's Marshaller copies fields by Schema definition only,
+        // and `_vectors` is not in the schema (Meilisearch treats it
+        // as a special field at the document level, not a regular
+        // field). Routing through saveDocument would silently strip
+        // the vector and Meilisearch would reject every document with
+        // "no vectors provided for document …" against the
+        // userProvided embedder.
         $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
 
         $count = 0;
@@ -117,8 +127,17 @@ final class IndexerService implements LoggerAwareInterface
                 $doc = $event->document;
                 if ($precompute) {
                     $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
+                    if ($client !== null) {
+                        $client->index($indexName)->addDocuments([$doc], 'id');
+                    } else {
+                        // No raw client (site lacks meilisearch.url) — fall
+                        // back to engine push; the vector will be stripped
+                        // but the doc still lands for keyword search.
+                        $engine->saveDocument($indexName, $doc);
+                    }
+                } else {
+                    $engine->saveDocument($indexName, $doc);
                 }
-                $engine->saveDocument($indexName, $doc);
                 $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
                 $count++;
             }
@@ -134,6 +153,10 @@ final class IndexerService implements LoggerAwareInterface
         }
         $indexName = $this->engineFactory->getIndexName($site);
         $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
+        // Raw Meilisearch client for the precompute-push path — see the
+        // long comment in indexAll() about why SEAL's saveDocument
+        // strips `_vectors`.
+        $client = $precompute ? $this->engineFactory->createClientForSite($site) : null;
 
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
@@ -146,8 +169,14 @@ final class IndexerService implements LoggerAwareInterface
                 $doc = $event->document;
                 if ($precompute) {
                     $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
+                    if ($client !== null) {
+                        $client->index($indexName)->addDocuments([$doc], 'id');
+                    } else {
+                        $engine->saveDocument($indexName, $doc);
+                    }
+                } else {
+                    $engine->saveDocument($indexName, $doc);
                 }
-                $engine->saveDocument($indexName, $doc);
                 $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
                 $any = true;
             }
