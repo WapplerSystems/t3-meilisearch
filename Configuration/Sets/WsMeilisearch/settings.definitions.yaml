@@ -168,11 +168,17 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.chatWidget.pageUid:
+    label: 'Chat widget target page UID'
+    description: 'TYPO3 page uid of the page that hosts the wsmeilisearch_rag plugin. The setup TypoScript resolves it via TypoLink at render time, so the bubble always points at the correct language overlay (DE → /de/x, EN → /en/x, …) and survives slug renames. Prefer this over the legacy chatWidget.url setting.'
+    type: int
+    default: 0
+
   meilisearch.rag.chatWidget.url:
-    label: 'Chat widget target URL'
-    description: 'URL the bubble panel iframes. Should point to a page that contains the wsmeilisearch_rag plugin. Path-relative (e.g. /de/suche) or absolute. Append ?chatframe=1 if you have a chrome-stripped layout for embedded usage.'
+    label: 'Chat widget target URL (legacy fallback)'
+    description: 'Hardcoded URL the bubble panel iframes, used only when chatWidget.pageUid is 0. Brittle: bakes in the language prefix, breaks on slug renames and multi-language overlays. Migrate to chatWidget.pageUid; this field stays for backwards compatibility.'
     type: string
-    default: '/de/suche'
+    default: ''
 
   meilisearch.rag.chatWidget.label:
     label: 'Chat widget label'

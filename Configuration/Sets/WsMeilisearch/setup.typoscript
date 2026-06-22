@@ -31,13 +31,32 @@ plugin.tx_wsmeilisearch_search {
 # --- RAG floating chat widget --------------------------------------------
 # Site-setting–driven opt-in. When enabled, every FE page that includes
 # this Set gets a fixed bubble bottom-right that opens the RAG plugin
-# in a slide-up panel. URL+label come from Site Settings so each site
-# can point the iframe at its own /suche-equivalent and brand the label.
+# in a slide-up panel.
+#
+# Target URL strategy:
+#   1) chatWidget.pageUid > 0  → resolved via TypoLink at render time, so
+#      the link follows the active language overlay (DE→/de/…, EN→/en/…)
+#      and survives slug renames.
+#   2) chatWidget.pageUid == 0 → fallback to the legacy hardcoded
+#      chatWidget.url string for backward compatibility.
 [{$meilisearch.rag.chatWidget.enabled} == 1]
+    page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
+    page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
+[END]
+
+# Render the bubble markup with a TypoLink-resolved URL when a pageUid
+# is configured. Two condition branches so we evaluate the URL source
+# exactly once per request.
+[{$meilisearch.rag.chatWidget.enabled} == 1 && {$meilisearch.rag.chatWidget.pageUid} > 0]
+    page.footerData.1746000000 = TEXT
+    page.footerData.1746000000.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid}
+    page.footerData.1746000000.typolink.returnLast = url
+    page.footerData.1746000000.wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
+[END]
+
+[{$meilisearch.rag.chatWidget.enabled} == 1 && {$meilisearch.rag.chatWidget.pageUid} == 0]
     page.footerData.1746000000 = TEXT
     page.footerData.1746000000.value (
 <div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
     )
-    page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
-    page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
 [END]
