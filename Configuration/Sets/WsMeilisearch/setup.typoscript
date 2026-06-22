@@ -28,6 +28,24 @@ plugin.tx_wsmeilisearch_search {
     }
 }
 
+# --- Live-suggest auto-attach --------------------------------------------
+# When meilisearch.suggest.autoAttachInputSelector is set, ship the
+# suggest dropdown JS globally and emit a <meta> tag carrying the CSS
+# selector + endpoint URL. The JS reads the meta on DOMContentLoaded
+# and promotes every matching input into a [data-ws-meilisearch-suggest]
+# wrapper so the existing init() path attaches without code changes.
+#
+# Why a meta tag and not inline JS: CSP-strict templates strip
+# unsigned inline <script> blocks; a meta carrying static attributes
+# survives that policy and is the standard TYPO3 v14 channel for
+# template-driven JS config.
+[{$meilisearch.suggest.autoAttachInputSelector} != '']
+    page.headerData.1746000010 = TEXT
+    page.headerData.1746000010.value = <meta name="ws-meilisearch-suggest" data-endpoint="/_ws_meilisearch/suggest" data-input-selector="{$meilisearch.suggest.autoAttachInputSelector}" />
+    page.includeJSFooter.wsMeilisearchSuggest = EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/suggest.js
+    page.includeJSFooter.wsMeilisearchSuggest.defer = 1
+[END]
+
 # --- RAG floating chat widget --------------------------------------------
 # Site-setting–driven opt-in. When enabled, every FE page that includes
 # this Set gets a fixed bubble bottom-right that opens the RAG plugin

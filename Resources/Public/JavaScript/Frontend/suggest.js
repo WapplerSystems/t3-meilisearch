@@ -313,8 +313,71 @@
         return escapeText(s).replace(/"/g, '&quot;');
     }
 
+    /**
+     * Auto-attach mode: wrap existing search-form inputs that match a
+     * configured CSS selector so sites without the ws_meilisearch_search
+     * Fluid template (e.g. the legacy indexed_search form, a hand-rolled
+     * header search) still get the live dropdown. The selector is read
+     * from a <meta name="ws-meilisearch-suggest"> tag set up by the
+     * setup TypoScript when meilisearch.suggest.autoAttachInputSelector
+     * is configured.
+     *
+     * Wrap shape mirrors the explicit markup contract so the existing
+     * init(root) path can attach unchanged: a wrapper carrying
+     * data-ws-meilisearch-suggest, the input tagged with
+     * data-suggest-input, plus an injected sibling <ul data-suggest-menu>
+     * positioned right under the input via the same CSS that ships with
+     * the Fluid version. Idempotent — re-running attachAuto() doesn't
+     * double-wrap (the input already has data-suggest-input set).
+     */
+    function attachAuto() {
+        const meta = document.querySelector('meta[name="ws-meilisearch-suggest"]');
+        if (!meta) return;
+        const selector = meta.getAttribute('data-input-selector') || '';
+        if (selector === '') return;
+        const endpoint = meta.getAttribute('data-endpoint') || DEFAULT_ENDPOINT;
+        const labelRecent = meta.getAttribute('data-label-recent') || '';
+        const labelMore = meta.getAttribute('data-label-more') || '';
+        document.querySelectorAll(selector).forEach(function (input) {
+            if (!(input instanceof HTMLInputElement)) return;
+            if (input.hasAttribute('data-suggest-input')) return; // already wired
+            // Promote the input's parent (or the input itself wrapped in
+            // a fresh <span>) to the suggest wrapper. Prefer the closest
+            // form-control container so absolutely-positioned menus stay
+            // aligned with the input's box.
+            let wrapper = input.closest('[data-ws-meilisearch-suggest]');
+            if (!wrapper) {
+                wrapper = document.createElement('span');
+                wrapper.className = 'ws-meilisearch-suggest';
+                wrapper.setAttribute('data-ws-meilisearch-suggest', '');
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'inline-block';
+                wrapper.style.width = '100%';
+                input.parentNode.insertBefore(wrapper, input);
+                wrapper.appendChild(input);
+            }
+            wrapper.dataset.endpoint = endpoint;
+            if (labelRecent !== '') wrapper.dataset.labelRecent = labelRecent;
+            if (labelMore !== '') wrapper.dataset.labelMore = labelMore;
+            input.setAttribute('data-suggest-input', '');
+            input.setAttribute('autocomplete', 'off');
+            // Inject the menu list if it isn't already there. Stays
+            // hidden until the first keystroke produces a payload.
+            let menu = wrapper.querySelector('[data-suggest-menu]');
+            if (!menu) {
+                menu = document.createElement('ul');
+                menu.className = 'ws-meilisearch-suggest__menu';
+                menu.setAttribute('data-suggest-menu', '');
+                menu.hidden = true;
+                wrapper.appendChild(menu);
+            }
+            init(wrapper);
+        });
+    }
+
     function start() {
         document.querySelectorAll('[data-ws-meilisearch-suggest]').forEach(init);
+        attachAuto();
     }
 
     if (document.readyState === 'loading') {
