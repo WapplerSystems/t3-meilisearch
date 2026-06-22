@@ -27,4 +27,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Adopt-as-expected: confirm before submit since this permanently
+    // replaces the regression baseline. Same progressive-enhancement
+    // shape — without JS the form still posts (with no confirm).
+    document.querySelectorAll('.ws-rag-adopt-form').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            const btn = form.querySelector('.ws-rag-adopt-btn');
+            const ok = window.confirm(
+                'Replace the expected answer with the last actual answer for this test? '
+                + 'Make sure the actual is factually correct — this becomes the new regression baseline.',
+            );
+            if (!ok) {
+                e.preventDefault();
+                return;
+            }
+            if (btn) {
+                btn.disabled = true;
+            }
+        });
+    });
 });

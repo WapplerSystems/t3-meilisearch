@@ -57,7 +57,7 @@ final class OverviewController
                 $this->diagnoseController->handle($request, $action),
             'knowledgeResources', 'runImporter', 'purgeKnowledgeResources' =>
                 $this->helpDocController->handle($request, $action),
-            'ragtests', 'runRagTest', 'runAllRagTests' =>
+            'ragtests', 'runRagTest', 'runAllRagTests', 'adoptActualAsExpected' =>
                 $this->ragTestController->handle($request, $action),
             default => $this->indexAction($request),
         };

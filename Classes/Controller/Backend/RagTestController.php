@@ -46,9 +46,10 @@ final class RagTestController
     public function handle(ServerRequestInterface $request, string $action): ResponseInterface
     {
         return match ($action) {
-            'runRagTest'     => $this->runOne($request),
-            'runAllRagTests' => $this->runAll($request),
-            default          => $this->index($request),
+            'runRagTest'              => $this->runOne($request),
+            'runAllRagTests'          => $this->runAll($request),
+            'adoptActualAsExpected'   => $this->adoptActual($request),
+            default                   => $this->index($request),
         };
     }
 
@@ -87,6 +88,7 @@ final class RagTestController
             'summary' => $summary,
             'runOneUrl' => $this->context->route('runRagTest'),
             'runAllUrl' => $this->context->route('runAllRagTests'),
+            'adoptUrl' => $this->context->route('adoptActualAsExpected'),
             'newTestUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('record_edit', [
                 'edit' => [self::TABLE => [0 => 'new']],
                 'returnUrl' => $this->context->route('ragtests'),
@@ -138,6 +140,74 @@ final class RagTestController
             default              => ContextualFeedbackSeverity::ERROR,
         };
         $this->context->addFlash($this->describe($row['title'] ?? '', $result), $severity);
+        return $this->context->redirect('ragtests');
+    }
+
+    /**
+     * Promote the last actual answer of a test to its new expected
+     * baseline. Used after the operator has reviewed the answer and
+     * judged it inhaltlich-correct — index drift / model upgrades
+     * routinely produce slightly different wording for the same
+     * factual answer, and lowering the cosine threshold to absorb
+     * that drift would also blind the harness to real regressions.
+     * Snapshot the actual instead.
+     *
+     * Records the previous expected in a flash for one-step undo
+     * visibility (full undo would need a separate version column;
+     * keep that out of scope until a second operator asks for it).
+     */
+    private function adoptActual(ServerRequestInterface $request): ResponseInterface
+    {
+        if ($wrong = $this->context->requirePost($request, 'ragtests')) {
+            return $wrong;
+        }
+        $uid = (int)(($request->getParsedBody() ?? [])['uid'] ?? 0);
+        if ($uid <= 0) {
+            $this->context->addFlash('Test uid missing.', ContextualFeedbackSeverity::ERROR);
+            return $this->context->redirect('ragtests');
+        }
+        $qb = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $qb->getRestrictions()->removeAll()->add(new DeletedRestriction());
+        $row = $qb->select('uid', 'title', 'expected_answer', 'last_actual_answer', 'last_status')
+            ->from(self::TABLE)
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchAssociative();
+        if ($row === false) {
+            $this->context->addFlash(sprintf('Test #%d not found.', $uid), ContextualFeedbackSeverity::ERROR);
+            return $this->context->redirect('ragtests');
+        }
+        $actual = trim((string)($row['last_actual_answer'] ?? ''));
+        if ($actual === '') {
+            $this->context->addFlash(
+                sprintf('Test #%d has no last_actual_answer yet — run the test first, then adopt.', $uid),
+                ContextualFeedbackSeverity::WARNING,
+            );
+            return $this->context->redirect('ragtests');
+        }
+        $oldExpected = (string)($row['expected_answer'] ?? '');
+        if ($oldExpected === $actual) {
+            $this->context->addFlash(
+                sprintf('Test #%d already matches the last actual answer — nothing to adopt.', $uid),
+                ContextualFeedbackSeverity::INFO,
+            );
+            return $this->context->redirect('ragtests');
+        }
+        $upd = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $upd->update(self::TABLE)
+            ->set('expected_answer', $actual)
+            ->set('tstamp', time())
+            ->where($upd->expr()->eq('uid', $upd->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)))
+            ->executeStatement();
+        $this->context->addFlash(
+            sprintf(
+                '"%s" — adopted last actual answer as new expected (%d→%d chars). Re-run to confirm.',
+                (string)($row['title'] ?? '#' . $uid),
+                mb_strlen($oldExpected),
+                mb_strlen($actual),
+            ),
+            ContextualFeedbackSeverity::OK,
+        );
         return $this->context->redirect('ragtests');
     }
 

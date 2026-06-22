@@ -77,6 +77,35 @@
                                     <f:if condition="{t.hidden}">
                                         <span class="badge text-bg-secondary ms-1">hidden</span>
                                     </f:if>
+                                    <f:if condition="{t.last_actual_answer}">
+                                        <!--
+                                            Adopt-as-expected: the actual answer drifts ~0.05 cosine
+                                            across reindex / model upgrades even when factually
+                                            unchanged, which is enough to push a passing test under
+                                            its threshold. Lowering the threshold globally would
+                                            hide real regressions. Instead: let the operator
+                                            promote a manually-OK'd actual to the new baseline.
+                                        -->
+                                        <details class="mt-2 small">
+                                            <summary class="text-muted" style="cursor:pointer;">Show last actual / adopt</summary>
+                                            <div class="ws-rag-adopt-panel mt-2 border rounded p-2 bg-light">
+                                                <div class="mb-1"><strong class="small text-muted">Expected (current baseline):</strong></div>
+                                                <pre class="small bg-white p-2 border rounded mb-2" style="white-space: pre-wrap;">{t.expected_answer -> f:format.htmlspecialchars()}</pre>
+                                                <div class="mb-1"><strong class="small text-muted">Actual (last run):</strong></div>
+                                                <pre class="small bg-white p-2 border rounded mb-2" style="white-space: pre-wrap;">{t.last_actual_answer -> f:format.htmlspecialchars()}</pre>
+                                                <form action="{adoptUrl}" method="post" class="d-inline ws-rag-adopt-form">
+                                                    <input type="hidden" name="token" value="{token}" />
+                                                    <input type="hidden" name="uid" value="{t.uid}" />
+                                                    <button type="submit"
+                                                            class="btn btn-sm btn-warning ws-rag-adopt-btn"
+                                                            data-uid="{t.uid}"
+                                                            title="Replace the expected answer with the latest actual. Use only after manually verifying the actual is factually correct.">
+                                                        ↻ Adopt actual as expected
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </details>
+                                    </f:if>
                                 </td>
                                 <td class="small text-muted">
                                     {t.question -> f:format.crop(maxCharacters: 80) -> f:format.htmlspecialchars()}
