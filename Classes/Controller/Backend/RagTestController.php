@@ -60,7 +60,7 @@ final class RagTestController
         // so the script tag inherits the CSP nonce — inline <script>
         // in the Fluid template would be stripped by strict CSP.
         $this->pageRenderer->addJsFile(
-            'EXT:meilisearch/Resources/Public/JavaScript/Backend/RagTestsRun.js',
+            'EXT:ws_meilisearch/Resources/Public/JavaScript/Backend/RagTestsRun.js',
             'text/javascript',
             false, // compress
             false, // forceOnTop
