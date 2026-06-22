@@ -147,6 +147,23 @@ final class EmbedderConfigurator implements LoggerAwareInterface
             return [];
         }
 
+        // Precompute mode: PHP fetches the embedding itself (with a real
+        // token-bucket against the provider) and writes the vector into
+        // the doc's `_vectors.default` field. Meilisearch's job shrinks
+        // to storing the precomputed vector — register a `userProvided`
+        // embedder with the right dimensions so hybrid search wires up.
+        if ((bool)$settings->get('meilisearch.embedder.precompute', false) === true) {
+            $dims = (int)$settings->get('meilisearch.embedder.dimensions', 0);
+            if ($dims <= 0) {
+                $this->logger?->warning(
+                    'Precompute mode requires meilisearch.embedder.dimensions > 0 for site {id} — skipping embedder push',
+                    ['id' => $site->getIdentifier()],
+                );
+                return [];
+            }
+            return [self::EMBEDDER_NAME => ['source' => 'userProvided', 'dimensions' => $dims]];
+        }
+
         // Infomaniak isn't a native Meilisearch source — it's a preset that
         // resolves to the OpenAI-compatible source with a derived URL, so the
         // user only has to fill productId + model + apiKey.

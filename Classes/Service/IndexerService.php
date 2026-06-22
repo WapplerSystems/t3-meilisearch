@@ -29,6 +29,7 @@ final class IndexerService implements LoggerAwareInterface
         private readonly SearchEngineFactory $engineFactory,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly EmbedderConfigurator $embedderConfigurator,
+        private readonly EmbeddingPrecomputer $embeddingPrecomputer,
     ) {}
 
     public function ensureSchema(Site $site, bool $rebuild = false, bool $skipEmbedder = false): bool
@@ -101,40 +102,24 @@ final class IndexerService implements LoggerAwareInterface
             }
         }
 
-        // Throttle reindex push rate when the embedding provider enforces
-        // a per-minute quota (Scaleway Generative APIs: 60–600 RPM per
-        // model depending on tier; Infomaniak: 60 RPM hard). When set,
-        // each saveDocument wait synchronously for the Meilisearch task
-        // to finish (which in turn waits for the embedding to complete),
-        // and a sleep enforces a minimum interval between pushes. With
-        // no setting (or 0), behaviour is the legacy fire-and-forget.
-        $rpm = (int)$site->getSettings()->get('meilisearch.indexing.requestsPerMinute', 0);
-        $minIntervalUs = $rpm > 0 ? (int)(60_000_000 / $rpm) : 0;
-        $pushOptions = $rpm > 0 ? ['return_slow_promise_result' => true] : [];
-        $lastPushAtUs = 0;
+        // When precompute is on, PHP fetches the embedding itself before
+        // saveDocument and writes it into `_vectors.default`. The throttle
+        // sits inside EmbeddingPrecomputer (token bucket against the
+        // provider); the Meilisearch side gets pre-vectorized documents,
+        // so there is no embedder fan-out to worry about here.
+        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
 
         $count = 0;
         foreach ($this->schemaProviders as $provider) {
             foreach ($provider->iterateDocuments($site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                if ($minIntervalUs > 0) {
-                    $nowUs = (int)(microtime(true) * 1_000_000);
-                    $waitUs = $minIntervalUs - ($nowUs - $lastPushAtUs);
-                    if ($waitUs > 0) {
-                        usleep($waitUs);
-                    }
-                    $lastPushAtUs = (int)(microtime(true) * 1_000_000);
+                $doc = $event->document;
+                if ($precompute) {
+                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
                 }
-                $task = $engine->saveDocument($indexName, $event->document, $pushOptions);
-                if ($task !== null) {
-                    // wait() blocks until the Meilisearch task is no longer
-                    // 'processing' — which includes the embedding fetch —
-                    // so the next loop iteration cannot pile a second
-                    // concurrent embedding request on the provider.
-                    $task->wait();
-                }
-                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $event->document));
+                $engine->saveDocument($indexName, $doc);
+                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
                 $count++;
             }
         }
@@ -148,6 +133,7 @@ final class IndexerService implements LoggerAwareInterface
             return false;
         }
         $indexName = $this->engineFactory->getIndexName($site);
+        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
 
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
@@ -157,8 +143,12 @@ final class IndexerService implements LoggerAwareInterface
             foreach ($provider->fetchDocuments($uid, $site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                $engine->saveDocument($indexName, $event->document);
-                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $event->document));
+                $doc = $event->document;
+                if ($precompute) {
+                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
+                }
+                $engine->saveDocument($indexName, $doc);
+                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
                 $any = true;
             }
             if (!$any) {
