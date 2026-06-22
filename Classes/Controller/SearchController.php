@@ -309,8 +309,11 @@ final class SearchController extends ActionController
         if (!($language instanceof SiteLanguage)) {
             return '';
         }
-        $iso = strtolower((string)$language->getTwoLetterIsoCode());
-        return $iso;
+        // TYPO3 v14 removed SiteLanguage::getTwoLetterIsoCode() — the
+        // replacement path is the Locale value object: ->getLocale()
+        // returns a Symfony Intl Locale, ->getLanguageCode() the
+        // ISO-639-1 stem ("de", "en", "fr").
+        return strtolower((string)$language->getLocale()->getLanguageCode());
     }
 
     private function resolveLanguageLabel(Site $site, int $languageId): string
