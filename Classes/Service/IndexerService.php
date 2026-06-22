@@ -101,12 +101,39 @@ final class IndexerService implements LoggerAwareInterface
             }
         }
 
+        // Throttle reindex push rate when the embedding provider enforces
+        // a per-minute quota (Scaleway Generative APIs: 60–600 RPM per
+        // model depending on tier; Infomaniak: 60 RPM hard). When set,
+        // each saveDocument wait synchronously for the Meilisearch task
+        // to finish (which in turn waits for the embedding to complete),
+        // and a sleep enforces a minimum interval between pushes. With
+        // no setting (or 0), behaviour is the legacy fire-and-forget.
+        $rpm = (int)$site->getSettings()->get('meilisearch.indexing.requestsPerMinute', 0);
+        $minIntervalUs = $rpm > 0 ? (int)(60_000_000 / $rpm) : 0;
+        $pushOptions = $rpm > 0 ? ['return_slow_promise_result' => true] : [];
+        $lastPushAtUs = 0;
+
         $count = 0;
         foreach ($this->schemaProviders as $provider) {
             foreach ($provider->iterateDocuments($site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                $engine->saveDocument($indexName, $event->document);
+                if ($minIntervalUs > 0) {
+                    $nowUs = (int)(microtime(true) * 1_000_000);
+                    $waitUs = $minIntervalUs - ($nowUs - $lastPushAtUs);
+                    if ($waitUs > 0) {
+                        usleep($waitUs);
+                    }
+                    $lastPushAtUs = (int)(microtime(true) * 1_000_000);
+                }
+                $task = $engine->saveDocument($indexName, $event->document, $pushOptions);
+                if ($task !== null) {
+                    // wait() blocks until the Meilisearch task is no longer
+                    // 'processing' — which includes the embedding fetch —
+                    // so the next loop iteration cannot pile a second
+                    // concurrent embedding request on the provider.
+                    $task->wait();
+                }
                 $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $event->document));
                 $count++;
             }
