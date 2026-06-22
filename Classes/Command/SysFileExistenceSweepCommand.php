@@ -9,6 +9,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Doctrine\DBAL\ParameterType;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 
@@ -69,9 +71,9 @@ final class SysFileExistenceSweepCommand extends Command
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file');
         $qb->select('uid', 'storage', 'identifier')
             ->from('sys_file')
-            ->where($qb->expr()->eq('missing', $qb->createNamedParameter(0, \PDO::PARAM_INT)));
+            ->where($qb->expr()->eq('missing', $qb->createNamedParameter(0, ParameterType::INTEGER)));
         if ($storageFilter > 0) {
-            $qb->andWhere($qb->expr()->eq('storage', $qb->createNamedParameter($storageFilter, \PDO::PARAM_INT)));
+            $qb->andWhere($qb->expr()->eq('storage', $qb->createNamedParameter($storageFilter, ParameterType::INTEGER)));
         }
         if ($limit > 0) {
             $qb->setMaxResults($limit);
@@ -142,14 +144,13 @@ final class SysFileExistenceSweepCommand extends Command
         }
 
         $now = time();
-        $conn = $this->connectionPool->getConnectionForTable('sys_file');
         $updated = 0;
         foreach (array_chunk($deadUids, $batchSize) as $chunk) {
             $upd = $this->connectionPool->getQueryBuilderForTable('sys_file');
             $upd->update('sys_file')
                 ->set('missing', 1)
                 ->set('tstamp', $now)
-                ->where($upd->expr()->in('uid', $upd->createNamedParameter($chunk, \TYPO3\CMS\Core\Database\Connection::PARAM_INT_ARRAY)));
+                ->where($upd->expr()->in('uid', $upd->createNamedParameter($chunk, Connection::PARAM_INT_ARRAY)));
             $updated += $upd->executeStatement();
         }
         $io->success(sprintf('Flagged %d sys_file rows as missing.', $updated));
