@@ -259,6 +259,12 @@ settings:
     type: bool
     default: false
 
+  meilisearch.indexing.skipFalForBrokenStorage:
+    label: 'Skip FAL indexing on broken storage'
+    description: 'Emergency bypass: when true, the FileSchemaProvider returns no documents at all. Use this when the FAL storage backend has tombstoned/missing objects (NoSuchKey / 404) for many sys_file rows — each broken row otherwise triggers AWS-SDK retries and stalls the reindex for hours before News / KR / Pages get a chance. Turn off again once sys_file is cleaned up.'
+    type: bool
+    default: false
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'

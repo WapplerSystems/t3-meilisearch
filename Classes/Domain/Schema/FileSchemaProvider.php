@@ -129,6 +129,23 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
 
     public function iterateDocuments(Site $site): iterable
     {
+        // Emergency bypass for environments where the FAL storage backend
+        // returns NoSuchKey / 404 for many sys_file rows (typical after a
+        // bucket rename, a fal_s3 storage swap, or a partial migration).
+        // Each broken row triggers AWS-SDK retry-with-backoff and the
+        // reindex spends hours probing dead keys before News / KR / Pages
+        // get a chance. Operator can set this flag, run the reindex to
+        // populate the other corpora, then clean up sys_file and turn the
+        // flag back off. Pre-reindex cleanup hook still runs — it only
+        // touches Meilisearch-side orphan docs, not sys_file.
+        if ((bool)$site->getSettings()->get('meilisearch.indexing.skipFalForBrokenStorage', false) === true) {
+            $this->logger?->info(
+                'FileSchemaProvider bypassed for site {id} (skipFalForBrokenStorage=true)',
+                ['id' => $site->getIdentifier()],
+            );
+            return;
+        }
+
         $languages = $site->getLanguages();
         $dedupe = $this->shouldDeduplicate($site);
         $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
