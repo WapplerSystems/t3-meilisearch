@@ -586,6 +586,22 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         if ($prefixes === []) {
             return 0;
         }
+        // Skip on a fresh / empty index: a just-recreated index hasn't had
+        // its filterableAttributes pushed yet (apply-settings runs AFTER
+        // the index exists), so `uri CONTAINS "…"` would fail with
+        // "Attribute `uri` is not filterable" — and every subsequent
+        // doc-add task in the same batch inherits that failure. Empty
+        // index has no orphans anyway, so the skip is also semantically
+        // correct.
+        try {
+            $stats = $client->index($indexName)->stats();
+            if ((int)($stats['numberOfDocuments'] ?? 0) === 0) {
+                return 0;
+            }
+        } catch (\Throwable) {
+            // Index doesn't exist yet → no orphans to clean up.
+            return 0;
+        }
         $total = 0;
         foreach ($prefixes as $prefix) {
             // Escape embedded double quotes in the literal (FAL paths
