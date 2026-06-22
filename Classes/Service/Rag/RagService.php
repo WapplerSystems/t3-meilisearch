@@ -120,10 +120,15 @@ final class RagService implements LoggerAwareInterface
             'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
             'url' => (string)$settings->get('meilisearch.rag.url', ''),
             'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
             // Tenant id for vendor-specific providers (currently Infomaniak).
             // Generic providers ignore it.
             'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
         ];
+        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
+        if ($maxTokens > 0) {
+            $llmOptions['maxTokens'] = $maxTokens;
+        }
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);
         $this->eventDispatcher->dispatch($before);
@@ -228,10 +233,15 @@ final class RagService implements LoggerAwareInterface
             'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
             'url' => (string)$settings->get('meilisearch.rag.url', ''),
             'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
             // Tenant id for vendor-specific providers (currently Infomaniak).
             // Generic providers ignore it.
             'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
         ];
+        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
+        if ($maxTokens > 0) {
+            $llmOptions['maxTokens'] = $maxTokens;
+        }
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);
         $this->eventDispatcher->dispatch($before);

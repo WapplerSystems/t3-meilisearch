@@ -265,6 +265,18 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.timeout:
+    label: 'RAG LLM timeout (seconds)'
+    description: 'HTTP timeout for the LLM chat completion call. 60 s suffices for small models / short answers; raise to 120–180 for large models (Scaleway mistral-medium-3.5-128b, Anthropic Sonnet, …) generating long answers from a big RAG context.'
+    type: int
+    default: 60
+
+  meilisearch.rag.maxTokens:
+    label: 'RAG LLM max completion tokens'
+    description: 'Hard cap on the number of tokens the LLM may generate. 0 = no cap (provider default). Set this to bound answer length and stop runaway generations that exceed the HTTP timeout. Reasonable starting point: 600–1000 for instruction-following answers with citations.'
+    type: int
+    default: 0
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'

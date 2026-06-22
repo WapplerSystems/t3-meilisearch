@@ -91,7 +91,13 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
                         'Content-Type' => 'application/json',
                     ],
                     'body' => json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-                    'timeout' => 60,
+                    // Large models on hosted endpoints (Scaleway's
+                    // mistral-medium-3.5-128b, Anthropic's Sonnet, …)
+                    // take 30–120 s for a long RAG completion under
+                    // load. Caller controls it via meilisearch.rag.timeout
+                    // — default 60 s preserves the previous behaviour
+                    // for fast endpoints.
+                    'timeout' => max(1, (int)($options['timeout'] ?? 60)),
                 ],
             );
         } catch (\Throwable $e) {
