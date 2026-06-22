@@ -153,6 +153,14 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         if ($source === 'infomaniak') {
             return $this->buildInfomaniakEmbedder($site);
         }
+        // Same idea for Scaleway Generative APIs (Paris, EU-sovereign).
+        // OpenAI-compatible /v1/embeddings, standard model names with
+        // dashes. Provider chosen for materially higher burst-rate
+        // tolerance than Infomaniak (200 parallel/9s vs 60/min) which
+        // matters for large reindex runs.
+        if ($source === 'scaleway') {
+            return $this->buildScalewayEmbedder($site);
+        }
 
         $allowed = self::SOURCE_FIELDS[$source] ?? null;
         if ($allowed === null) {
@@ -237,6 +245,62 @@ final class EmbedderConfigurator implements LoggerAwareInterface
             if ($value !== '') {
                 $embedder[$field] = $value;
             }
+        }
+        $dims = (int)$settings->get('meilisearch.embedder.dimensions', 0);
+        if ($dims > 0) {
+            $embedder['dimensions'] = $dims;
+        }
+        return [self::EMBEDDER_NAME => $embedder];
+    }
+
+    /**
+     * Scaleway Generative APIs preset. OpenAI-compatible embeddings
+     * endpoint at https://api.scaleway.ai/v1/embeddings, single global
+     * URL (no tenant interpolation needed — auth happens via the API
+     * key in the bearer header).
+     *
+     * Model names use the standard dashed form: `bge-multilingual-gemma2`,
+     * `qwen3-embedding-8b`. Tested with `bge-multilingual-gemma2` at 200
+     * parallel embedding requests/9s → 0 failures, vs Infomaniaks 60/min
+     * cap that broke the 50k-doc reindex.
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    private function buildScalewayEmbedder(Site $site): array
+    {
+        $settings = $site->getSettings();
+        $model = trim((string)$settings->get('meilisearch.embedder.model', ''));
+        $apiKey = trim((string)$settings->get('meilisearch.embedder.apiKey', ''));
+        if ($model === '' || $apiKey === '') {
+            $this->logger?->warning(
+                'Scaleway embedder preset requires meilisearch.embedder.model AND meilisearch.embedder.apiKey for site {id} — skipping embedder push',
+                ['id' => $site->getIdentifier()],
+            );
+            return [];
+        }
+        $embedder = [
+            'source' => 'rest',
+            'url' => 'https://api.scaleway.ai/v1/embeddings',
+            'apiKey' => $apiKey,
+            // Single-text-per-request rather than the array+repeater
+            // batch form — same rationale as Infomaniak: Meilisearch
+            // picks its own batch size with no documented cap, so we
+            // stay on the predictable one-call-per-doc path. Even at
+            // that rate Scaleway sustained 22 req/s in the burst test
+            // without rejecting a single call.
+            'request' => [
+                'model' => $model,
+                'input' => '{{text}}',
+            ],
+            'response' => [
+                'data' => [
+                    ['embedding' => '{{embedding}}'],
+                ],
+            ],
+        ];
+        $template = trim((string)$settings->get('meilisearch.embedder.documentTemplate', ''));
+        if ($template !== '') {
+            $embedder['documentTemplate'] = $template;
         }
         $dims = (int)$settings->get('meilisearch.embedder.dimensions', 0);
         if ($dims > 0) {
