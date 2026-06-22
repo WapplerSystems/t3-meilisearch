@@ -93,6 +93,21 @@ final class RagService implements LoggerAwareInterface
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === [] && ($event->options['matchingStrategy'] ?? '') !== 'last') {
+            // Primary retrieval (default: matchingStrategy=frequency)
+            // returned nothing. Frequency drops the most-frequent tokens
+            // first, which is right for verb-led question shapes ("gebe
+            // …") — but on long natural-language questions ("Wie gebe
+            // ich eine nicht mehr benötigte LINEAR Lizenz wieder frei?")
+            // it can drop the only fach-tokens that anchor the match
+            // and return zero hits. Fall back to "last" — strict
+            // trailing-token drop — which keeps the leading fach-tokens
+            // ("Lizenz") and surfaces "Lizenzen freigeben" again.
+            $retryOpts = $event->options;
+            $retryOpts['matchingStrategy'] = 'last';
+            $searchResult = $this->searchService->search($site, $event->question, $retryOpts);
+            $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        }
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer));
@@ -206,6 +221,14 @@ final class RagService implements LoggerAwareInterface
 
         $searchResult = $this->searchService->search($site, $event->question, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === [] && ($event->options['matchingStrategy'] ?? '') !== 'last') {
+            // See the long comment in ask() — same frequency-→-last
+            // fallback so streaming RAG matches non-streaming behaviour.
+            $retryOpts = $event->options;
+            $retryOpts['matchingStrategy'] = 'last';
+            $searchResult = $this->searchService->search($site, $event->question, $retryOpts);
+            $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        }
         if ($hits === []) {
             yield RagStreamChunk::noContext();
             return;
