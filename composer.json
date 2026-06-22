@@ -1,7 +1,7 @@
 {
     "name": "wapplersystems/meilisearch",
     "type": "typo3-cms-extension",
-    "description": "Meilisearch backend integration for TYPO3 via SEAL abstraction. Indexing, faceted search, typo tolerance, and (later) hybrid + RAG search.",
+    "description": "Meilisearch backend for TYPO3 v14: typo-tolerant full-text search across pages, news and FAL files (Tika-extracted), with hybrid keyword + semantic ranking, RAG-powered chat with cited sources, live suggestions, similar documents, content-language detection, zero-downtime reindex, and a backend analytics tab. SEAL-abstracted so the search backend stays swappable.",
     "license": "GPL-2.0-or-later",
     "authors": [
         {
