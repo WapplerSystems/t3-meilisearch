@@ -182,7 +182,7 @@ settings:
 
   meilisearch.suggest.autoAttachInputSelector:
     label: 'Suggest: auto-attach CSS selector'
-    description: 'CSS selector for search inputs that should get the live-suggestion dropdown without the ws_meilisearch Fluid template (e.g. a header search field carrying the indexed_search form, a custom layout-level search box). Leave empty to disable auto-attach — only inputs inside [data-ws-meilisearch-suggest] wrappers get the dropdown then. Example: "form.tx-indexedsearch-form input[name*=\"sword\"], header input[type=\"search\"]".'
+    description: 'CSS selector for layout-level search inputs (header bar, off-canvas, mobile menu) that should get the live-suggestion dropdown without rendering the ws_meilisearch_search Fluid template themselves. Leave empty to disable auto-attach — only inputs inside [data-ws-meilisearch-suggest] wrappers get the dropdown then. Example: "header input[type=\"search\"], .site-search input[type=\"search\"]".'
     type: string
     default: ''
 

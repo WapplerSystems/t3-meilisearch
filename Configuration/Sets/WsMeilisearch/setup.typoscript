@@ -34,6 +34,8 @@ plugin.tx_wsmeilisearch_search {
 # selector + endpoint URL. The JS reads the meta on DOMContentLoaded
 # and promotes every matching input into a [data-ws-meilisearch-suggest]
 # wrapper so the existing init() path attaches without code changes.
+# Intended for layout-level search fields (header bar, off-canvas
+# menu) that are NOT rendered by the ws_meilisearch Fluid template.
 #
 # Why a meta tag and not inline JS: CSP-strict templates strip
 # unsigned inline <script> blocks; a meta carrying static attributes
