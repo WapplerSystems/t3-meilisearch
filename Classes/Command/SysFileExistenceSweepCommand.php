@@ -116,7 +116,7 @@ final class SysFileExistenceSweepCommand extends Command
                     if ($storage === null) {
                         $stats['error']++;
                         $verdict = 'errored (storage missing)';
-                    } elseif ($storage->getDriver()->fileExists($identifier)) {
+                    } elseif ($storage->hasFile($identifier)) {
                         $stats['alive']++;
                         $verdict = 'alive';
                     } else {
