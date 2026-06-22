@@ -152,7 +152,14 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         // the doc's `_vectors.default` field. Meilisearch's job shrinks
         // to storing the precomputed vector — register a `userProvided`
         // embedder with the right dimensions so hybrid search wires up.
-        if ((bool)$settings->get('meilisearch.embedder.precompute', false) === true) {
+        $precomputeRaw = $settings->get('meilisearch.embedder.precompute', '__MISSING__');
+        error_log(sprintf(
+            '[ws_meilisearch] precompute probe for site %s: value=%s type=%s',
+            $site->getIdentifier(),
+            var_export($precomputeRaw, true),
+            gettype($precomputeRaw),
+        ));
+        if ((bool)$precomputeRaw === true) {
             $dims = (int)$settings->get('meilisearch.embedder.dimensions', 0);
             if ($dims <= 0) {
                 $this->logger?->warning(
