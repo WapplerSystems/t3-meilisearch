@@ -160,15 +160,22 @@ final class SearchService implements LoggerAwareInterface
 
         // matchingStrategy lets the caller switch Meilisearch's
         // "which tokens may be dropped if the corpus has no document
-        // matching all of them?" behaviour. Index default is "last"
-        // (drop trailing tokens) which fails on long natural-language
-        // RAG queries where the FIRST token ("gebe", "wie") doesn't
-        // appear in any KR — Meilisearch refuses to drop a leading
-        // token and returns zero hits even though "Lizenzen freigeben"
-        // is right there in the corpus. RAG retrieval passes
-        // "frequency" so the highest-frequency tokens (function
-        // words, generic verbs) get dropped first.
+        // matching all of them?" behaviour. Three modes:
+        //  - "last"      (Meilisearch default): drop trailing tokens.
+        //                FE-search returns "linear OR building"-style
+        //                matches for the query "linear building", which
+        //                surfaces docs that only mention one of the
+        //                words — confusing for users who typed a 2-word
+        //                product name expecting an exact-phrase intent.
+        //  - "all":      require every query token. Strict AND.
+        //  - "frequency": drop the highest-frequency tokens first.
+        //                Used by RAG retrieval for verb-led questions.
+        // Callers explicitly opt in via the option; otherwise the
+        // SearchConfigurationProvider site-setting controls the default.
         $strategy = (string)($options['matchingStrategy'] ?? '');
+        if ($strategy === '') {
+            $strategy = trim((string)$site->getSettings()->get('meilisearch.search.matchingStrategy', 'all'));
+        }
         if ($strategy !== '') {
             $params['matchingStrategy'] = $strategy;
         }

@@ -295,6 +295,12 @@ settings:
     type: string
     default: 'frequency'
 
+  meilisearch.search.matchingStrategy:
+    label: 'FE search matching strategy'
+    description: 'Meilisearch matchingStrategy used by frontend search. "all" requires every query token (strict AND) — matches user intent for short brand/product queries like "linear building" where a doc that only mentions "linear" should NOT appear. "last" (Meilisearch default) drops trailing tokens, behaving OR-like and surfacing partially-matching docs. Set to empty string to inherit the Meilisearch index default.'
+    type: string
+    default: 'all'
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
