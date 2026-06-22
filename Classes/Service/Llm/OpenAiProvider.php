@@ -39,7 +39,12 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
      */
     protected function resolveBaseUrl(array $options): string
     {
-        return rtrim((string)($options['url'] ?? static::DEFAULT_BASE_URL), '/');
+        // RagService always sends `url` in the options array — empty
+        // string when the operator hasn't overridden it — so a naive
+        // `?? DEFAULT_BASE_URL` would fail (the coalesce doesn't catch
+        // empty strings). Treat empty as missing.
+        $url = trim((string)($options['url'] ?? ''));
+        return $url !== '' ? rtrim($url, '/') : static::DEFAULT_BASE_URL;
     }
 
     /**
