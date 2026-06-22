@@ -283,6 +283,12 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.stopWords:
+    label: 'RAG-specific stop-words'
+    description: 'Override the index-wide stopWords for RAG-retrieval stripping. Use this to keep brand / domain tokens ("linear", "building", "freigeben") in the query while still removing generic question / function words ("wie", "kann", "ich", "der", "die", …). Leave empty to reuse the index-side list. The override is consulted only when meilisearch.rag.stripStopWords is on.'
+    type: stringlist
+    default: []
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'

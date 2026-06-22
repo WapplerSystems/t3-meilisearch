@@ -332,6 +332,15 @@ final class RagService implements LoggerAwareInterface
             // "freigeben") to fire.
             'stripStopWords' => (bool)$settings->get('meilisearch.rag.stripStopWords', true),
         ];
+        // RAG-specific stop-words override: narrow the strip set down to
+        // generic question / function words. Without this override the
+        // FE-tuned index-side stopWords would also nuke brand / domain
+        // tokens ("linear", "building", "freigeben") and the query goes
+        // empty for short product questions like "Was ist LINEAR Building?".
+        $ragStopWords = $settings->get('meilisearch.rag.stopWords', null);
+        if (is_array($ragStopWords) && $ragStopWords !== []) {
+            $opts['stopWords'] = array_values(array_map('strval', $ragStopWords));
+        }
         // Default 0.3 mirrors the settings.definitions.yaml default;
         // hard-coding it here too means sites that never opt into a
         // Site Set still get the RAG-tuned ratio (without it, the
