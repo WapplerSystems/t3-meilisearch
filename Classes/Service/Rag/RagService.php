@@ -320,12 +320,17 @@ final class RagService implements LoggerAwareInterface
             // must be retrieved here even though they're hidden from
             // the public FE search results.
             'includeKnowledgeResources' => true,
-            // Skip the client-side stop-word stripping for RAG. The
-            // stripped form provides too few context tokens for
-            // multi-word synonyms (e.g. "gebe frei" → "freigeben") to
-            // expand properly; Meilisearch's own stop-word handling
-            // tokenises the full natural-language question better.
-            'stripStopWords' => false,
+            // Client-side stop-word stripping: defaults to ON because
+            // long natural-language questions ("Wie kann ich die
+            // Lizenzdatei automatisch importieren?") otherwise drown
+            // the fach-tokens under common-word matches and Meilisearch
+            // ranks irrelevant docs (e.g. "Raumbauteilen angrenzenden
+            // Raum zuweisen") above the obvious hit ("Lizenzdatei
+            // automatisch importieren"). Operator can override via
+            // meilisearch.rag.stripStopWords when the stripped form
+            // becomes too short for synonym expansion ("gebe frei" →
+            // "freigeben") to fire.
+            'stripStopWords' => (bool)$settings->get('meilisearch.rag.stripStopWords', true),
         ];
         // Default 0.3 mirrors the settings.definitions.yaml default;
         // hard-coding it here too means sites that never opt into a

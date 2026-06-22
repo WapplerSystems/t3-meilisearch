@@ -277,6 +277,12 @@ settings:
     type: int
     default: 0
 
+  meilisearch.rag.stripStopWords:
+    label: 'Strip stop-words from RAG queries'
+    description: 'When true, the client-side stop-word stripper runs against RAG-retrieval queries — turning "Wie kann ich die Lizenzdatei automatisch importieren?" into "Lizenzdatei automatisch importieren" before it reaches Meilisearch. Defaults on; raise the relevant fach-tokens above common-word matches. Turn off only when your queries are already short and you rely on multi-word synonym expansion ("gebe frei" → "freigeben") which the stripped form would defeat.'
+    type: bool
+    default: true
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'
