@@ -79,7 +79,20 @@ final class LanguageDetector implements LoggerAwareInterface
             // codes are legitimate (its configured languages plus any
             // partner sites' codes) so a fluke detection of, say,
             // Klingon doesn't end up in the index.
-            $allow = (array)$site->getSettings()->get('meilisearch.indexing.contentLanguageAllowList', []);
+            $rawAllow = $site->getSettings()->get('meilisearch.indexing.contentLanguageAllowList', null);
+            // Defensive parse: typed stringlist comes through as array,
+            // but a list defined only flat in settings.yaml without a
+            // typed identifier comes through as the raw value (string
+            // "[de,en,…]" or comma-separated). Handle both shapes so
+            // operators using either declaration style get the same
+            // behaviour.
+            $allow = [];
+            if (\is_array($rawAllow)) {
+                $allow = $rawAllow;
+            } elseif (\is_string($rawAllow) && $rawAllow !== '') {
+                $trimmed = \trim($rawAllow, " \t\n\r\0\x0B[]");
+                $allow = \array_filter(\array_map('trim', \explode(',', $trimmed)));
+            }
             if ($allow !== [] && !\in_array($code, \array_map('strtolower', \array_map('strval', $allow)), true)) {
                 $code = '';
             }
