@@ -285,11 +285,24 @@
     }
 
     function linkFor(hit) {
+        // The suggest endpoint already resolves the right target for
+        // every type into publicUrl (file public URL for files, the
+        // speaking page/record URI for pages/news/knowledge resources).
+        // Use it directly instead of rebuilding a non-speaking ?id= link
+        // (which ignored the language prefix) or returning '#'.
+        var url = hit.publicUrl;
+        if (url) {
+            // Absolute URLs (e.g. S3-hosted files) pass through; a
+            // storage-relative file path without a leading slash gets one.
+            if (/^https?:\/\//i.test(url) || url.charAt(0) === '/') {
+                return url;
+            }
+            return '/' + url.replace(/^\/+/, '');
+        }
+        // Fallback only when no URL was resolved (e.g. a page without an
+        // indexed URI): a non-speaking id link still beats a dead '#'.
         if (hit.type === 'page' && hit.uid) {
             return '?id=' + encodeURIComponent(hit.uid);
-        }
-        if (hit.type === 'file' && hit.publicUrl) {
-            return '/' + hit.publicUrl.replace(/^\/+/, '');
         }
         return '#';
     }
