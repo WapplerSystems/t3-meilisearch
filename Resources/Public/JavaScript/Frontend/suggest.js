@@ -87,13 +87,18 @@
         }
 
         function open(payload, query) {
+            const grouped = payload.grouped === true && Array.isArray(payload.groups);
             const hits = Array.isArray(payload.hits) ? payload.hits : [];
             if (hits.length === 0) {
                 close();
                 return;
             }
-            menu.innerHTML = renderMenu(hits, payload.totalHits, query, labels);
+            menu.innerHTML = grouped
+                ? renderMenuGrouped(payload.groups, payload.totalHits, query, labels)
+                : renderMenu(hits, payload.totalHits, query, labels);
             menu.hidden = false;
+            // Keyboard navigation walks the [data-suggest-item] rows;
+            // group headers carry no such marker, so they're skipped.
             items = Array.from(menu.querySelectorAll('[data-suggest-item]'));
             activeIndex = -1;
         }
@@ -266,17 +271,45 @@
         return header + items;
     }
 
+    // One dropdown row. showBadge=false in grouped mode, where the
+    // section header already names the type so a per-row badge would be
+    // redundant.
+    function renderHitItem(hit, i, showBadge) {
+        return [
+            '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
+            ' data-suggest-item class="ws-meilisearch-suggest__item">',
+            '<a href="' + escapeAttr(linkFor(hit)) + '" class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
+            showBadge ? '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.typeLabel || hit.type || '?') + '</span>' : '',
+            '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
+            '</a>',
+            '</li>',
+        ].join('');
+    }
+
+    // Grouped dropdown: one labelled section per type. Item ids stay
+    // globally unique (running idx) so aria-activedescendant works; the
+    // header <li> carries no data-suggest-item, so keyboard nav skips it.
+    function renderMenuGrouped(groups, totalHits, query, labels) {
+        var idx = 0;
+        var shown = 0;
+        var sections = groups.map(function (group) {
+            var head = '<li class="ws-meilisearch-suggest__group-header text-muted small text-uppercase" role="presentation">'
+                + escapeText(group.label || group.type || '') + '</li>';
+            var rows = (Array.isArray(group.hits) ? group.hits : []).map(function (hit) {
+                shown++;
+                return renderHitItem(hit, idx++, false);
+            }).join('');
+            return head + rows;
+        }).join('');
+        var footer = (totalHits > shown)
+            ? '<li class="ws-meilisearch-suggest__footer text-muted small">' + escapeText(labels.more.replace('%d', String(totalHits - shown))) + '</li>'
+            : '';
+        return sections + footer;
+    }
+
     function renderMenu(hits, totalHits, query, labels) {
         const items = hits.map(function (hit, i) {
-            return [
-                '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
-                ' data-suggest-item class="ws-meilisearch-suggest__item">',
-                '<a href="' + escapeAttr(linkFor(hit)) + '" class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
-                '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.typeLabel || hit.type || '?') + '</span>',
-                '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
-                '</a>',
-                '</li>',
-            ].join('');
+            return renderHitItem(hit, i, true);
         }).join('');
         const footer = (totalHits > hits.length)
             ? '<li class="ws-meilisearch-suggest__footer text-muted small">' + escapeText(labels.more.replace('%d', String(totalHits - hits.length))) + '</li>'

@@ -53,6 +53,22 @@
     margin-top: 0.25rem;
 }
 
+.ws-meilisearch-suggest__group-header {
+    padding: 0.35rem 0.875rem 0.2rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: #6c757d;
+    pointer-events: none;
+}
+
+/* Separator above every section except the first. */
+.ws-meilisearch-suggest__group-header ~ .ws-meilisearch-suggest__group-header,
+.ws-meilisearch-suggest__item + .ws-meilisearch-suggest__group-header {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 0.25rem;
+}
+
 .ws-meilisearch-suggest__header {
     padding: 0.35rem 0.875rem;
     font-size: 0.75rem;

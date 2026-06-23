@@ -94,6 +94,24 @@ final class SuggestEndpoint implements MiddlewareInterface
         // empty) always pass through.
         $filters = $this->accessControlFilter->applyTo($filters, $site, $request);
 
+        $settings = $site->getSettings();
+        $limit = max(1, (int)$settings->get('meilisearch.suggest.limit', self::LIMIT));
+        $groupByType = (bool)$settings->get('meilisearch.suggest.groupByType', false);
+        $perTypeLimit = max(1, (int)$settings->get('meilisearch.suggest.perTypeLimit', 3));
+        // Ordered allow-list of types for the grouped dropdown. Empty =
+        // every type that surfaces, in first-seen (relevance) order.
+        $typeOrder = [];
+        foreach ((array)$settings->get('meilisearch.suggest.types', []) as $t) {
+            if (is_string($t) && $t !== '') {
+                $typeOrder[] = $t;
+            }
+        }
+        // Over-fetch headroom: grouped mode needs enough rows per type
+        // (after dedupe) to fill each section up to perTypeLimit.
+        $overFetch = $groupByType
+            ? max($limit, $perTypeLimit * max(count($typeOrder), 4)) * 3
+            : $limit * 4;
+
         // The suggest endpoint deliberately runs the keyword path even
         // when an embedder is configured. Live dropdowns benefit from
         // exact-prefix matches, which the keyword retriever is better at
@@ -103,7 +121,7 @@ final class SuggestEndpoint implements MiddlewareInterface
         // the LIMIT — same uid+type can still surface twice on metadata
         // duplicates within one language.
         $result = $this->searchService->search($site, $query, [
-            'perPage' => self::LIMIT * 4,
+            'perPage' => $overFetch,
             'page' => 1,
             'hybrid' => false,
             'filters' => $filters,
@@ -170,13 +188,57 @@ final class SuggestEndpoint implements MiddlewareInterface
                 'language' => (int)($hit['language'] ?? 0),
                 'publicUrl' => $url !== '' ? $url : null,
             ];
-            if (count($hits) >= self::LIMIT) {
+            // Grouped mode needs the full deduped set (bounded by the
+            // over-fetch above) to fill every section; flat mode stops
+            // as soon as it has the overall limit.
+            if (!$groupByType && count($hits) >= $limit) {
                 break;
             }
         }
 
+        if (!$groupByType) {
+            return new JsonResponse([
+                'hits' => array_slice($hits, 0, $limit),
+                'totalHits' => $result->totalHits,
+            ]);
+        }
+
+        // Group by type. Section order: configured types first (in the
+        // operator's order), then any remaining surfaced types in
+        // relevance order. Each section capped at perTypeLimit.
+        $byType = [];
+        foreach ($hits as $h) {
+            $byType[$h['type']][] = $h;
+        }
+        $orderedTypes = $typeOrder;
+        foreach (array_keys($byType) as $t) {
+            if (!in_array($t, $orderedTypes, true)) {
+                $orderedTypes[] = $t;
+            }
+        }
+        $groups = [];
+        $flat = [];
+        foreach ($orderedTypes as $t) {
+            if (empty($byType[$t])) {
+                continue;
+            }
+            $groupHits = array_slice($byType[$t], 0, $perTypeLimit);
+            $groups[] = [
+                'type' => $t,
+                'label' => (string)($groupHits[0]['typeLabel'] ?? $t),
+                'hits' => $groupHits,
+            ];
+            foreach ($groupHits as $gh) {
+                $flat[] = $gh;
+            }
+        }
+
         return new JsonResponse([
-            'hits' => $hits,
+            'grouped' => true,
+            'groups' => $groups,
+            // Flat concatenation kept for the empty-check + any consumer
+            // that ignores grouping.
+            'hits' => $flat,
             'totalHits' => $result->totalHits,
         ]);
     }

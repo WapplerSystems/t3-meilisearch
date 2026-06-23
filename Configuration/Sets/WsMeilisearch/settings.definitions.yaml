@@ -204,6 +204,30 @@ settings:
     type: string
     default: ''
 
+  meilisearch.suggest.limit:
+    label: 'Suggest: max results'
+    description: 'Maximum number of suggestions in the flat (ungrouped) dropdown, and the overall cap. Default 5.'
+    type: int
+    default: 5
+
+  meilisearch.suggest.groupByType:
+    label: 'Suggest: group preview by type'
+    description: 'When ON, the dropdown is split into per-type sections (Pages, News, Files, …) with a heading per type instead of one flat relevance-ranked list. Each section is capped at "Suggest: results per type". OFF (default) keeps the flat list.'
+    type: bool
+    default: false
+
+  meilisearch.suggest.perTypeLimit:
+    label: 'Suggest: results per type'
+    description: 'Maximum suggestions shown per type section when "group preview by type" is ON. Default 3.'
+    type: int
+    default: 3
+
+  meilisearch.suggest.types:
+    label: 'Suggest: type order / allow-list'
+    description: 'Ordered list of document types to show as sections when "group preview by type" is ON (e.g. [page, news, file, knowledge_resource]). The sections render in this order. Leave empty to show every type that surfaces, in relevance order. Types not listed here are appended after the configured ones.'
+    type: stringlist
+    default: []
+
   meilisearch.rag.chatWidget.label:
     label: 'Chat widget label'
     description: 'Used as the panel heading AND as the bubble''s aria-label / tooltip. Keep it short and self-explanatory (e.g. "KI-Chat", "Frag uns", "Help").'
