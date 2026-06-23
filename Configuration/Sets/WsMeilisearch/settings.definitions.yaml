@@ -272,10 +272,12 @@ settings:
 
   meilisearch.indexing.excludeIdentifierPrefixes:
     label: 'Excluded sys_file identifier prefixes'
-    description: 'Sys_file rows whose identifier starts with any of these prefixes are skipped. Use to keep generated artefacts out of the search corpus — e.g. `/typo3temp/` (chart PNGs, cached previews) or `/_processed_/` (FAL-generated derivatives). Leading slash matters; matched with str_starts_with, case-sensitive. Default: [/typo3temp/].'
+    description: 'Sys_file rows whose identifier starts with any of these prefixes are skipped. Matched with str_starts_with (case-sensitive) against the FAL identifier, which is STORAGE-RELATIVE and does NOT contain the public `/fileadmin/` segment — e.g. a frontend form upload has identifier `/user_upload/form_<hash>/file.pdf`, so the prefix is `/user_upload/form_`, NOT `/fileadmin/user_upload/`. Defaults keep generated artefacts (`/typo3temp/`), privacy-sensitive frontend form uploads (`/user_upload/form_`) and published extension assets (`/_assets/`) out of the search corpus. Default: [/typo3temp/, /user_upload/form_, /_assets/].'
     type: stringlist
     default:
       - '/typo3temp/'
+      - '/user_upload/form_'
+      - '/_assets/'
 
   meilisearch.indexing.requestsPerMinute:
     label: 'Reindex throttle (requests / minute)'
