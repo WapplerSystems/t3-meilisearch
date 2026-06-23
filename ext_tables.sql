@@ -109,6 +109,13 @@ CREATE TABLE tx_wsmeilisearch_search_log (
     source          VARCHAR(32) DEFAULT 'search' NOT NULL,
     -- Whether the query was hybrid (keyword + semantic).
     hybrid          TINYINT(1) UNSIGNED DEFAULT 0 NOT NULL,
+    -- RAG-only columns (empty/0 for source='search'|'suggest'):
+    -- the RagAnalyticsLogger writes one row per answered RAG turn.
+    -- status = ok|no_context|failed; cited_count = number of sources
+    -- the LLM actually cited (0 with status=ok flags a low-confidence
+    -- answer worth reviewing).
+    status          VARCHAR(16) DEFAULT '' NOT NULL,
+    cited_count     INT(11) UNSIGNED DEFAULT 0 NOT NULL,
 
     PRIMARY KEY (uid),
     KEY site_lang_crdate (site_identifier, language_id, crdate),

@@ -177,5 +177,78 @@
         </div>
     </div>
 
+    <!-- ============== RAG ============== -->
+    <h2 class="h4 mt-5">RAG</h2>
+    <p class="text-muted small">
+        Pro beantworteter RAG-Anfrage wird eine Zeile mit <code>source='rag'</code> gespeichert
+        ({Frage, Status, Anzahl Kontext-Treffer, Anzahl zitierter Quellen, Hybrid, Zeit}) — kein Antworttext.
+    </p>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">RAG-Anfragen ({windowDays}d)</div>
+                    <div class="display-6">{rag.total}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Beantwortet (ok)</div>
+                    <div class="display-6 text-success">{rag.ok}</div>
+                    <div class="small text-muted">Ø {rag.avgCited} zitierte Quellen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 {f:if(condition: '{rag.lowConfidence} > 0', then: 'border-warning')}">
+                <div class="card-body">
+                    <div class="text-muted small">Low-Confidence (ok, 0 Zitate)</div>
+                    <div class="display-6 {f:if(condition: '{rag.lowConfidence} > 0', then: 'text-warning')}">{rag.lowConfidence}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 {f:if(condition: '{rag.failed} > 0', then: 'border-danger')}">
+                <div class="card-body">
+                    <div class="text-muted small">Kein Kontext / Fehler</div>
+                    <div class="display-6">{rag.noContext} <small class="text-muted">/</small> <span class="{f:if(condition: '{rag.failed} > 0', then: 'text-danger')}">{rag.failed}</span></div>
+                    <div class="small text-muted">no_context / failed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><strong>Top RAG-Fragen</strong> <small class="text-muted">(häufigste, Top 20)</small></div>
+                <div class="card-body p-0">
+                    <f:if condition="{ragTopQueries}">
+                        <f:then>
+                            <table class="table table-sm m-0">
+                                <thead>
+                                    <tr><th>Frage</th><th class="text-end">Anzahl</th><th class="text-end">Ø Kontext-Treffer</th></tr>
+                                </thead>
+                                <tbody>
+                                    <f:for each="{ragTopQueries}" as="q">
+                                        <tr>
+                                            <td>{q.query -> f:format.htmlspecialchars()}</td>
+                                            <td class="text-end">{q.hits}</td>
+                                            <td class="text-end font-monospace small">{q.avgResults}</td>
+                                        </tr>
+                                    </f:for>
+                                </tbody>
+                            </table>
+                        </f:then>
+                        <f:else>
+                            <div class="p-3 text-muted small">Keine RAG-Anfragen im gewählten Zeitraum.</div>
+                        </f:else>
+                    </f:if>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </f:section>
 </html>

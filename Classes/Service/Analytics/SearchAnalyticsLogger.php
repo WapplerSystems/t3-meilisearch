@@ -54,6 +54,14 @@ final class SearchAnalyticsLogger implements LoggerAwareInterface
         if (!$site instanceof Site) {
             return;
         }
+        // RAG retrieval runs through SearchService too and would
+        // otherwise land here as a phantom 'search' row (plus one row
+        // per fallback-ladder retry). The RagAnalyticsLogger writes a
+        // single clean 'rag' row from AfterRagAnswerEvent instead, so
+        // skip the internal retrieval search entirely.
+        if (!empty($event->options['__skipAnalytics'])) {
+            return;
+        }
         $settings = $site->getSettings();
         if ((bool)$settings->get('meilisearch.analytics.enabled', false) !== true) {
             return;

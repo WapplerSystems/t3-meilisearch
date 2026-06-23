@@ -67,11 +67,18 @@ final class AnalyticsController
 
         $analyticsEnabled = $this->analyticsEnabledAnywhere();
 
-        $totals = $this->totals($cutoff, $siteFilter);
-        $topQueries = $this->topQueries($cutoff, $siteFilter, false);
-        $zeroResultQueries = $this->topQueries($cutoff, $siteFilter, true);
+        // Keyword-search panels exclude RAG rows so RAG questions don't
+        // skew the search top-queries / zero-result histograms. RAG gets
+        // its own panel below; the source breakdown stays unfiltered.
+        $keywordSources = ['search', 'suggest'];
+        $totals = $this->totals($cutoff, $siteFilter, $keywordSources);
+        $topQueries = $this->topQueries($cutoff, $siteFilter, false, $keywordSources);
+        $zeroResultQueries = $this->topQueries($cutoff, $siteFilter, true, $keywordSources);
         $sourceBreakdown = $this->sourceBreakdown($cutoff, $siteFilter);
         $hybridRate = $this->hybridRate($cutoff, $siteFilter);
+
+        $rag = $this->ragStats($cutoff, $siteFilter);
+        $ragTopQueries = $this->topQueries($cutoff, $siteFilter, false, ['rag']);
 
         $moduleTemplate->assignMultiple([
             'analyticsEnabled' => $analyticsEnabled,
@@ -83,6 +90,8 @@ final class AnalyticsController
             'zeroResultQueries' => $zeroResultQueries,
             'sourceBreakdown' => $sourceBreakdown,
             'hybridRate' => $hybridRate,
+            'rag' => $rag,
+            'ragTopQueries' => $ragTopQueries,
             'baseUrl' => $this->context->route('analytics'),
             ...$this->context->tabNavData(),
             'active' => 'analytics',
@@ -91,29 +100,31 @@ final class AnalyticsController
     }
 
     /**
+     * @param list<string>|null $sources
      * @return array{rows:int, distinctQueries:int, zeroResultRows:int}
      */
-    private function totals(int $cutoff, string $siteFilter): array
+    private function totals(int $cutoff, string $siteFilter, ?array $sources = null): array
     {
-        $qb = $this->base($cutoff, $siteFilter);
+        $qb = $this->base($cutoff, $siteFilter, $sources);
         $rows = (int)$qb->count('uid')->executeQuery()->fetchOne();
 
-        $qb = $this->base($cutoff, $siteFilter);
+        $qb = $this->base($cutoff, $siteFilter, $sources);
         $distinct = (int)$qb->addSelectLiteral('COUNT(DISTINCT query) AS distinctQueries')
             ->executeQuery()->fetchOne();
 
-        $qb = $this->base($cutoff, $siteFilter);
+        $qb = $this->base($cutoff, $siteFilter, $sources);
         $zero = (int)$qb->andWhere($qb->expr()->eq('result_count', $qb->createNamedParameter(0, ParameterType::INTEGER)))
             ->count('uid')->executeQuery()->fetchOne();
         return ['rows' => $rows, 'distinctQueries' => $distinct, 'zeroResultRows' => $zero];
     }
 
     /**
+     * @param list<string>|null $sources
      * @return list<array{query:string, hits:int, avgResults:float}>
      */
-    private function topQueries(int $cutoff, string $siteFilter, bool $onlyZero): array
+    private function topQueries(int $cutoff, string $siteFilter, bool $onlyZero, ?array $sources = null): array
     {
-        $qb = $this->base($cutoff, $siteFilter);
+        $qb = $this->base($cutoff, $siteFilter, $sources);
         $qb->addSelectLiteral('query', 'COUNT(*) AS hits', 'AVG(result_count) AS avgResults');
         if ($onlyZero) {
             $qb->andWhere($qb->expr()->eq('result_count', $qb->createNamedParameter(0, ParameterType::INTEGER)));
@@ -172,6 +183,45 @@ final class AnalyticsController
     }
 
     /**
+     * RAG usage panel: volume + status mix + low-confidence rate over
+     * the window. "Low confidence" = answered (status=ok) but the LLM
+     * cited nothing — the answers worth a human spot-check.
+     *
+     * @return array{total:int, ok:int, noContext:int, failed:int, lowConfidence:int, avgCited:float}
+     */
+    private function ragStats(int $cutoff, string $siteFilter): array
+    {
+        $qb = $this->base($cutoff, $siteFilter, ['rag']);
+        $qb->addSelectLiteral('status', 'COUNT(*) AS count')->groupBy('status');
+        $byStatus = [];
+        foreach ($qb->executeQuery()->fetchAllAssociative() as $r) {
+            $byStatus[(string)$r['status']] = (int)$r['count'];
+        }
+        $total = array_sum($byStatus);
+
+        $qb = $this->base($cutoff, $siteFilter, ['rag']);
+        $lowConfidence = (int)$qb
+            ->andWhere(
+                $qb->expr()->eq('status', $qb->createNamedParameter('ok')),
+                $qb->expr()->eq('cited_count', $qb->createNamedParameter(0, ParameterType::INTEGER)),
+            )
+            ->count('uid')->executeQuery()->fetchOne();
+
+        $qb = $this->base($cutoff, $siteFilter, ['rag']);
+        $avgCited = (float)$qb->addSelectLiteral('AVG(cited_count) AS avgCited')
+            ->executeQuery()->fetchOne();
+
+        return [
+            'total' => $total,
+            'ok' => $byStatus['ok'] ?? 0,
+            'noContext' => $byStatus['no_context'] ?? 0,
+            'failed' => $byStatus['failed'] ?? 0,
+            'lowConfidence' => $lowConfidence,
+            'avgCited' => round($avgCited, 1),
+        ];
+    }
+
+    /**
      * Site-setting probe — true when at least one configured site has
      * analytics.enabled. Drives the empty-state hint in the template
      * (no rows can mean "no traffic" OR "feature off"; this disambiguates).
@@ -186,13 +236,25 @@ final class AnalyticsController
         return false;
     }
 
-    private function base(int $cutoff, string $siteFilter): \TYPO3\CMS\Core\Database\Query\QueryBuilder
+    /**
+     * @param list<string>|null $sources Restrict to these source values
+     *        (e.g. ['search','suggest'] for the keyword panels, ['rag']
+     *        for the RAG panel). Null = all sources (used by the source
+     *        breakdown).
+     */
+    private function base(int $cutoff, string $siteFilter, ?array $sources = null): \TYPO3\CMS\Core\Database\Query\QueryBuilder
     {
         $qb = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $qb->from(self::TABLE)
             ->where($qb->expr()->gte('crdate', $qb->createNamedParameter($cutoff, ParameterType::INTEGER)));
         if ($siteFilter !== '') {
             $qb->andWhere($qb->expr()->eq('site_identifier', $qb->createNamedParameter($siteFilter)));
+        }
+        if ($sources !== null && $sources !== []) {
+            $qb->andWhere($qb->expr()->in(
+                'source',
+                $qb->createNamedParameter($sources, \Doctrine\DBAL\ArrayParameterType::STRING),
+            ));
         }
         return $qb;
     }

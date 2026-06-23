@@ -98,7 +98,7 @@ final class RagService implements LoggerAwareInterface
         }
         if ($hits === []) {
             $answer = RagAnswer::noContext();
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
             return $answer;
         }
 
@@ -144,7 +144,7 @@ final class RagService implements LoggerAwareInterface
                 'exception' => $e,
             ]);
             $answer = RagAnswer::failed($e->getMessage());
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
             return $answer;
         }
 
@@ -155,7 +155,7 @@ final class RagService implements LoggerAwareInterface
             citedIds: $citedIds,
             status: 'ok',
         );
-        $after = new AfterRagAnswerEvent($event->question, $answer);
+        $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($after);
         return $after->answer;
     }
@@ -218,6 +218,12 @@ final class RagService implements LoggerAwareInterface
         }
         if ($hits === []) {
             yield RagStreamChunk::noContext();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
+                $event->question,
+                RagAnswer::noContext(),
+                $site,
+                $this->resolveLanguageId($options),
+            ));
             return;
         }
 
@@ -268,7 +274,7 @@ final class RagService implements LoggerAwareInterface
                 sources: $hits,
                 citedIds: $citedIds,
                 status: 'ok',
-            )));
+            ), $site, $this->resolveLanguageId($options)));
             return;
         }
 
@@ -287,6 +293,12 @@ final class RagService implements LoggerAwareInterface
                 'exception' => $e,
             ]);
             yield RagStreamChunk::failed($e->getMessage());
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
+                $event->question,
+                RagAnswer::failed($e->getMessage()),
+                $site,
+                $this->resolveLanguageId($options),
+            ));
             return;
         }
 
@@ -298,7 +310,7 @@ final class RagService implements LoggerAwareInterface
             sources: $hits,
             citedIds: $citedIds,
             status: 'ok',
-        )));
+        ), $site, $this->resolveLanguageId($options)));
     }
 
     /**
@@ -368,6 +380,12 @@ final class RagService implements LoggerAwareInterface
         $opts = [
             'perPage' => $maxHits,
             'hybrid' => $useHybrid,
+            // Don't let the internal retrieval search show up in the
+            // search analytics log — the RagAnalyticsLogger records the
+            // RAG turn (question + status + cited count) separately.
+            // Survives the fallback ladder because those retries reuse
+            // this options array.
+            '__skipAnalytics' => true,
             // Knowledge resources are the primary grounding corpus and
             // must be retrieved here even though they're hidden from
             // the public FE search results.
