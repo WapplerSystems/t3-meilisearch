@@ -1,0 +1,34 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    Action suggestions under a RAG answer. Each {suggestion} is
+    {type, label, value}:
+      - recommend → value is a resolved source URL (server-grounded, never
+        a hallucinated link) → plain external link.
+      - followup / refine → value is a question/query → re-ask via the Rag
+        plugin (ask action), keeping the visitor in the chat.
+    Empty/absent {suggestions} renders nothing.
+</f:comment>
+<f:if condition="{suggestions}">
+    <div class="ws-meilisearch-rag-suggestions mt-3">
+        <small class="text-muted d-block mb-2">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading"/>
+        </small>
+        <div class="d-flex flex-wrap gap-2">
+            <f:for each="{suggestions}" as="suggestion">
+                <f:if condition="{suggestion.type} == 'recommend'">
+                    <f:then>
+                        <a href="{suggestion.value}"
+                           class="btn btn-sm btn-outline-secondary ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--recommend"
+                           rel="noopener">{suggestion.label}</a>
+                    </f:then>
+                    <f:else>
+                        <f:link.action action="ask"
+                            arguments="{q: suggestion.value}"
+                            class="btn btn-sm btn-outline-primary ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--{suggestion.type}">{suggestion.label}</f:link.action>
+                    </f:else>
+                </f:if>
+            </f:for>
+        </div>
+    </div>
+</f:if>
+</html>

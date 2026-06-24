@@ -510,6 +510,18 @@ settings:
     type: int
     default: 3
 
+  meilisearch.rag.suggestions.enabled:
+    label: 'RAG: action suggestions under the answer'
+    description: 'When true, after each answer one short extra LLM call proposes up to N actionable buttons: follow-up questions, narrower search queries, and pointers to retrieved sources. Optional + safe — when disabled or on any error no suggestions are shown and the answer is unaffected.'
+    type: bool
+    default: true
+
+  meilisearch.rag.suggestions.max:
+    label: 'RAG: max action suggestions'
+    description: 'Upper bound on how many suggestion buttons are shown under an answer (1–8).'
+    type: int
+    default: 4
+
   meilisearch.rag.useHybrid:
     label: 'Use hybrid search for retrieval'
     description: 'When true, RAG retrieval uses hybrid (keyword + semantic) search instead of keyword-only. Requires a configured embedder. Ignored when no embedder is configured.'

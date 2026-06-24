@@ -129,6 +129,14 @@
         </f:if>
 
         <f:comment>
+            Action suggestions (followup / refine / recommend) for the latest
+            answer — rendered below the answer card or the conversation thread.
+            {answer.suggestions} is empty unless the answer is ok and the
+            feature is enabled, so the partial produces no markup otherwise.
+        </f:comment>
+        <f:render partial="Rag/Suggestions" arguments="{suggestions: answer.suggestions}"/>
+
+        <f:comment>
             Contact fallback — rendered below whatever the switch
             produced (answer card, no_context/failed alert, or the
             conversation thread). Controller sets {showFallback} per

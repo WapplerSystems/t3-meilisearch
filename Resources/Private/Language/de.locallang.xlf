@@ -51,6 +51,10 @@
                 <source>Sources</source>
                 <target>Quellen</target>
             </trans-unit>
+            <trans-unit id="rag.suggestions.heading">
+                <source>Suggestions</source>
+                <target>Vorschläge</target>
+            </trans-unit>
             <trans-unit id="rag.answer.lowConfidence">
                 <source>&lt;strong&gt;Heads up:&lt;/strong&gt; the assistant didn&apos;t cite any of the retrieved documents — the answer above may not be directly grounded in the indexed content. Try rephrasing with more specific terms.</source>
                 <target>&lt;strong&gt;Hinweis:&lt;/strong&gt; Die KI hat keines der gefundenen Dokumente als Quelle angegeben — die Antwort oben ist möglicherweise nicht direkt aus dem indexierten Inhalt abgeleitet. Versuche es mit präziseren Begriffen.</target>

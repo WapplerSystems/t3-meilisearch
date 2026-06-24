@@ -20,7 +20,28 @@ final class RagAnswer
         public readonly array $citedIds,
         public readonly string $status,
         public readonly ?string $error = null,
+        /** @var list<array{type:string,label:string,value:string}> */
+        public readonly array $suggestions = [],
     ) {}
+
+    /**
+     * Immutable copy with action suggestions attached (followup / refine /
+     * recommend). Generated after the answer so the model can base them on
+     * the produced text + sources; never affects the answer itself.
+     *
+     * @param list<array{type:string,label:string,value:string}> $suggestions
+     */
+    public function withSuggestions(array $suggestions): self
+    {
+        return new self(
+            $this->answer,
+            $this->sources,
+            $this->citedIds,
+            $this->status,
+            $this->error,
+            $suggestions,
+        );
+    }
 
     public static function failed(string $error): self
     {

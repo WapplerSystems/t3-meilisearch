@@ -57,6 +57,7 @@ final class RagService implements LoggerAwareInterface
         private readonly PromptBuilder $promptBuilder,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly QueryRewriter $queryRewriter,
+        private readonly SuggestionGenerator $suggestionGenerator,
     ) {}
 
     /**
@@ -175,7 +176,14 @@ final class RagService implements LoggerAwareInterface
         );
         $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($after);
-        return $after->answer;
+        $final = $after->answer;
+        // Decision-support suggestions (followup / refine / recommend),
+        // rendered as buttons under the answer. Generated from the final
+        // answer + sources; returns [] when disabled or on any error, so it
+        // never blocks the answer.
+        return $final->withSuggestions(
+            $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
+        );
     }
 
     /**
