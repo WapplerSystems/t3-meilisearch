@@ -5,17 +5,24 @@ namespace WapplerSystems\Meilisearch\Domain\Schema;
 
 use CmsIg\Seal\Schema\Field\IntegerField;
 use CmsIg\Seal\Schema\Field\TextField;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceInterface;
+use WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceRegistry;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 
-final class NewsSchemaProvider implements SchemaProviderInterface
+final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly BoostCalculator $boostCalculator,
         private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
+        private readonly PluginRecordSourceRegistry $recordSourceRegistry,
     ) {}
 
     public function getTable(): string
@@ -46,6 +53,8 @@ final class NewsSchemaProvider implements SchemaProviderInterface
         if (!ExtensionManagementUtility::isLoaded('news')) {
             return;
         }
+        $source = $this->newsSource();
+        $reachable = $source?->collectReachableUids($site);
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_news_domain_model_news');
         $row = $qb->select(...$this->columnsToSelect())
             ->from('tx_news_domain_model_news')
@@ -57,7 +66,13 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             ->executeQuery()
             ->fetchAssociative();
         if ($row !== false) {
-            yield $this->toDocument($row, $site);
+            // Scope: only index the record if a news plugin actually makes
+            // it reachable. Unreachable records are skipped (eviction of a
+            // now-unreachable record is the change listener's job).
+            if ($reachable !== null && !$this->isReachable($row, $reachable)) {
+                return;
+            }
+            yield $this->toDocument($row, $site, $source);
         }
     }
 
@@ -66,6 +81,8 @@ final class NewsSchemaProvider implements SchemaProviderInterface
         if (!ExtensionManagementUtility::isLoaded('news')) {
             return;
         }
+        $source = $this->newsSource();
+        $reachable = $source?->collectReachableUids($site);
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_news_domain_model_news');
         $result = $qb->select(...$this->columnsToSelect())
             ->from('tx_news_domain_model_news')
@@ -74,9 +91,45 @@ final class NewsSchemaProvider implements SchemaProviderInterface
                 $qb->expr()->eq('hidden', 0)
             )
             ->executeQuery();
+        $total = 0;
+        $indexed = 0;
         while ($row = $result->fetchAssociative()) {
-            yield $this->toDocument($row, $site);
+            $total++;
+            // Scope: skip records no news plugin would display — this is the
+            // safety net against indexing records from folders/categories
+            // that were never meant to be public.
+            if ($reachable !== null && !$this->isReachable($row, $reachable)) {
+                continue;
+            }
+            $indexed++;
+            yield $this->toDocument($row, $site, $source);
         }
+        if ($reachable !== null && $indexed === 0 && $total > 0) {
+            $this->logger?->warning(
+                'News indexing scope matched 0 of {total} records for site {site} — check that a news list plugin exists and the News::detail route enhancer points to a valid page.',
+                ['total' => $total, 'site' => $site->getIdentifier()],
+            );
+        }
+    }
+
+    private function newsSource(): ?PluginRecordSourceInterface
+    {
+        $source = $this->recordSourceRegistry->get('news');
+        return ($source !== null && $source->isAvailable()) ? $source : null;
+    }
+
+    /**
+     * A record is reachable iff itself (default language) or its parent
+     * (translation) is in the plugin-derived reachable set.
+     *
+     * @param array<string,mixed> $row
+     * @param array<int,true> $reachable
+     */
+    private function isReachable(array $row, array $reachable): bool
+    {
+        $language = (int)($row['sys_language_uid'] ?? 0);
+        $parent = $language > 0 ? (int)($row['l10n_parent'] ?? 0) : (int)$row['uid'];
+        return isset($reachable[$parent]);
     }
 
     /**
@@ -87,7 +140,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
      */
     private function columnsToSelect(): array
     {
-        return ['uid', 'pid', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'fe_group', 'tx_wsmeilisearch_boost'];
+        return ['uid', 'pid', 'l10n_parent', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'fe_group', 'tx_wsmeilisearch_boost'];
     }
 
     public function getAdditionalFields(): array
@@ -103,7 +156,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface
      * @param array<string,mixed> $row
      * @return array<string,mixed>
      */
-    private function toDocument(array $row, Site $site): array
+    private function toDocument(array $row, Site $site, ?PluginRecordSourceInterface $source = null): array
     {
         $teaser = (string)$row['teaser'];
         $bodytext = strip_tags((string)$row['bodytext']);
@@ -119,6 +172,10 @@ final class NewsSchemaProvider implements SchemaProviderInterface
             'uid' => (int)$row['uid'],
             'pid' => (int)$row['pid'],
             'language' => (int)$row['sys_language_uid'],
+            // Speaking detail URL built from the plugin's detail page +
+            // tx_news route enhancer; '' when no record source / detail
+            // page is resolvable (record still indexed, just without link).
+            'uri' => $source?->buildUri($site, (int)$row['uid'], (int)$row['sys_language_uid']) ?? '',
             'title' => (string)$row['title'],
             'teaser' => $teaser,
             'bodytext' => $bodytext,

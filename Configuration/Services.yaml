@@ -8,6 +8,7 @@ services:
     resource: '../Classes/*'
     exclude:
       - '../Classes/Domain/Schema/SchemaProviderInterface.php'
+      - '../Classes/Domain/RecordSource/PluginRecordSourceInterface.php'
       - '../Classes/Event/*'
       - '../Classes/Service/SearchResult.php'
       - '../Classes/Service/Llm/LlmProviderInterface.php'
@@ -36,6 +37,8 @@ services:
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
       tags: ['ws_meilisearch.schema_provider']
+    WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceInterface:
+      tags: ['ws_meilisearch.plugin_record_source']
     WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface:
       tags: ['ws_meilisearch.llm_provider']
     WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter:
@@ -44,6 +47,10 @@ services:
       tags: ['ws_meilisearch.embedding_client']
     WapplerSystems\Meilisearch\Service\Quota\QuotaProviderInterface:
       tags: ['ws_meilisearch.quota_provider']
+
+  WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceRegistry:
+    arguments:
+      $sources: !tagged_iterator ws_meilisearch.plugin_record_source
 
   WapplerSystems\Meilisearch\Service\SearchEngineFactory:
     public: true
