@@ -108,6 +108,9 @@
             <trans-unit id="facet.value.type.knowledge_resource">
                 <source>Knowledge resource</source>
             </trans-unit>
+            <trans-unit id="facet.value.type.whatsnew">
+                <source>What's New</source>
+            </trans-unit>
             <trans-unit id="search.sort.label">
                 <source>Sort by</source>
             </trans-unit>

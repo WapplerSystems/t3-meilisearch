@@ -143,6 +143,10 @@
                 <source>Knowledge resource</source>
                 <target>Wissens-Resource</target>
             </trans-unit>
+            <trans-unit id="facet.value.type.whatsnew">
+                <source>What's New</source>
+                <target>Neuerungen</target>
+            </trans-unit>
             <trans-unit id="search.sort.label">
                 <source>Sort by</source>
                 <target>Sortieren nach</target>
