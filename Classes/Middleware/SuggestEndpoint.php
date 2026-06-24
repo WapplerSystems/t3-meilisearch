@@ -185,6 +185,10 @@ final class SuggestEndpoint implements MiddlewareInterface
                     return $translated !== '' ? $translated : $t;
                 })($type)
                 : '';
+            // Image files carry a dedicated search token: the dropdown links
+            // to the results page with q=<searchToken> (narrows to this one
+            // image) instead of opening the file directly.
+            $searchToken = (string)($hit['searchToken'] ?? '');
             $hits[] = [
                 'id' => (string)($hit['id'] ?? ''),
                 'title' => (string)($hit['title'] ?? ''),
@@ -193,6 +197,7 @@ final class SuggestEndpoint implements MiddlewareInterface
                 'uid' => $uid,
                 'language' => (int)($hit['language'] ?? 0),
                 'publicUrl' => $url !== '' ? $url : null,
+                'searchToken' => $searchToken !== '' ? $searchToken : null,
             ];
             // Grouped mode needs the full deduped set (bounded by the
             // over-fetch above) to fill every section; flat mode stops

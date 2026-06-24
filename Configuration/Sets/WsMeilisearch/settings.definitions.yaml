@@ -294,6 +294,18 @@ settings:
     type: int
     default: 0
 
+  meilisearch.files.thumbnail.maxWidth:
+    label: 'Image preview: max thumbnail width (px)'
+    description: 'Maximum width of the preview thumbnail generated at index time for image files (scaled to fit, no crop). The URL is stored as thumbnailUrl and rendered in the result list. 0 = no width constraint (then maxHeight applies).'
+    type: int
+    default: 320
+
+  meilisearch.files.thumbnail.maxHeight:
+    label: 'Image preview: max thumbnail height (px)'
+    description: 'Maximum height of the preview thumbnail generated at index time for image files (scaled to fit, no crop). 0 = no height constraint (then maxWidth applies). Both 0 = no thumbnail generated.'
+    type: int
+    default: 320
+
   meilisearch.indexing.excludeIdentifierPrefixes:
     label: 'Excluded sys_file identifier prefixes'
     description: 'Sys_file rows whose identifier starts with any of these prefixes are skipped. Matched with str_starts_with (case-sensitive) against the FAL identifier, which is STORAGE-RELATIVE and does NOT contain the public `/fileadmin/` segment — e.g. a frontend form upload has identifier `/user_upload/form_<hash>/file.pdf`, so the prefix is `/user_upload/form_`, NOT `/fileadmin/user_upload/`. Defaults keep generated artefacts (`/typo3temp/`), privacy-sensitive frontend form uploads (`/user_upload/form_`) and published extension assets (`/_assets/`) out of the search corpus. Default: [/typo3temp/, /user_upload/form_, /_assets/].'
@@ -568,9 +580,10 @@ settings:
 
   meilisearch.defaults.typoTolerance.disableOnAttributes:
     label: 'Typo tolerance: disable on attributes'
-    description: 'Attributes where typo tolerance must be off (e.g. "sku", "isbn", "uri"). Empty = typo tolerance is active on every searchable attribute.'
+    description: 'Attributes where typo tolerance must be off (e.g. "sku", "isbn", "uri", "searchToken"). Empty = typo tolerance is active on every searchable attribute. `searchToken` (the per-image identifier the suggest dropdown searches for) is included by default so q=<token> narrows to exactly one image.'
     type: stringlist
-    default: []
+    default:
+      - 'searchToken'
 
   meilisearch.defaults.typoTolerance.disableOnWords:
     label: 'Typo tolerance: disable on words'

@@ -9,6 +9,8 @@ use Meilisearch\Client;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Resource\File;
+use TYPO3\CMS\Core\Resource\ProcessedFile;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -284,6 +286,17 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             // group id. Declared here once; the merged schema applies to all
             // doc types.
             new IntegerField('accessGroups', multiple: true, searchable: false, filterable: true),
+            // Index-time generated preview thumbnail URL for image files
+            // (empty for non-images / processing failures). Rendered in the
+            // result list; not searchable.
+            new TextField('thumbnailUrl', searchable: false),
+            // Dedicated, unique, fixed-width search token per image
+            // (e.g. "img0000001426"). The suggest dropdown navigates to the
+            // results page with q=<searchToken>; because the token is unique,
+            // fixed-width (no prefix collisions) and excluded from typo
+            // tolerance (meilisearch.defaults.typoTolerance.disableOnAttributes),
+            // that query narrows down to exactly this one image. Searchable.
+            new TextField('searchToken', searchable: true),
         ];
     }
 
@@ -317,9 +330,21 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             ? (string)$metadata['title']
             : (string)$file->getName();
 
+        // Image-only: a preview thumbnail + a unique fixed-width search
+        // token so the suggest dropdown can "search this one image".
+        $isImage = str_starts_with((string)$file->getMimeType(), 'image/');
+        // Per-(uid, language) so q=<token> resolves to exactly ONE document
+        // even though a file is indexed once per language overlay (all of
+        // which would otherwise share the same token). Fixed width + typo
+        // tolerance disabled on `searchToken` ⇒ no prefix/typo collisions.
+        $searchToken = $isImage ? sprintf('img%010dl%03d', (int)$file->getUid(), $languageId) : '';
+        $thumbnailUrl = $isImage ? $this->resolveThumbnailUrl($file, $site) : '';
+
         return [
             'id' => $this->buildDocumentIdForLanguage((int)$file->getUid(), $languageId),
             'type' => 'file',
+            'thumbnailUrl' => $thumbnailUrl,
+            'searchToken' => $searchToken,
             'uid' => (int)$file->getUid(),
             'pid' => 0,
             'language' => $languageId,
@@ -450,6 +475,39 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             }
         }
         return $out;
+    }
+
+    /**
+     * Index-time preview thumbnail for an image file, scaled to fit within
+     * the configured max dimensions (no crop). Returns '' for non-resolvable
+     * or failed processing (e.g. remote fal_s3 hiccups) — the result list
+     * then falls back to the plain file rendering.
+     */
+    private function resolveThumbnailUrl(File $file, Site $site): string
+    {
+        $maxW = (int)$site->getSettings()->get('meilisearch.files.thumbnail.maxWidth', 320);
+        $maxH = (int)$site->getSettings()->get('meilisearch.files.thumbnail.maxHeight', 320);
+        if ($maxW <= 0 && $maxH <= 0) {
+            return '';
+        }
+        $config = [];
+        if ($maxW > 0) {
+            $config['maxWidth'] = $maxW;
+        }
+        if ($maxH > 0) {
+            $config['maxHeight'] = $maxH;
+        }
+        try {
+            $processed = $file->process(ProcessedFile::CONTEXT_IMAGECROPSCALEMASK, $config);
+            $url = (string)$processed->getPublicUrl();
+            return $url !== '' ? $this->normalisePublicUrl($url) : '';
+        } catch (\Throwable $e) {
+            $this->logger?->warning(
+                'Thumbnail generation failed for sys_file {uid}: {msg}',
+                ['uid' => $file->getUid(), 'msg' => $e->getMessage()],
+            );
+            return '';
+        }
     }
 
     /**

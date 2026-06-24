@@ -97,10 +97,25 @@
                 ? renderMenuGrouped(payload.groups, payload.totalHits, query, labels)
                 : renderMenu(hits, payload.totalHits, query, labels);
             menu.hidden = false;
+            // Image hits don't link to the file: their link points to the
+            // results page with q=<searchToken>, which narrows down to this
+            // one image (shown there with a preview). Resolve the href here
+            // because the results base URL comes from this form.
+            menu.querySelectorAll('a[data-search-token]').forEach(function (a) {
+                a.setAttribute('href', resultsUrlFor(a.getAttribute('data-search-token')));
+            });
             // Keyboard navigation walks the [data-suggest-item] rows;
             // group headers carry no such marker, so they're skipped.
             items = Array.from(menu.querySelectorAll('[data-suggest-item]'));
             activeIndex = -1;
+        }
+
+        function resultsUrlFor(token) {
+            const base = (form && form.getAttribute('action')) || window.location.pathname;
+            const url = new URL(base, window.location.origin);
+            // Submit the token under the same field name the search form uses.
+            url.searchParams.set(input.getAttribute('name') || 'q', token);
+            return url.pathname + url.search;
         }
 
         function openRecent() {
@@ -275,10 +290,21 @@
     // section header already names the type so a per-row badge would be
     // redundant.
     function renderHitItem(hit, i, showBadge) {
+        // Image hits: link to the results page (q=<searchToken>) instead of
+        // the file. href is finalised in open() via data-search-token, since
+        // the results base URL depends on the form.
+        var href, tokenAttr;
+        if (hit.searchToken) {
+            href = '#';
+            tokenAttr = ' data-search-token="' + escapeAttr(hit.searchToken) + '"';
+        } else {
+            href = escapeAttr(linkFor(hit));
+            tokenAttr = '';
+        }
         return [
             '<li role="option" id="ws-meilisearch-suggest-item-' + i + '"',
             ' data-suggest-item class="ws-meilisearch-suggest__item">',
-            '<a href="' + escapeAttr(linkFor(hit)) + '" class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
+            '<a href="' + href + '"' + tokenAttr + ' class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
             showBadge ? '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.typeLabel || hit.type || '?') + '</span>' : '',
             '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
             '</a>',

@@ -1,0 +1,67 @@
+<html
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    data-namespace-typo3-fluid="true">
+<f:comment>
+    Result card for file hits (type=file). Image files carry a
+    thumbnailUrl (index-time ProcessedFile, scaled to the configured max
+    dimensions; empty for non-images / processing failures). When present
+    it is shown as a preview; otherwise the card falls back to the plain
+    file rendering. The title/preview link to the file itself (publicUrl).
+</f:comment>
+<article class="ws-meilisearch-hit ws-meilisearch-hit--file card mb-3">
+    <div class="row g-0">
+        <f:if condition="{hit.thumbnailUrl}">
+            <div class="col-md-3">
+                <a href="{hit.publicUrl}" class="d-block h-100 ws-meilisearch-hit__media" target="_blank" rel="noopener">
+                    <img src="{hit.thumbnailUrl}"
+                         alt="{hit.title}"
+                         loading="lazy"
+                         class="img-fluid rounded-start ws-meilisearch-hit__thumb"/>
+                </a>
+            </div>
+        </f:if>
+        <div class="{f:if(condition: '{hit.thumbnailUrl}', then: 'col-md-9', else: 'col-12')}">
+            <div class="card-body">
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <h3 class="card-title h5 mb-0 flex-grow-1">
+                        <f:variable name="titleHtml">
+                            <f:if condition="{hit._formatted.title}">
+                                <f:then><f:format.raw>{hit._formatted.title}</f:format.raw></f:then>
+                                <f:else>{hit.title}</f:else>
+                            </f:if>
+                        </f:variable>
+                        <f:if condition="{hit.publicUrl}">
+                            <f:then>
+                                <a href="{hit.publicUrl}" class="ws-meilisearch-hit__link text-decoration-none" target="_blank" rel="noopener">{titleHtml -> f:format.raw()}</a>
+                            </f:then>
+                            <f:else>{titleHtml -> f:format.raw()}</f:else>
+                        </f:if>
+                    </h3>
+                    <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.file" default="file"/></f:variable>
+                    <span class="badge text-bg-warning ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span>
+                </div>
+
+                <f:if condition="{hit._formatted.description} || {hit.description}">
+                    <p class="card-text mb-1">
+                        <f:if condition="{hit._formatted.description}">
+                            <f:then><f:format.raw>{hit._formatted.description}</f:format.raw></f:then>
+                            <f:else>{hit.description -> f:format.crop(maxCharacters: 250, append: '…')}</f:else>
+                        </f:if>
+                    </p>
+                </f:if>
+                <f:if condition="{hit._formatted.bodytext}">
+                    <p class="card-text text-muted small mb-1">
+                        <f:format.raw>{hit._formatted.bodytext}</f:format.raw>
+                    </p>
+                </f:if>
+
+                <f:if condition="{hit.languageLabel}">
+                    <p class="card-text mb-0">
+                        <small class="text-muted">{hit.languageLabel}</small>
+                    </p>
+                </f:if>
+            </div>
+        </div>
+    </div>
+</article>
+</html>
