@@ -56,7 +56,33 @@ final class RagService implements LoggerAwareInterface
         private readonly LlmProviderRegistry $providerRegistry,
         private readonly PromptBuilder $promptBuilder,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly QueryRewriter $queryRewriter,
     ) {}
+
+    /**
+     * Assemble the LLM connection + sampling options from Site Settings.
+     * Shared by ask()/askStreaming() and the conversational query rewrite.
+     *
+     * @return array<string,mixed>
+     */
+    private function buildLlmOptions(object $settings): array
+    {
+        $llmOptions = [
+            'model' => (string)$settings->get('meilisearch.rag.model', ''),
+            'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
+            'url' => (string)$settings->get('meilisearch.rag.url', ''),
+            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
+            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
+            // Tenant id for vendor-specific providers (currently Infomaniak).
+            // Generic providers ignore it.
+            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
+        ];
+        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
+        if ($maxTokens > 0) {
+            $llmOptions['maxTokens'] = $maxTokens;
+        }
+        return $llmOptions;
+    }
 
     public function ask(Site $site, string $question, array $options = []): RagAnswer
     {
@@ -91,10 +117,17 @@ final class RagService implements LoggerAwareInterface
         ));
         $this->eventDispatcher->dispatch($event);
 
-        $searchResult = $this->searchService->search($site, $event->question, $event->options);
+        $llmOptions = $this->buildLlmOptions($settings);
+        // Fold conversation history into the *retrieval* query so a follow-up
+        // ("und der Preis?") searches for the right subject. Retrieval only —
+        // $event->question (the user's actual wording) still drives the answer
+        // prompt below and the analytics, so nothing user-visible changes.
+        $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
+
+        $searchResult = $this->searchService->search($site, $retrievalQuestion, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
         if ($hits === []) {
-            $hits = $this->retrieveWithFallbacks($site, $event->question, $event->options, $maxHits);
+            $hits = $this->retrieveWithFallbacks($site, $retrievalQuestion, $event->options, $maxHits);
         }
         if ($hits === []) {
             $answer = RagAnswer::noContext();
@@ -117,21 +150,6 @@ final class RagService implements LoggerAwareInterface
         // insert the conversation history between those two so the LLM
         // sees: system → history → current user (with fresh context).
         $messages = $this->withConversation($currentTurnMessages, $conversation);
-
-        $llmOptions = [
-            'model' => (string)$settings->get('meilisearch.rag.model', ''),
-            'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
-            'url' => (string)$settings->get('meilisearch.rag.url', ''),
-            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
-            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
-            // Tenant id for vendor-specific providers (currently Infomaniak).
-            // Generic providers ignore it.
-            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
-        ];
-        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
-        if ($maxTokens > 0) {
-            $llmOptions['maxTokens'] = $maxTokens;
-        }
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);
         $this->eventDispatcher->dispatch($before);
@@ -207,14 +225,20 @@ final class RagService implements LoggerAwareInterface
         ));
         $this->eventDispatcher->dispatch($event);
 
-        $searchResult = $this->searchService->search($site, $event->question, $event->options);
+        $llmOptions = $this->buildLlmOptions($settings);
+        // Conversational rewrite for retrieval only (see ask()); the streamed
+        // answer still uses $event->question so the user's wording + history
+        // drive the reply.
+        $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
+
+        $searchResult = $this->searchService->search($site, $retrievalQuestion, $event->options);
         $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
         if ($hits === []) {
             // Reuse the same retrieval-fallback ladder ask() uses
             // (frequency → last → drop-leading-verb-token) so the
             // streaming RAG path doesn't degrade differently than
             // non-streaming on identical questions.
-            $hits = $this->retrieveWithFallbacks($site, $event->question, $event->options, $maxHits);
+            $hits = $this->retrieveWithFallbacks($site, $retrievalQuestion, $event->options, $maxHits);
         }
         if ($hits === []) {
             yield RagStreamChunk::noContext();
@@ -243,21 +267,6 @@ final class RagService implements LoggerAwareInterface
             $this->resolveLanguageId($options),
         );
         $messages = $this->withConversation($currentTurnMessages, $conversation);
-
-        $llmOptions = [
-            'model' => (string)$settings->get('meilisearch.rag.model', ''),
-            'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
-            'url' => (string)$settings->get('meilisearch.rag.url', ''),
-            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
-            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
-            // Tenant id for vendor-specific providers (currently Infomaniak).
-            // Generic providers ignore it.
-            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
-        ];
-        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
-        if ($maxTokens > 0) {
-            $llmOptions['maxTokens'] = $maxTokens;
-        }
 
         $before = new BeforeLlmCallEvent($messages, $llmOptions);
         $this->eventDispatcher->dispatch($before);

@@ -498,6 +498,18 @@ settings:
     type: text
     default: "You are a helpful site assistant. Answer the user's question strictly using the provided context excerpts. If the answer cannot be derived from the context, say so. Cite each fact by appending [id] markers that match the IDs in the context. Respond in the user's language."
 
+  meilisearch.rag.conversationalRewrite:
+    label: 'RAG: conversational query rewriting'
+    description: 'When true, a follow-up question in a multi-turn chat is rewritten into a self-contained search query using the conversation history before retrieval (one extra short LLM call). Fixes elliptical follow-ups ("und der Preis?") that would otherwise retrieve the wrong context. Retrieval only — the answer still uses the original wording. No effect on the first turn (no history).'
+    type: bool
+    default: true
+
+  meilisearch.rag.rewriteHistoryTurns:
+    label: 'RAG: history turns used for query rewriting'
+    description: 'How many of the most recent conversation turns are shown to the rewriting model when reformulating a follow-up into a standalone search query. Higher values resolve longer-range references at the cost of a larger rewrite prompt.'
+    type: int
+    default: 3
+
   meilisearch.rag.useHybrid:
     label: 'Use hybrid search for retrieval'
     description: 'When true, RAG retrieval uses hybrid (keyword + semantic) search instead of keyword-only. Requires a configured embedder. Ignored when no embedder is configured.'
