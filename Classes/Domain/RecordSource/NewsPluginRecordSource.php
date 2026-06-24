@@ -52,7 +52,13 @@ final class NewsPluginRecordSource implements PluginRecordSourceInterface, Logge
 
     public function isAvailable(): bool
     {
-        return ExtensionManagementUtility::isLoaded('news');
+        // Requires the DemandFactory (georgringer/news fork, feature/demand-factory
+        // — see svewap/news). On a news build without it, scoping degrades
+        // gracefully: NewsSchemaProvider then indexes news unscoped instead of
+        // fatal-ing on the missing class. This lets ws_meilisearch deploy even
+        // where the DemandFactory isn't merged.
+        return ExtensionManagementUtility::isLoaded('news')
+            && class_exists(\GeorgRinger\News\Domain\Factory\DemandFactory::class);
     }
 
     public function collectReachableUids(Site $site): array
