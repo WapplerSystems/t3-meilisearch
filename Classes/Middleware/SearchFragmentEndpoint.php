@@ -81,7 +81,8 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         // Same single-language-page UX switch the SearchController honors:
         // hide the language facet, force-filter to the active language so
         // visitors can't escape the scope via URL params.
-        if ((bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false)) {
+        $restrictToLanguage = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', false);
+        if ($restrictToLanguage) {
             $language = $request->getAttribute('language');
             if ($language instanceof SiteLanguage) {
                 $filters['language'] = [(string)$language->getLanguageId()];
@@ -107,7 +108,11 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
 
         $hits = [];
         foreach ($result->hits as $hit) {
-            $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            // Hide the per-hit language hint when the result set is scoped to
+            // one language (redundant); the partials guard on this being set.
+            $hit['languageLabel'] = $restrictToLanguage
+                ? ''
+                : $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
             $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }

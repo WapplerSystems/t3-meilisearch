@@ -223,6 +223,10 @@
         if (form) {
             form.addEventListener('submit', function () {
                 saveRecent(input.value);
+                // Confirming the search (Enter or the submit button) shows the
+                // result list — the suggestion dropdown must close, just like
+                // it does on a button click.
+                close();
             });
         }
 

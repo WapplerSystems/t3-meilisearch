@@ -173,7 +173,12 @@ final class SearchController extends ActionController
         // and dispatch happens by data instead of by template-side switch.
         $hits = [];
         foreach ($result->hits as $hit) {
-            $hit['languageLabel'] = $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
+            // Per-hit language hint is redundant when the whole result set is
+            // restricted to one language — leave it empty so the partials
+            // (which guard on {hit.languageLabel}) hide it.
+            $hit['languageLabel'] = $restrictToLanguage
+                ? ''
+                : $this->resolveLanguageLabel($site, (int)($hit['language'] ?? 0));
             $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }
