@@ -85,7 +85,13 @@ final class SuggestEndpoint implements MiddlewareInterface
         // dilute the list. Pull the over-fetch + dedupe still happens
         // below as a defense against same-language metadata clones.
         $filters = [];
-        $language = $request->getAttribute('language');
+        // Resolve the site language even when the dropdown calls the bare
+        // /_ws_meilisearch/suggest path (e.g. an auto-attached header input
+        // outside any language base): TYPO3 then leaves the 'language'
+        // request attribute empty, so without this the count would span all
+        // language overlays and read far higher than the language-scoped
+        // results list (the reported "preview shows many more hits").
+        $language = $this->resolveSiteLanguage($request, $site);
         if ($language instanceof SiteLanguage) {
             $filters['language'] = [(string)$language->getLanguageId()];
         }
@@ -241,5 +247,47 @@ final class SuggestEndpoint implements MiddlewareInterface
             'hits' => $flat,
             'totalHits' => $result->totalHits,
         ]);
+    }
+
+    /**
+     * Resolve the site language for scoping the suggestion query.
+     *
+     * Prefers the routed 'language' request attribute; when the dropdown
+     * calls the bare /_ws_meilisearch/suggest path (no language base, e.g.
+     * an auto-attached header input) that attribute is absent, so we recover
+     * the language from the Referer (the page the search box sits on) by the
+     * longest-matching language base path, finally falling back to the site
+     * default. This keeps the suggest count consistent with the language-
+     * scoped results list.
+     */
+    private function resolveSiteLanguage(ServerRequestInterface $request, Site $site): ?SiteLanguage
+    {
+        $language = $request->getAttribute('language');
+        if ($language instanceof SiteLanguage) {
+            return $language;
+        }
+
+        $refererPath = (string)(parse_url($request->getHeaderLine('Referer'), PHP_URL_PATH) ?: '');
+        if ($refererPath !== '') {
+            $refererPath = '/' . ltrim($refererPath, '/');
+            $best = null;
+            $bestLen = -1;
+            foreach ($site->getAllLanguages() as $candidate) {
+                $base = '/' . trim($candidate->getBase()->getPath(), '/');
+                $prefix = $base === '/' ? '/' : $base . '/';
+                if ($prefix === '/' || str_starts_with($refererPath . '/', $prefix)) {
+                    $len = strlen($prefix);
+                    if ($len > $bestLen) {
+                        $bestLen = $len;
+                        $best = $candidate;
+                    }
+                }
+            }
+            if ($best instanceof SiteLanguage) {
+                return $best;
+            }
+        }
+
+        return $site->getDefaultLanguage();
     }
 }
