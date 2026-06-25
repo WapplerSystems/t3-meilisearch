@@ -131,14 +131,16 @@ final class SearchService implements LoggerAwareInterface
             'offset' => ($page - 1) * $perPage,
         ];
 
-        $filter = $this->buildMeilisearchFilter((array)($options['filters'] ?? []));
         // Knowledge resources are indexed for RAG-grounding but must not show
         // up in the FE result list. Excluded by default; callers that need
         // them (RAG retrieval) opt in via $options['includeKnowledgeResources'].
-        if (!($options['includeKnowledgeResources'] ?? false)) {
-            $exclude = 'type != "knowledge_resource"';
-            $filter = $filter !== '' ? '(' . $filter . ') AND ' . $exclude : $exclude;
-        }
+        // Applied to the main query AND every disjunctive-facet side query
+        // below — otherwise removing the `type` filter for the side query
+        // re-exposes knowledge_resource as a facet checkbox.
+        $filter = $this->withKnowledgeResourceExclusion(
+            $this->buildMeilisearchFilter((array)($options['filters'] ?? [])),
+            $options,
+        );
         if ($filter !== '') {
             $params['filter'] = $filter;
         }
@@ -221,7 +223,13 @@ final class SearchService implements LoggerAwareInterface
                 'limit' => 0,
                 'facets' => [$facetField],
             ];
-            $sideFilter = $this->buildMeilisearchFilter($sideFilters);
+            // Keep the knowledge_resource exclusion here too — without it the
+            // side query (which drops the user's `type` filter) would list
+            // knowledge_resource as an available facet value again.
+            $sideFilter = $this->withKnowledgeResourceExclusion(
+                $this->buildMeilisearchFilter($sideFilters),
+                $options,
+            );
             if ($sideFilter !== '') {
                 $sideParams['filter'] = $sideFilter;
             }
@@ -306,6 +314,23 @@ final class SearchService implements LoggerAwareInterface
             }
             yield [$field, $dir === 'desc' ? 'desc' : 'asc'];
         }
+    }
+
+    /**
+     * Translate the same options.filters shape used by SEAL into a Meilisearch
+     * filter expression. Strings are wrapped in double quotes; embedded quotes
+     * are escaped. Numeric / boolean values are emitted unquoted so they hit
+     * Meilisearch's numeric/boolean comparison.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function withKnowledgeResourceExclusion(string $filter, array $options): string
+    {
+        if ($options['includeKnowledgeResources'] ?? false) {
+            return $filter;
+        }
+        $exclude = 'type != "knowledge_resource"';
+        return $filter !== '' ? '(' . $filter . ') AND ' . $exclude : $exclude;
     }
 
     /**
