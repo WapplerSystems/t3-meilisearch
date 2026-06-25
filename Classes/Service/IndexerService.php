@@ -279,6 +279,56 @@ final class IndexerService implements LoggerAwareInterface
         return false;
     }
 
+    /**
+     * (Re)index every document a single provider yields for $table into the
+     * existing index. Mirrors indexAll()'s per-document push but scoped to one
+     * table, so e.g. knowledge resources can be back-filled without
+     * re-extracting and re-embedding the whole file corpus. No schema rebuild —
+     * the index settings (filterable/sortable attributes) are assumed current;
+     * run a full reindex once when introducing a brand-new document type.
+     *
+     * Returns the number of documents pushed, or -1 when no provider supports
+     * the table.
+     */
+    public function indexTable(string $table, Site $site): int
+    {
+        $engine = $this->engineFactory->createForSite($site);
+        if ($engine === null) {
+            return -1;
+        }
+        $indexName = $this->engineFactory->getIndexName($site);
+        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
+        // Raw client for the precompute push — see indexAll() on why
+        // saveDocument() would strip `_vectors`.
+        $client = $precompute ? $this->engineFactory->createClientForSite($site) : null;
+
+        foreach ($this->schemaProviders as $provider) {
+            if (!$provider->supports($table)) {
+                continue;
+            }
+            $count = 0;
+            foreach ($provider->iterateDocuments($site) as $document) {
+                $event = new BeforeDocumentIndexedEvent($provider, $document);
+                $this->eventDispatcher->dispatch($event);
+                $doc = $event->document;
+                if ($precompute) {
+                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
+                    if ($client !== null) {
+                        $client->index($indexName)->addDocuments([$doc], 'id');
+                    } else {
+                        $engine->saveDocument($indexName, $doc);
+                    }
+                } else {
+                    $engine->saveDocument($indexName, $doc);
+                }
+                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
+                $count++;
+            }
+            return $count;
+        }
+        return -1;
+    }
+
     public function removeRecord(string $table, int $uid, Site $site): bool
     {
         $engine = $this->engineFactory->createForSite($site);

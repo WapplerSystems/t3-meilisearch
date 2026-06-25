@@ -730,6 +730,14 @@ ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one 
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
 
+# Scoped (re)indexing — one record or one whole table, no schema rebuild.
+# Cheaper than a full reindex when back-filling a single document type
+# (e.g. knowledge resources after an import) without re-extracting/re-embedding
+# the whole file corpus. Runs the same indexer path as a backend save.
+ddev exec vendor/bin/typo3 ws_meilisearch:index-record tx_wsmeilisearch_knowledge_resource       # whole table
+ddev exec vendor/bin/typo3 ws_meilisearch:index-record tx_news_domain_model_news 17 main          # one record
+ddev exec vendor/bin/typo3 ws_meilisearch:index-record sys_file 99 main --remove                  # drop one record
+
 # Page indexing via Integration/ExtIndex (on top of EXT:index)
 ddev exec vendor/bin/typo3 ws_meilisearch:setup-index-config main         # create/repair the EXT:index Configuration row
 ddev exec vendor/bin/typo3 index:queue --limitSiteIdentifiers=main        # seed the message queue
@@ -792,6 +800,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:check-quotas main --dry-run      # one
 | Realtime sync (FAL storage) | PSR-14 listeners on AfterFileAdded / Deleted / Renamed / Moved / ContentsSet / Replaced / Copied / MetaDataUpdated / RemovedFromIndex | `Classes/DataHandling/FalEventListener.php` |
 | Cross-site file dispatcher | Shared `reindex(uid)` / `remove(uid)` used by both sync paths | `Classes/DataHandling/FileLifecycleHandler.php` |
 | CLI | `ws_meilisearch:reindex [site] [--rebuild]` | `Classes/Command/ReindexCommand.php` |
+| CLI (scoped) | `ws_meilisearch:index-record <table> [uid] [site] [--remove]` — one record or whole table, no schema rebuild | `Classes/Command/IndexRecordCommand.php` |
 | Events (PSR-14) | Before/After Document Indexed, Before/After Search | `Classes/Event/` |
 | Frontend templates | GET-only forms, auto-submit facets, PRG-redirect on stray POSTs | `Resources/Private/Templates/Search/` |
 
