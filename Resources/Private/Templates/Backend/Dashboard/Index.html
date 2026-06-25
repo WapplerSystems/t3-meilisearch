@@ -1,0 +1,118 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1>Meilisearch — Dashboard</h1>
+    <f:variable name="active" value="dashboard"/>
+    <f:render partial="Backend/TabNav" arguments="{_all}" />
+
+    <p class="lead">
+        Live-Status jedes Site-Index direkt aus der Engine (ungecacht): Dokumente,
+        Indexierungs-Status, Verteilung pro Typ, Task-Queue inkl. letzter Fehler und ein
+        Settings-Snapshot.
+    </p>
+
+    <f:for each="{cards}" as="card">
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                <strong>{card.siteTitle}</strong>
+                <code>{card.indexName}</code>
+                <f:if condition="{card.isIndexing}">
+                    <span class="badge bg-info">indexing…</span>
+                </f:if>
+                <span class="ms-auto text-muted small">{card.siteIdentifier}</span>
+            </div>
+            <div class="card-body">
+
+                <f:if condition="{card.configured} == 0">
+                    <f:then>
+                        <div class="alert alert-secondary mb-0">Für diese Site ist kein Meilisearch konfiguriert (<code>meilisearch.url</code> leer).</div>
+                    </f:then>
+                    <f:else>
+                        <f:if condition="{card.error}">
+                            <div class="alert alert-danger"><strong>Engine-Fehler:</strong> {card.error}</div>
+                        </f:if>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-auto">
+                                <div class="border rounded p-2 text-center" style="min-width: 8rem;">
+                                    <div class="h3 mb-0">{f:if(condition: '{card.docCount}', then: '{card.docCount}', else: '0')}</div>
+                                    <div class="text-muted small">Dokumente</div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="border rounded p-2 text-center" style="min-width: 8rem;">
+                                    <div class="h3 mb-0">
+                                        <f:if condition="{card.isIndexing}"><f:then><span class="text-info">ja</span></f:then><f:else><span class="text-muted">nein</span></f:else></f:if>
+                                    </div>
+                                    <div class="text-muted small">isIndexing</div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="border rounded p-2 text-center" style="min-width: 6rem;">
+                                    <div class="h3 mb-0">{f:if(condition: '{card.tasks.enqueued}', then: '{card.tasks.enqueued}', else: '0')}</div>
+                                    <div class="text-muted small">enqueued</div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="border rounded p-2 text-center" style="min-width: 6rem;">
+                                    <div class="h3 mb-0">{f:if(condition: '{card.tasks.processing}', then: '{card.tasks.processing}', else: '0')}</div>
+                                    <div class="text-muted small">processing</div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="border rounded p-2 text-center {f:if(condition: '{card.tasks.failed} > 0', then: 'border-danger')}" style="min-width: 6rem;">
+                                    <div class="h3 mb-0 {f:if(condition: '{card.tasks.failed} > 0', then: 'text-danger')}">{f:if(condition: '{card.tasks.failed}', then: '{card.tasks.failed}', else: '0')}</div>
+                                    <div class="text-muted small">failed</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <f:if condition="{card.typeDistribution}">
+                            <h4 class="h6">Dokumente pro Typ</h4>
+                            <p class="mb-3">
+                                <f:for each="{card.typeDistribution}" as="count" key="type">
+                                    <span class="badge bg-light text-dark border me-1 mb-1">{type}: <strong>{count}</strong></span>
+                                </f:for>
+                            </p>
+                        </f:if>
+
+                        <f:if condition="{card.recentFailed}">
+                            <h4 class="h6 text-danger">Letzte fehlgeschlagene Tasks</h4>
+                            <table class="table table-sm table-bordered mb-3">
+                                <thead><tr><th>uid</th><th>Typ</th><th>Fehler</th><th>finishedAt</th></tr></thead>
+                                <tbody>
+                                    <f:for each="{card.recentFailed}" as="t">
+                                        <tr>
+                                            <td><code>{t.uid}</code></td>
+                                            <td>{t.type}</td>
+                                            <td class="small">{t.error}</td>
+                                            <td class="small text-muted">{t.finishedAt}</td>
+                                        </tr>
+                                    </f:for>
+                                </tbody>
+                            </table>
+                        </f:if>
+
+                        <h4 class="h6">Settings-Snapshot</h4>
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-3">searchableAttributes</dt>
+                            <dd class="col-sm-9"><code>{card.searchableAttributes -> f:join(separator: ', ')}</code></dd>
+                            <dt class="col-sm-3">rankingRules</dt>
+                            <dd class="col-sm-9"><code>{card.rankingRules -> f:join(separator: ', ')}</code></dd>
+                            <dt class="col-sm-3">embedders</dt>
+                            <dd class="col-sm-9">
+                                <f:if condition="{card.embedders}"><f:then><code>{card.embedders -> f:join(separator: ', ')}</code></f:then><f:else><span class="text-muted">keiner</span></f:else></f:if>
+                            </dd>
+                        </dl>
+                    </f:else>
+                </f:if>
+
+            </div>
+        </div>
+    </f:for>
+</f:section>
+</html>

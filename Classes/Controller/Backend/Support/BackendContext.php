@@ -74,6 +74,7 @@ final class BackendContext
     {
         return [
             'indexUrl' => $this->route(),
+            'dashboardUrl' => $this->route('dashboard'),
             'testUrl' => $this->route('test'),
             'diagnoseUrl' => $this->route('diagnose'),
             'knowledgeResourcesUrl' => $this->route('knowledgeResources'),
