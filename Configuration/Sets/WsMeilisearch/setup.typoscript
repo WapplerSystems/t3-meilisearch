@@ -41,7 +41,7 @@ plugin.tx_wsmeilisearch_search {
 # unsigned inline <script> blocks; a meta carrying static attributes
 # survives that policy and is the standard TYPO3 v14 channel for
 # template-driven JS config.
-[{$meilisearch.suggest.autoAttachInputSelector} != '']
+[site("settings").get("meilisearch.suggest.autoAttachInputSelector")]
     page.headerData.1746000010 = TEXT
     page.headerData.1746000010.value = <meta name="ws-meilisearch-suggest" data-endpoint="/_ws_meilisearch/suggest" data-input-selector="{$meilisearch.suggest.autoAttachInputSelector}" />
     page.includeJSFooter.wsMeilisearchSuggest = EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/suggest.js
@@ -59,7 +59,7 @@ plugin.tx_wsmeilisearch_search {
 #      and survives slug renames.
 #   2) chatWidget.pageUid == 0 → fallback to the legacy hardcoded
 #      chatWidget.url string for backward compatibility.
-[{$meilisearch.rag.chatWidget.enabled} == 1]
+[site("settings").get("meilisearch.rag.chatWidget.enabled")]
     page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
     page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
 [END]
@@ -67,14 +67,14 @@ plugin.tx_wsmeilisearch_search {
 # Render the bubble markup with a TypoLink-resolved URL when a pageUid
 # is configured. Two condition branches so we evaluate the URL source
 # exactly once per request.
-[{$meilisearch.rag.chatWidget.enabled} == 1 && {$meilisearch.rag.chatWidget.pageUid} > 0]
+[site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") > 0]
     page.footerData.1746000000 = TEXT
     page.footerData.1746000000.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid}
     page.footerData.1746000000.typolink.returnLast = url
     page.footerData.1746000000.wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
 [END]
 
-[{$meilisearch.rag.chatWidget.enabled} == 1 && {$meilisearch.rag.chatWidget.pageUid} == 0]
+[site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") == 0]
     page.footerData.1746000000 = TEXT
     page.footerData.1746000000.value (
 <div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
