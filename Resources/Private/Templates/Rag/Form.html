@@ -10,8 +10,23 @@
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
         </h2>
 
-        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
-        <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+        <f:comment><!--
+            Progressive enhancement: RagStream.js intercepts the form submit and
+            streams the answer + sources + suggestions into the containers below
+            via the SSE endpoint — no page reload. Without JS the form is a normal
+            GET round-trip rendered by Ask.html.
+        --></f:comment>
+        <div data-ws-meilisearch-rag-stream data-endpoint="/_ws_meilisearch/rag/stream">
+            <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
+            <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+
+            <div data-rag-sources class="ws-meilisearch-rag-sources mb-2"></div>
+            <div data-rag-answer class="ws-meilisearch-rag-answer card-text"></div>
+            <div data-rag-suggestions class="ws-meilisearch-rag-suggestions mt-3"
+                 data-heading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}"></div>
+        </div>
+
+        <f:asset.script identifier="wsMeilisearchRagStream" src="EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js"/>
 
         <f:if condition="{showFallback}">
             <f:render partial="Rag/FallbackContact" arguments="{fallback: fallback, question: question}"/>

@@ -28,6 +28,8 @@ final class RagStreamChunk
     public const TYPE_FAILED = 'failed';
     public const TYPE_NO_CONTEXT = 'no_context';
     public const TYPE_DISABLED = 'disabled';
+    public const TYPE_SUGGESTIONS = 'suggestions';
+    public const TYPE_END = 'end';
 
     /**
      * @param array<string,mixed> $data
@@ -56,6 +58,24 @@ final class RagStreamChunk
     public static function done(string $answer, array $citedIds): self
     {
         return new self(self::TYPE_DONE, ['answer' => $answer, 'citedIds' => $citedIds]);
+    }
+
+    /**
+     * @param list<array{type:string,label:string,value:string}> $suggestions
+     */
+    public static function suggestions(array $suggestions): self
+    {
+        return new self(self::TYPE_SUGGESTIONS, ['suggestions' => $suggestions]);
+    }
+
+    /**
+     * Terminal sentinel — always the last frame on a successful answer. The
+     * client closes the EventSource on this (not on `done`), so the optional
+     * `suggestions` frame, which is generated after `done`, still arrives.
+     */
+    public static function end(): self
+    {
+        return new self(self::TYPE_END, []);
     }
 
     public static function failed(string $error): self

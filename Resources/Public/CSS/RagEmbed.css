@@ -101,6 +101,18 @@
 .ws-meilisearch-rag-embed .text-bg-info { background: #0aa2c0; color: #fff; }
 .ws-meilisearch-rag-embed .text-bg-warning { background: #ffc107; color: #1d2228; }
 
+/* AJAX-streamed answer + sources (rendered by RagStream.js) */
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-answer { margin-top: .75rem; white-space: pre-wrap; }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-answer[data-streaming="true"]::after {
+    content: "▋"; margin-left: 2px; color: var(--wsm-muted);
+    animation: wsm-blink 1s steps(2) infinite;
+}
+@keyframes wsm-blink { 50% { opacity: 0; } }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-sources ul { margin: .25rem 0 0; padding-left: 0; list-style: none; }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-sources li { padding: .15rem 0; }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-sources li.is-cited { font-weight: 600; }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-sources code { color: var(--wsm-muted); }
+
 /* RAG suggestion buttons */
 .ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestions { margin-top: .75rem; }
 .ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestion { text-decoration: none; }

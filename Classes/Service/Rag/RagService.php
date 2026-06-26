@@ -286,12 +286,18 @@ final class RagService implements LoggerAwareInterface
             yield RagStreamChunk::token($before->response);
             $citedIds = $this->extractCitations($before->response, $hits);
             yield RagStreamChunk::done($before->response, $citedIds);
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, new RagAnswer(
+            $cachedAnswer = new RagAnswer(
                 answer: trim($before->response),
                 sources: $hits,
                 citedIds: $citedIds,
                 status: 'ok',
-            ), $site, $this->resolveLanguageId($options)));
+            );
+            $cachedSuggestions = $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions);
+            if ($cachedSuggestions !== []) {
+                yield RagStreamChunk::suggestions($cachedSuggestions);
+            }
+            yield RagStreamChunk::end();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $cachedAnswer, $site, $this->resolveLanguageId($options)));
             return;
         }
 
@@ -322,12 +328,21 @@ final class RagService implements LoggerAwareInterface
         $citedIds = $this->extractCitations($accumulated, $hits);
         yield RagStreamChunk::done(trim($accumulated), $citedIds);
 
-        $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, new RagAnswer(
+        $answer = new RagAnswer(
             answer: trim($accumulated),
             sources: $hits,
             citedIds: $citedIds,
             status: 'ok',
-        ), $site, $this->resolveLanguageId($options)));
+        );
+        // Decision-support suggestions, same generator as the non-streaming
+        // ask(); emitted as a trailing frame so the streaming chat shows the
+        // followup / refine / recommend buttons too.
+        $suggestions = $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions);
+        if ($suggestions !== []) {
+            yield RagStreamChunk::suggestions($suggestions);
+        }
+        yield RagStreamChunk::end();
+        $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
     }
 
     /**
