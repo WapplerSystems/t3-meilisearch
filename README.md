@@ -269,6 +269,66 @@ on sites without an embedder. `semanticRatio` (0..1) is read from site
 settings and can be overridden per request via the `options` parameter
 of `SearchService::search()`.
 
+### Relevance boosting
+
+Two independent knobs let you push some documents above others at equal
+text relevance. They **compose multiplicatively** into a single `boost`
+float stored on every document, which Meilisearch sorts on via the
+`boost:desc` custom ranking rule.
+
+**Per-type (integrator), Site Settings** — `meilisearch.boosts.types.<type>`,
+one float per document type (`1.0` = neutral):
+
+```yaml
+meilisearch:
+  boosts:
+    types:
+      page: 2.0               # core content on top
+      knowledge_resource: 1.5
+      news: 1.2
+      whatsnew: 1.2
+      file: 0.5               # damp FAL assets to a late fallback
+```
+
+**Per-record (editor), backend field** — `tx_wsmeilisearch_boost`, a
+5-step select on `pages`, `tx_news_domain_model_news` and
+`tx_wsmeilisearch_knowledge_resource` (tab "Search"). Editors pick a
+relative weight; the indexer multiplies it onto the type default:
+
+| Setting | Multiplier |
+|---|---|
+| Very low | 0.5× |
+| Low | 0.75× |
+| Normal (default) | 1× |
+| High | 1.5× |
+| Very high | 2× |
+
+Example: a *High* news article (`1.5`) of a type weighted `1.2` ends up
+at `boost = 1.8`. Honoring the editor field can be switched off with
+`meilisearch.boosts.recordOverrideEnabled: false` (type defaults still
+apply). Tables without the field (e.g. `sys_file`, `whatsnew`) use the
+type default only.
+
+**Activation:** the `boost` field is always written, but only influences
+ranking once `boost:desc` is present in `meilisearch.defaults.rankingRules`
+— place it **before** `attribute` so it breaks ties before the
+match-position rule:
+
+```yaml
+meilisearch:
+  defaults:
+    rankingRules: [words, typo, proximity, boost:desc, attribute, sort, exactness]
+```
+
+`boost:desc` is a tie-breaker: it reorders documents that are otherwise
+equal on words/typo/proximity. A file with a genuinely stronger text
+match still outranks a higher-boosted page — boost cannot rescue a weaker
+hit, only order equally-relevant ones. Changing per-type values or the
+ranking rule needs `ws_meilisearch:apply-settings`; changing a record's
+field re-indexes that record automatically on save (back-fill a whole
+type with `ws_meilisearch:index-record <table>`). The editor field is
+labelled and described inline in the backend (EN + DE).
+
 ### Retrieval-Augmented Generation (Phase 4)
 
 Pick an LLM provider in site settings and the `WsMeilisearch / Rag`

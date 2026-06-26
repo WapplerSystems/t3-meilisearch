@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+    <file source-language="en" target-language="de" datatype="plaintext" original="messages" date="2026-06-26T00:00:00Z" product-name="ws_meilisearch">
+        <header/>
+        <body>
+            <trans-unit id="plugin.search.title">
+                <source>Meilisearch: Search Plugin</source>
+                <target>Meilisearch: Such-Plugin</target>
+            </trans-unit>
+            <trans-unit id="plugin.search.description">
+                <source>Faceted full-text search backed by Meilisearch.</source>
+                <target>Facettierte Volltextsuche auf Basis von Meilisearch.</target>
+            </trans-unit>
+            <trans-unit id="plugin.rag.title">
+                <source>Meilisearch: RAG (ask the site)</source>
+                <target>Meilisearch: RAG (Seite fragen)</target>
+            </trans-unit>
+            <trans-unit id="plugin.rag.description">
+                <source>Retrieval-Augmented Generation: search the site index and ask an LLM to summarize the matching documents.</source>
+                <target>Retrieval-Augmented Generation: durchsucht den Seitenindex und lässt ein LLM die passenden Dokumente zusammenfassen.</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.title">
+                <source>Meilisearch: Full Reindex</source>
+                <target>Meilisearch: Voll-Reindex</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.description">
+                <source>Iterates all sites (or a single site) and re-pushes every indexed record to Meilisearch.</source>
+                <target>Durchläuft alle Sites (oder eine einzelne) und schreibt jeden indexierten Datensatz erneut an Meilisearch.</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.site_identifier">
+                <source>Site identifier</source>
+                <target>Site-Identifier</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.site_identifier.description">
+                <source>Empty = all sites. Otherwise the TYPO3 site identifier (matches the directory under config/sites/).</source>
+                <target>Leer = alle Sites. Andernfalls der TYPO3-Site-Identifier (entspricht dem Verzeichnis unter config/sites/).</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.rebuild">
+                <source>Rebuild</source>
+                <target>Neu aufbauen</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.rebuild.description">
+                <source>Drop and recreate the Meilisearch index before populating. Use only after schema changes — the index is unavailable for the duration.</source>
+                <target>Verwirft den Meilisearch-Index vor dem Befüllen und legt ihn neu an. Nur nach Schema-Änderungen verwenden — der Index ist währenddessen nicht verfügbar.</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.skip_embedder">
+                <source>Skip embedder push</source>
+                <target>Embedder-Push überspringen</target>
+            </trans-unit>
+            <trans-unit id="task.fullReindex.skip_embedder.description">
+                <source>Leave the configured embedder settings untouched on Meilisearch. Use when troubleshooting a wedged hybrid setup.</source>
+                <target>Lässt die konfigurierten Embedder-Einstellungen auf Meilisearch unangetastet. Zur Fehlersuche bei festgefahrenem Hybrid-Setup.</target>
+            </trans-unit>
+            <trans-unit id="module.overview.title">
+                <source>Meilisearch</source>
+                <target>Meilisearch</target>
+            </trans-unit>
+            <trans-unit id="module.overview.description">
+                <source>Index status and ad-hoc search / RAG testing.</source>
+                <target>Index-Status und Ad-hoc-Suche / RAG-Test.</target>
+            </trans-unit>
+            <trans-unit id="module.action.reindex">
+                <source>Reindex</source>
+                <target>Reindex</target>
+            </trans-unit>
+            <trans-unit id="module.action.rebuild">
+                <source>Rebuild</source>
+                <target>Neu aufbauen</target>
+            </trans-unit>
+            <trans-unit id="module.action.test_search">
+                <source>Test search</source>
+                <target>Suche testen</target>
+            </trans-unit>
+            <trans-unit id="module.action.test_ask">
+                <source>Test RAG</source>
+                <target>RAG testen</target>
+            </trans-unit>
+            <trans-unit id="module.flash.reindex_done">
+                <source>Reindexed %d document(s) for site "%s".</source>
+                <target>%d Dokument(e) für Site „%s“ neu indexiert.</target>
+            </trans-unit>
+            <trans-unit id="module.flash.reindex_skipped">
+                <source>Site "%s" is not configured for Meilisearch.</source>
+                <target>Site „%s“ ist nicht für Meilisearch konfiguriert.</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.tab">
+                <source>Search</source>
+                <target>Suche</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.label">
+                <source>Search ranking boost</source>
+                <target>Such-Ranking-Gewichtung</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.description">
+                <source>Promotes or demotes this record in search results. Composes multiplicatively with the per-type default configured in Site Settings. Has no effect unless the integrator has enabled the boost ranking rule.</source>
+                <target>Stuft diesen Datensatz in den Suchergebnissen höher oder niedriger ein. Wirkt multiplikativ mit dem pro Datensatztyp konfigurierten Standardwert (Site Settings). Greift nur, wenn die Boost-Ranking-Regel aktiviert ist.</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.veryLow">
+                <source>Very low (0.5×)</source>
+                <target>Sehr niedrig (0,5×)</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.low">
+                <source>Low (0.75×)</source>
+                <target>Niedrig (0,75×)</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.normal">
+                <source>Normal (1×) — default</source>
+                <target>Normal (1×) — Standard</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.high">
+                <source>High (1.5×)</source>
+                <target>Hoch (1,5×)</target>
+            </trans-unit>
+            <trans-unit id="tca.boost.veryHigh">
+                <source>Very high (2×)</source>
+                <target>Sehr hoch (2×)</target>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>
