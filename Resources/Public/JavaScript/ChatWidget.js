@@ -10,11 +10,13 @@
  *
  * This script upgrades that anchor div into:
  *   - a fixed bubble button (bottom-right)
- *   - a slide-up panel containing an <iframe src="data-url">
+ *   - a slide-up panel whose chat shell is fetched from data-url (the bare
+ *     RAG embed type) and rendered INLINE in the host DOM — no iframe —
+ *     then driven by RagStream.js over the SSE endpoint.
  *
  * Open/close via the bubble, the panel's close button, or Escape.
- * The iframe stays lazy — its src is only assigned the first time the
- * panel opens, so the bubble itself adds no network cost.
+ * The fetch is lazy — it runs the first time the panel opens, so the bubble
+ * itself adds no network cost.
  *
  * No framework, no module imports. Drop-in <script defer> via
  * page.includeJSFooter so the DOM is ready by the time we run.
@@ -59,9 +61,13 @@
 
     const targetUrl = (root.dataset.url || '').trim();
     const label = (root.dataset.label || 'KI-Chat').trim();
+    const loadingText = (root.dataset.loading || 'Wird geladen …').trim();
+    const errorText = (root.dataset.error || 'Der Chat konnte nicht geladen werden.').trim();
     if (targetUrl === '') {
         return;
     }
+
+    const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
     // --- Build DOM ---------------------------------------------------
 
@@ -97,16 +103,14 @@
 
     panel.appendChild(header);
 
-    const frame = document.createElement('iframe');
-    frame.className = 'ws-meilisearch-chat-panel__frame';
-    frame.title = label;
-    // Sandbox stays permissive enough to let the embedded RAG form
-    // POST/GET back to the same origin (allow-same-origin) and run
-    // its inline JS (allow-scripts). No allow-top-navigation, so a
-    // malicious upstream can't yank the host page out from under us.
-    frame.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-popups');
-    frame.setAttribute('loading', 'lazy');
-    panel.appendChild(frame);
+    // Chat content is rendered inline in the host DOM (no iframe): on first
+    // open we fetch the bare RAG shell (the chatWidget embed type) and inject
+    // it here, then hand it to RagStream.js. The .ws-meilisearch-rag-embed
+    // class keeps RagEmbed.css (scoped) in control of the look even on a
+    // Bootstrap host page.
+    const body = document.createElement('div');
+    body.className = 'ws-meilisearch-chat-panel__body ws-meilisearch-rag-embed';
+    panel.appendChild(body);
 
     document.body.appendChild(bubble);
     document.body.appendChild(panel);
@@ -114,19 +118,48 @@
     // --- Open / close ------------------------------------------------
 
     let opened = false;
+    let loaded = false;
+
+    // First open: fetch the bare RAG shell (chatWidget embed type) and inject
+    // it inline, then let RagStream.js wire it. Lazy, same-origin, sends the
+    // fe_typo_user cookie so the server can seed conversation history.
+    const loadChat = () => {
+        if (loaded) {
+            return;
+        }
+        loaded = true;
+        body.innerHTML = '<div class="ws-meilisearch-chat-panel__status">' + escapeHtml(loadingText) + '</div>';
+        fetch(targetUrl, { credentials: 'include', headers: { 'X-Requested-With': 'fetch' } })
+            .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+            .then((html) => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const shell = doc.querySelector('[data-ws-meilisearch-rag-stream]');
+                if (!shell) {
+                    throw new Error('chat shell not found in response');
+                }
+                body.innerHTML = '';
+                body.appendChild(document.importNode(shell, true));
+                if (typeof window.wsMeilisearchRagStreamInit === 'function') {
+                    window.wsMeilisearchRagStreamInit(body);
+                }
+                const input = body.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
+                if (input) {
+                    input.focus({ preventScroll: true });
+                }
+            })
+            .catch(() => {
+                loaded = false; // let the next open retry
+                body.innerHTML = '<div class="ws-meilisearch-chat-panel__status ws-meilisearch-chat-panel__status--error">'
+                    + escapeHtml(errorText) + '</div>';
+            });
+    };
 
     const open = () => {
         if (opened) {
             return;
         }
         opened = true;
-        if (frame.src === '' || frame.src === 'about:blank') {
-            // First open: actually load the RAG page into the frame.
-            // Cache-busting is unnecessary — the iframe URL is the
-            // canonical TYPO3 page, and its own caching/middleware
-            // chain handles freshness.
-            frame.src = targetUrl;
-        }
+        loadChat();
         panel.hidden = false;
         // Force a reflow so the CSS transition kicks in instead of
         // jumping from display:none → opacity:1 in one paint.

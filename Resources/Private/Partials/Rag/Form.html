@@ -32,7 +32,7 @@
 
 <f:if condition="{conversationEnabled} && {conversation}">
     <p class="ws-meilisearch-rag-reset text-end small">
-        <f:link.action action="reset" pageType="{pageType}" class="link-secondary">
+        <f:link.action action="reset" pageType="{pageType}" class="link-secondary" additionalAttributes="{data-rag-reset: '1'}">
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.reset"/>
         </f:link.action>
     </p>

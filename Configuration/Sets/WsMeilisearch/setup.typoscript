@@ -61,7 +61,12 @@ plugin.tx_wsmeilisearch_search {
 #      chatWidget.url string for backward compatibility.
 [site("settings").get("meilisearch.rag.chatWidget.enabled")]
     page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
+    # Inline chat (no iframe): the widget injects the RAG shell into the host
+    # DOM, so RagStream.js (driver) and RagEmbed.css (scoped look) must load on
+    # the host page too.
+    page.includeJSFooter.wsMeilisearchRagStream = EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js
     page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
+    page.includeCSS.wsMeilisearchRagEmbed = EXT:ws_meilisearch/Resources/Public/CSS/RagEmbed.css
 [END]
 
 # Render the bubble markup with a TypoLink-resolved URL when a pageUid

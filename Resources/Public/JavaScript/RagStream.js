@@ -29,6 +29,13 @@
     'use strict';
 
     function init(root) {
+        // Idempotency: boot() runs on DOMContentLoaded and the chat widget
+        // also calls the exported init on injected markup — never wire twice.
+        if (root.dataset.wsmsStreamInit === '1') {
+            return;
+        }
+        root.dataset.wsmsStreamInit = '1';
+
         const endpoint = root.dataset.endpoint || '/_ws_meilisearch/rag/stream';
         const form = root.querySelector('[data-rag-form]');
         const thread = root.querySelector('[data-rag-thread]');
@@ -81,6 +88,22 @@
             if (value === '') return;
             if (currentStream) currentStream.close();
             ask(value);
+        });
+
+        // Reset link: when the chat is embedded inline (no iframe) a normal
+        // navigation would yank the whole host page away. Intercept it — clear
+        // the transcript and fire the reset URL in the background to drop the
+        // server-side conversation session.
+        root.addEventListener('click', function (e) {
+            const reset = e.target.closest('[data-rag-reset]');
+            if (!reset) return;
+            e.preventDefault();
+            const href = reset.getAttribute('href') || '';
+            if (href) {
+                fetch(href, { credentials: 'include' }).catch(function () { /* best effort */ });
+            }
+            thread.innerHTML = '';
+            if (inputEl) { inputEl.value = ''; inputEl.focus(); }
         });
 
         function appendTurn(question) {
@@ -199,7 +222,7 @@
             const type = (s.type || 'followup').toString();
             if (type === 'recommend') {
                 return '<a class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--recommend btn btn-sm btn-outline-secondary"'
-                    + ' href="' + escapeAttr(value) + '" rel="noopener">' + label + '</a>';
+                    + ' href="' + escapeAttr(value) + '" target="_blank" rel="noopener">' + label + '</a>';
             }
             return '<button type="button"'
                 + ' class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--' + escapeAttr(type) + ' btn btn-sm btn-outline-primary"'
@@ -217,7 +240,7 @@
             const title = (s.title || '').toString();
             const url = (s.uri || s.publicUrl || '').toString();
             const linked = url
-                ? '<a href="' + escapeAttr(url) + '">' + escapeText(title) + '</a>'
+                ? '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">' + escapeText(title) + '</a>'
                 : escapeText(title);
             return '<li data-source-id="' + escapeAttr(id) + '"><code>' + escapeText(id) + '</code> ' + linked + '</li>';
         }).join('');
@@ -249,11 +272,14 @@
         return escapeText(s).replace(/"/g, '&quot;');
     }
 
-    function boot() {
-        document.querySelectorAll('[data-ws-meilisearch-rag-stream]').forEach(init);
+    function boot(scope) {
+        (scope || document).querySelectorAll('[data-ws-meilisearch-rag-stream]').forEach(init);
     }
+    // Exported so the chat widget can wire markup it injects after page load.
+    window.wsMeilisearchRagStreamInit = boot;
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', boot);
+        document.addEventListener('DOMContentLoaded', function () { boot(); });
     } else {
         boot();
     }
