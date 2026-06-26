@@ -137,6 +137,7 @@
             const es = new EventSource(endpoint + '?q=' + encodeURIComponent(q), { withCredentials: true });
             currentStream = es;
             let closeTimer = null;
+            let acc = '';
             function finish() {
                 if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
                 es.close();
@@ -152,7 +153,10 @@
 
             es.addEventListener('token', function (ev) {
                 try {
-                    turn.answerEl.append(JSON.parse(ev.data).text || '');
+                    acc += JSON.parse(ev.data).text || '';
+                    // Hide inline [id=…] citation markers — the sources are
+                    // listed separately under the answer.
+                    turn.answerEl.textContent = stripCitations(acc);
                     turn.answerEl.scrollIntoView({ block: 'nearest' });
                 } catch (_) { /* ignore */ }
             });
@@ -165,8 +169,8 @@
                 setBusy(false);
                 try {
                     const p = JSON.parse(ev.data);
-                    const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : turn.answerEl.textContent;
-                    turn.answerEl.innerHTML = renderMarkdownLight(finalText);
+                    const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : acc;
+                    turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(finalText));
                     if (Array.isArray(p.citedIds) && p.citedIds.length > 0) {
                         markCitedSources(turn.sourcesEl, p.citedIds);
                     }
@@ -262,6 +266,13 @@
         return String(s).replace(/[&<>]/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
         });
+    }
+
+    // Remove inline citation brackets like "[id=help-66]" or
+    // "[id=help-66, id=pages-7]" from the displayed answer (incl. a preceding
+    // space). Citations are surfaced in the separate sources list instead.
+    function stripCitations(text) {
+        return String(text).replace(/\s*\[\s*id\s*=\s*[^\]]*\]/gi, '');
     }
 
     function renderMarkdownLight(text) {

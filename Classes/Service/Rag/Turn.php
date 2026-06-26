@@ -19,4 +19,15 @@ final class Turn
         public readonly string $answer,
         public readonly array $citedIds = [],
     ) {}
+
+    /**
+     * Answer for display: inline "[id=…]" citation markers removed (incl. a
+     * preceding space). The sources are surfaced separately, so the markers
+     * are noise in the rendered transcript. The raw {@see $answer} keeps them
+     * for any citation-aware processing.
+     */
+    public function getDisplayAnswer(): string
+    {
+        return (string)preg_replace('/\s*\[\s*id\s*=\s*[^\]]*\]/i', '', $this->answer);
+    }
 }
