@@ -69,14 +69,47 @@ plugin.tx_wsmeilisearch_search {
 # exactly once per request.
 [site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") > 0]
     page.footerData.1746000000 = TEXT
-    page.footerData.1746000000.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid}
+    # "pageUid,typeNum" → speaking URL of the chat page in the bare embed type
+    # (renders only the RAG plugin, no site chrome), language overlay preserved.
+    page.footerData.1746000000.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid},{$meilisearch.rag.chatWidget.embedTypeNum}
     page.footerData.1746000000.typolink.returnLast = url
     page.footerData.1746000000.wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
 [END]
 
 [site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") == 0]
     page.footerData.1746000000 = TEXT
+    # Legacy hardcoded URL: append the bare-embed type. Assumes the URL has no
+    # query string of its own (prefer chatWidget.pageUid, which is robust).
     page.footerData.1746000000.value (
-<div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
+<div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}?type={$meilisearch.rag.chatWidget.embedTypeNum}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
     )
 [END]
+
+# --- Bare RAG chat embed page type ---------------------------------------
+# Dedicated typeNum the chat-widget iframe loads. Independent PAGE object
+# (does NOT inherit the site's `page` template), so it renders a minimal
+# self-contained document containing ONLY the wsmeilisearch_rag plugin —
+# no header/nav/footer. Styled by RagEmbed.css; the plugin's own JS/CSS
+# assets are emitted via the normal asset collector. RagController keeps
+# this type sticky across the plugin's GET form submit + action links.
+wsMeilisearchRagEmbed = PAGE
+wsMeilisearchRagEmbed {
+    typeNum = {$meilisearch.rag.chatWidget.embedTypeNum}
+    config {
+        disableAllHeaderCode = 0
+        admPanel = 0
+        no_cache = 1
+        additionalHeaders.10.header = X-Robots-Tag: noindex, nofollow
+    }
+    bodyTag = <body class="ws-meilisearch-rag-embed">
+    includeCSS.ragEmbed = EXT:ws_meilisearch/Resources/Public/CSS/RagEmbed.css
+    10 = CONTENT
+    10 {
+        table = tt_content
+        select {
+            pidInList = this
+            orderBy = sorting
+            where = CType = 'wsmeilisearch_rag'
+        }
+    }
+}

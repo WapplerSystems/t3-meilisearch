@@ -10,7 +10,7 @@
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
         </h2>
 
-        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled}"/>
+        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
         <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
 
         <f:if condition="{showFallback}">

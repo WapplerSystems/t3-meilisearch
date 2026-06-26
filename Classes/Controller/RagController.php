@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Controller;
 
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Core\Routing\PageArguments;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -72,6 +74,7 @@ final class RagController extends ActionController
             'conversationEnabled' => $this->conversationEnabled($site),
             'fallback' => $this->resolveFallback($site),
             'showFallback' => $mode === 'always',
+            'pageType' => $this->currentPageType(),
         ]);
         return $this->htmlResponse();
     }
@@ -138,6 +141,7 @@ final class RagController extends ActionController
             'conversationEnabled' => $this->conversationEnabled($site),
             'fallback' => $this->resolveFallback($site),
             'showFallback' => $this->shouldShowFallback($site, $answer->status, $answer->citedIds),
+            'pageType' => $this->currentPageType(),
         ]);
         return $this->htmlResponse();
     }
@@ -196,7 +200,31 @@ final class RagController extends ActionController
         if ($site instanceof Site && $this->conversationEnabled($site)) {
             $this->conversationStore->clear($this->request, $this->sessionKey($site));
         }
+        // Preserve the current page type so a reset inside the bare chat-widget
+        // embed stays in the embed instead of bouncing to the full page (type 0).
+        $pageType = $this->currentPageType();
+        if ($pageType > 0) {
+            $uri = $this->uriBuilder->reset()->setTargetPageType($pageType)->uriFor('form');
+            return $this->redirectToUri($uri);
+        }
         return $this->redirect('form');
+    }
+
+    /**
+     * Current frontend page type (typeNum). Used to keep the bare chat-widget
+     * embed (a dedicated typeNum) sticky across the plugin's own GET form
+     * submit and action links — otherwise they default to type 0 and the
+     * iframe reloads the full page. Read from the global request because
+     * Extbase strips routing attributes off $this->request.
+     */
+    private function currentPageType(): int
+    {
+        $request = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $routing = $request instanceof ServerRequestInterface ? $request->getAttribute('routing') : null;
+        if ($routing instanceof PageArguments) {
+            return (int)$routing->getPageType();
+        }
+        return 0;
     }
 
     private function conversationEnabled(?Site $site): bool

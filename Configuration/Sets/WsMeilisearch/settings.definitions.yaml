@@ -180,6 +180,12 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.chatWidget.embedTypeNum:
+    label: 'Chat widget embed page type'
+    description: 'Page typeNum used for the bare chat view the widget iframe loads — renders ONLY the wsmeilisearch_rag plugin without the site header/nav/footer (styled by RagEmbed.css). The widget URL is built with this type appended. Change only if it collides with another page type on the site.'
+    type: int
+    default: 1748231
+
   meilisearch.analytics.enabled:
     label: 'Search analytics'
     description: 'When true, every non-trivial FE search is recorded in tx_wsmeilisearch_search_log so the BE analytics tab can show top queries / zero-result queries / hybrid-usage over time. Stores only {site, language, query, count, source, hybrid, timestamp} — no IPs, no session ids, no user agents.'

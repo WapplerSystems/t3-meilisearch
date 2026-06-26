@@ -2,6 +2,10 @@
 <form action="{f:uri.page()}" method="get" role="search" class="ws-meilisearch-rag-form mb-3" data-ws-meilisearch-rag-form="1">
     <input type="hidden" name="tx_wsmeilisearch_rag[action]" value="ask"/>
     <input type="hidden" name="tx_wsmeilisearch_rag[controller]" value="Rag"/>
+    <f:comment><!-- Keep the bare chat-widget embed (dedicated typeNum) sticky across this GET submit. --></f:comment>
+    <f:if condition="{pageType}">
+        <input type="hidden" name="type" value="{pageType}"/>
+    </f:if>
 
     <label for="ws-meilisearch-rag-q" class="visually-hidden">
         <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.placeholder"/>
@@ -28,7 +32,7 @@
 
 <f:if condition="{conversationEnabled} && {conversation}">
     <p class="ws-meilisearch-rag-reset text-end small">
-        <f:link.action action="reset" class="link-secondary">
+        <f:link.action action="reset" pageType="{pageType}" class="link-secondary">
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.reset"/>
         </f:link.action>
     </p>

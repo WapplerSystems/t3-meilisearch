@@ -1,0 +1,134 @@
+/*
+ * Standalone styling for the bare RAG chat-widget embed (dedicated typeNum).
+ * The RAG Fluid partials are authored with Bootstrap 5 class names, but the
+ * embed renders without the site's CSS — so this file provides a minimal,
+ * self-contained implementation of just the classes those partials use.
+ * Everything is scoped under .ws-meilisearch-rag-embed (the embed <body>)
+ * so it never leaks into a host page that happens to load it.
+ */
+.ws-meilisearch-rag-embed {
+    --wsm-accent: #1a5fb4;
+    --wsm-border: #d7dbe0;
+    --wsm-muted: #5b6570;
+    --wsm-bg-soft: #f5f7f9;
+    margin: 0;
+    padding: 1rem;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #1d2228;
+    background: #fff;
+    -webkit-text-size-adjust: 100%;
+}
+.ws-meilisearch-rag-embed *,
+.ws-meilisearch-rag-embed *::before,
+.ws-meilisearch-rag-embed *::after { box-sizing: border-box; }
+
+/* Typography */
+.ws-meilisearch-rag-embed h1,
+.ws-meilisearch-rag-embed h2,
+.ws-meilisearch-rag-embed h3,
+.ws-meilisearch-rag-embed .h4,
+.ws-meilisearch-rag-embed .h6 { margin: 0 0 .5rem; line-height: 1.25; font-weight: 600; }
+.ws-meilisearch-rag-embed .h4 { font-size: 1.25rem; }
+.ws-meilisearch-rag-embed .h6 { font-size: .9rem; }
+.ws-meilisearch-rag-embed p { margin: 0 0 .75rem; }
+.ws-meilisearch-rag-embed a { color: var(--wsm-accent); }
+.ws-meilisearch-rag-embed code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+
+/* Form / input group */
+.ws-meilisearch-rag-embed .input-group { display: flex; width: 100%; }
+.ws-meilisearch-rag-embed .form-control {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: .5rem .75rem;
+    border: 1px solid var(--wsm-border);
+    border-radius: .375rem;
+    font: inherit;
+}
+.ws-meilisearch-rag-embed .input-group-lg .form-control { padding: .625rem .9rem; font-size: 1.0625rem; }
+.ws-meilisearch-rag-embed .input-group .form-control { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ws-meilisearch-rag-embed .form-control:focus { outline: 2px solid var(--wsm-accent); outline-offset: -1px; border-color: var(--wsm-accent); }
+
+/* Buttons */
+.ws-meilisearch-rag-embed .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: .5rem .9rem;
+    border: 1px solid transparent;
+    border-radius: .375rem;
+    font: inherit; font-weight: 500; line-height: 1.2;
+    cursor: pointer; text-decoration: none;
+    background: var(--wsm-accent); color: #fff;
+}
+.ws-meilisearch-rag-embed .input-group .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ws-meilisearch-rag-embed .btn-sm { padding: .3rem .6rem; font-size: .85rem; }
+.ws-meilisearch-rag-embed .btn-success { background: #1a7f37; }
+.ws-meilisearch-rag-embed .btn-outline-primary { background: #fff; color: var(--wsm-accent); border-color: var(--wsm-accent); }
+.ws-meilisearch-rag-embed .btn-outline-secondary { background: #fff; color: var(--wsm-muted); border-color: var(--wsm-border); }
+.ws-meilisearch-rag-embed .btn:hover { filter: brightness(.95); }
+.ws-meilisearch-rag-embed .btn-outline-primary:hover { background: var(--wsm-accent); color: #fff; }
+.ws-meilisearch-rag-embed .btn-outline-secondary:hover { background: var(--wsm-bg-soft); }
+
+/* Card */
+.ws-meilisearch-rag-embed .card { border: 1px solid var(--wsm-border); border-radius: .5rem; background: #fff; overflow: hidden; }
+.ws-meilisearch-rag-embed .card-header { padding: .5rem .85rem; background: var(--wsm-bg-soft); border-bottom: 1px solid var(--wsm-border); font-weight: 600; }
+.ws-meilisearch-rag-embed .card-body { padding: .85rem; }
+.ws-meilisearch-rag-embed .card-text { margin: 0; }
+.ws-meilisearch-rag-embed .border { border: 1px solid var(--wsm-border) !important; }
+.ws-meilisearch-rag-embed .border-primary { border-color: var(--wsm-accent) !important; }
+
+/* List group (sources / thread) */
+.ws-meilisearch-rag-embed .list-group { display: flex; flex-direction: column; padding-left: 0; margin: 0; list-style: none; border-radius: .5rem; }
+.ws-meilisearch-rag-embed .list-group-item { padding: .55rem .85rem; border: 1px solid var(--wsm-border); }
+.ws-meilisearch-rag-embed .list-group-item + .list-group-item { border-top-width: 0; }
+.ws-meilisearch-rag-embed .list-group-flush { border-radius: 0; }
+.ws-meilisearch-rag-embed .list-group-flush > .list-group-item { border-width: 0 0 1px; }
+.ws-meilisearch-rag-embed .list-group-item-success { background: #e7f4ea; }
+.ws-meilisearch-rag-embed .list-unstyled { padding-left: 0; list-style: none; margin: 0; }
+
+/* Alerts */
+.ws-meilisearch-rag-embed .alert { padding: .7rem .85rem; border: 1px solid transparent; border-radius: .375rem; margin: 0 0 .75rem; }
+.ws-meilisearch-rag-embed .alert-info { background: #e7f1fb; border-color: #bcd9f5; }
+.ws-meilisearch-rag-embed .alert-light { background: var(--wsm-bg-soft); border-color: var(--wsm-border); }
+.ws-meilisearch-rag-embed .alert-warning { background: #fdf3e2; border-color: #f5dcae; }
+.ws-meilisearch-rag-embed .alert-danger { background: #fbe9e9; border-color: #f3c2c2; }
+
+/* Badges */
+.ws-meilisearch-rag-embed .badge { display: inline-block; padding: .2em .5em; border-radius: .35rem; font-size: .72em; font-weight: 600; }
+.ws-meilisearch-rag-embed .text-bg-light { background: var(--wsm-bg-soft); color: #1d2228; }
+.ws-meilisearch-rag-embed .text-bg-secondary { background: #6c757d; color: #fff; }
+.ws-meilisearch-rag-embed .text-bg-primary { background: var(--wsm-accent); color: #fff; }
+.ws-meilisearch-rag-embed .text-bg-info { background: #0aa2c0; color: #fff; }
+.ws-meilisearch-rag-embed .text-bg-warning { background: #ffc107; color: #1d2228; }
+
+/* RAG suggestion buttons */
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestions { margin-top: .75rem; }
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestion { text-decoration: none; }
+
+/* Utilities (only the ones the partials use) */
+.ws-meilisearch-rag-embed .d-flex { display: flex; }
+.ws-meilisearch-rag-embed .d-block { display: block; }
+.ws-meilisearch-rag-embed .flex-wrap { flex-wrap: wrap; }
+.ws-meilisearch-rag-embed .flex-grow-1 { flex-grow: 1; }
+.ws-meilisearch-rag-embed .align-items-start { align-items: flex-start; }
+.ws-meilisearch-rag-embed .gap-2 { gap: .5rem; }
+.ws-meilisearch-rag-embed .gap-3 { gap: 1rem; }
+.ws-meilisearch-rag-embed .text-end { text-align: right; }
+.ws-meilisearch-rag-embed .text-uppercase { text-transform: uppercase; }
+.ws-meilisearch-rag-embed .text-muted { color: var(--wsm-muted); }
+.ws-meilisearch-rag-embed .text-primary { color: var(--wsm-accent); }
+.ws-meilisearch-rag-embed .fw-semibold { font-weight: 600; }
+.ws-meilisearch-rag-embed .small { font-size: .85em; }
+.ws-meilisearch-rag-embed .mb-0 { margin-bottom: 0; }
+.ws-meilisearch-rag-embed .mb-1 { margin-bottom: .25rem; }
+.ws-meilisearch-rag-embed .mb-2 { margin-bottom: .5rem; }
+.ws-meilisearch-rag-embed .mb-3 { margin-bottom: 1rem; }
+.ws-meilisearch-rag-embed .mb-4 { margin-bottom: 1.5rem; }
+.ws-meilisearch-rag-embed .mt-2 { margin-top: .5rem; }
+.ws-meilisearch-rag-embed .mt-3 { margin-top: 1rem; }
+.ws-meilisearch-rag-embed .ms-1 { margin-left: .25rem; }
+.ws-meilisearch-rag-embed .py-2 { padding-top: .5rem; padding-bottom: .5rem; }
+.ws-meilisearch-rag-embed .visually-hidden {
+    position: absolute !important; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}

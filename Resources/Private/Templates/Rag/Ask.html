@@ -10,7 +10,7 @@
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
         </h2>
 
-        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled}"/>
+        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
 
         <f:comment>
             With conversation memory enabled, the controller has already
@@ -134,7 +134,7 @@
             {answer.suggestions} is empty unless the answer is ok and the
             feature is enabled, so the partial produces no markup otherwise.
         </f:comment>
-        <f:render partial="Rag/Suggestions" arguments="{suggestions: answer.suggestions}"/>
+        <f:render partial="Rag/Suggestions" arguments="{suggestions: answer.suggestions, pageType: pageType}"/>
 
         <f:comment>
             Contact fallback — rendered below whatever the switch

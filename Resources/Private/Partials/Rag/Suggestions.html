@@ -23,6 +23,7 @@
                     </f:then>
                     <f:else>
                         <f:link.action action="ask"
+                            pageType="{pageType}"
                             arguments="{q: suggestion.value}"
                             class="btn btn-sm btn-outline-primary ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--{suggestion.type}">{suggestion.label}</f:link.action>
                     </f:else>
