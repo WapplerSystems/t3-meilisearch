@@ -6,8 +6,13 @@
     Order is chronological (oldest first); the latest turn lands at
     the bottom of the page.
 </f:comment>
-<f:if condition="{conversation}">
-    <ol class="ws-meilisearch-rag-thread list-unstyled mb-4">
+<f:comment>
+    Always render the <ol> (even empty) so RagStream.js can append live turns
+    into the same list — keeping the JS chat transcript and the server-rendered
+    history visually identical. The no-JS path simply gets an empty list on the
+    first question.
+</f:comment>
+    <ol class="ws-meilisearch-rag-thread list-unstyled mb-4" data-rag-thread>
         <f:for each="{conversation}" as="turn">
             <li class="ws-meilisearch-rag-turn mb-3">
                 <div class="card mb-2">
@@ -39,5 +44,4 @@
             </li>
         </f:for>
     </ol>
-</f:if>
 </html>

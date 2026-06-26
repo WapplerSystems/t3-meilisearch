@@ -3,18 +3,24 @@
  * Vanilla JS, no framework, no build step.
  *
  * Turns the GET-only PRG RAG plugin into an AJAX chat: it intercepts the
- * form submit, streams the answer token-by-token from
- * /_ws_meilisearch/rag/stream, and renders sources + decision-support
- * suggestions client-side — without reloading the page. Without JS the
- * plugin still works as a normal synchronous round-trip.
+ * form submit and appends each Q&A as a streamed turn to the
+ * [data-rag-thread] transcript — same markup as the server-rendered
+ * history (Partials/Rag/Thread.html) — without reloading the page.
+ * The answer streams token-by-token; sources and decision-support
+ * suggestions render inside that turn. Without JS the plugin still works
+ * as a normal synchronous round-trip (Ask.html).
  *
- * Wiring (see Templates/Rag/Form.html):
- *   <div data-ws-meilisearch-rag-stream data-endpoint="/_ws_meilisearch/rag/stream">
+ * Wiring (Templates/Rag/Form.html):
+ *   <div data-ws-meilisearch-rag-stream data-endpoint="…"
+ *        data-label-you data-label-assistant data-label-sources data-label-suggestions>
  *     <form data-rag-form> … name="tx_wsmeilisearch_rag[q]" … </form>
- *     <div data-rag-sources></div>
- *     <div data-rag-answer></div>
- *     <div data-rag-suggestions data-heading="…"></div>
+ *     <ol data-rag-thread> … server history … </ol>
  *   </div>
+ *
+ * Frame order from the server: sources → token* → done → suggestions? → end.
+ * We finalize the answer on `done` but only close the stream on `end`
+ * (with a safety timeout), so the suggestions frame — generated after the
+ * answer — still arrives without EventSource auto-reconnecting.
  *
  * Conversation memory works because the chat page sets the fe_typo_user
  * session cookie on load; the SSE request carries it (withCredentials).
@@ -25,16 +31,19 @@
     function init(root) {
         const endpoint = root.dataset.endpoint || '/_ws_meilisearch/rag/stream';
         const form = root.querySelector('[data-rag-form]');
-        const sourcesEl = root.querySelector('[data-rag-sources]');
-        const answerEl = root.querySelector('[data-rag-answer]');
-        const suggestionsEl = root.querySelector('[data-rag-suggestions]');
-        if (!form || !answerEl) {
+        const thread = root.querySelector('[data-rag-thread]');
+        if (!form || !thread) {
             return;
         }
+        const labels = {
+            you: root.dataset.labelYou || 'You',
+            assistant: root.dataset.labelAssistant || 'Assistant',
+            sources: root.dataset.labelSources || 'Sources',
+            suggestions: root.dataset.labelSuggestions || ''
+        };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
         const submitOriginal = submitBtn ? submitBtn.innerHTML : '';
-
         let currentStream = null;
 
         function setBusy(busy) {
@@ -48,6 +57,11 @@
             }
         }
 
+        function readQuestion() {
+            if (inputEl) return inputEl.value.trim();
+            return (new FormData(form).get('q') || '').toString().trim();
+        }
+
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             const q = readQuestion();
@@ -56,36 +70,48 @@
             ask(q);
         });
 
-        if (suggestionsEl) {
-            // followup / refine suggestions re-ask through the stream; recommend
-            // suggestions are plain links handled by the browser.
-            suggestionsEl.addEventListener('click', function (e) {
-                const btn = e.target.closest('[data-suggestion-value]');
-                if (!btn) return;
-                e.preventDefault();
-                const value = btn.getAttribute('data-suggestion-value') || '';
-                if (value === '') return;
-                if (inputEl) inputEl.value = value;
-                if (currentStream) currentStream.close();
-                ask(value);
-            });
-        }
+        // followup / refine suggestions re-ask through the stream; recommend
+        // suggestions are plain links handled by the browser. Delegated on the
+        // transcript so it covers every appended turn.
+        thread.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-suggestion-value]');
+            if (!btn) return;
+            e.preventDefault();
+            const value = btn.getAttribute('data-suggestion-value') || '';
+            if (value === '') return;
+            if (currentStream) currentStream.close();
+            ask(value);
+        });
 
-        function readQuestion() {
-            if (inputEl) return inputEl.value.trim();
-            const data = new FormData(form);
-            return (data.get('q') || '').toString().trim();
+        function appendTurn(question) {
+            const li = document.createElement('li');
+            li.className = 'ws-meilisearch-rag-turn mb-3';
+            li.innerHTML =
+                '<div class="card mb-2"><div class="card-body py-2">'
+                + '<small class="text-muted d-block mb-1">' + escapeText(labels.you) + '</small>'
+                + '<p class="card-text mb-0">' + escapeText(question) + '</p>'
+                + '</div></div>'
+                + '<div class="card border-primary"><div class="card-body py-2">'
+                + '<small class="text-primary d-block mb-1">' + escapeText(labels.assistant) + '</small>'
+                + '<p class="card-text mb-0 ws-meilisearch-rag-answer" data-streaming="true" style="white-space: pre-wrap;"></p>'
+                + '<div class="ws-meilisearch-rag-sources mt-2"></div>'
+                + '<div class="ws-meilisearch-rag-suggestions mt-2"></div>'
+                + '</div></div>';
+            thread.appendChild(li);
+            li.scrollIntoView({ block: 'nearest' });
+            return {
+                answerEl: li.querySelector('.ws-meilisearch-rag-answer'),
+                sourcesEl: li.querySelector('.ws-meilisearch-rag-sources'),
+                suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions')
+            };
         }
 
         function ask(q) {
-            if (sourcesEl) sourcesEl.textContent = '';
-            if (suggestionsEl) suggestionsEl.innerHTML = '';
-            answerEl.textContent = '';
-            answerEl.dataset.streaming = 'true';
+            const turn = appendTurn(q);
+            if (inputEl) inputEl.value = '';
             setBusy(true);
 
-            const url = endpoint + '?q=' + encodeURIComponent(q);
-            const es = new EventSource(url, { withCredentials: true });
+            const es = new EventSource(endpoint + '?q=' + encodeURIComponent(q), { withCredentials: true });
             currentStream = es;
             let closeTimer = null;
             function finish() {
@@ -95,47 +121,40 @@
             }
 
             es.addEventListener('sources', function (ev) {
-                if (!sourcesEl) return;
                 try {
-                    const payload = JSON.parse(ev.data);
-                    sourcesEl.innerHTML = renderSources(payload.sources || []);
-                } catch (_) { /* ignore malformed frame */ }
+                    const p = JSON.parse(ev.data);
+                    turn.sourcesEl.innerHTML = renderSources(p.sources || [], labels.sources);
+                } catch (_) { /* ignore */ }
             });
 
             es.addEventListener('token', function (ev) {
                 try {
-                    const payload = JSON.parse(ev.data);
-                    answerEl.append(payload.text || '');
+                    turn.answerEl.append(JSON.parse(ev.data).text || '');
+                    turn.answerEl.scrollIntoView({ block: 'nearest' });
                 } catch (_) { /* ignore */ }
             });
 
             es.addEventListener('done', function (ev) {
-                // Finalize the answer immediately, but keep the stream open: the
-                // optional `suggestions` frame is emitted AFTER `done`. The
-                // `end` sentinel closes us; the timer is a safety net so a
-                // missing `end` can't trigger EventSource auto-reconnect.
-                answerEl.dataset.streaming = 'false';
+                // Finalize the answer now; keep the stream open for the trailing
+                // suggestions frame and close on `end` (safety timeout guards
+                // against a missing `end` triggering an auto-reconnect).
+                turn.answerEl.dataset.streaming = 'false';
                 setBusy(false);
                 try {
-                    const payload = JSON.parse(ev.data);
-                    const finalText = typeof payload.answer === 'string' && payload.answer !== ''
-                        ? payload.answer
-                        : answerEl.textContent;
-                    answerEl.innerHTML = renderMarkdownLight(finalText);
-                    if (Array.isArray(payload.citedIds) && payload.citedIds.length > 0) {
-                        markCitedSources(sourcesEl, payload.citedIds);
+                    const p = JSON.parse(ev.data);
+                    const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : turn.answerEl.textContent;
+                    turn.answerEl.innerHTML = renderMarkdownLight(finalText);
+                    if (Array.isArray(p.citedIds) && p.citedIds.length > 0) {
+                        markCitedSources(turn.sourcesEl, p.citedIds);
                     }
                 } catch (_) { /* ignore */ }
                 closeTimer = setTimeout(finish, 15000);
             });
 
             es.addEventListener('suggestions', function (ev) {
-                if (suggestionsEl) {
-                    try {
-                        const payload = JSON.parse(ev.data);
-                        renderSuggestions(payload.suggestions || []);
-                    } catch (_) { /* ignore */ }
-                }
+                try {
+                    renderSuggestions(turn.suggestionsEl, JSON.parse(ev.data).suggestions || [], labels.suggestions);
+                } catch (_) { /* ignore */ }
             });
 
             es.addEventListener('end', function () { finish(); });
@@ -146,50 +165,52 @@
 
             function terminate(prefix, fromEvent = true) {
                 finish();
-                answerEl.dataset.streaming = 'false';
+                turn.answerEl.dataset.streaming = 'false';
                 setBusy(false);
                 let msg = prefix;
                 if (fromEvent && arguments.length > 2) {
                     try {
-                        const payload = JSON.parse(arguments[2].data);
-                        if (payload.error) msg += payload.error;
+                        const p = JSON.parse(arguments[2].data);
+                        if (p.error) msg += p.error;
                     } catch (_) { /* ignore */ }
                 }
-                answerEl.textContent = msg;
+                turn.answerEl.textContent = msg;
             }
 
             es.onerror = function () {
-                if (es.readyState === EventSource.CLOSED) { finish(); return; }
+                const closed = es.readyState === EventSource.CLOSED;
                 finish();
-                answerEl.dataset.streaming = 'false';
+                if (closed) return;
+                turn.answerEl.dataset.streaming = 'false';
                 setBusy(false);
-                answerEl.textContent = 'Connection to the server was interrupted.';
-            };
-        }
-
-        function renderSuggestions(items) {
-            if (!suggestionsEl) return;
-            if (!items.length) { suggestionsEl.innerHTML = ''; return; }
-            const heading = suggestionsEl.dataset.heading || '';
-            const buttons = items.map(function (s) {
-                const label = escapeText((s.label || '').toString());
-                const value = (s.value || '').toString();
-                const type = (s.type || 'followup').toString();
-                if (type === 'recommend') {
-                    return '<a class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--recommend btn btn-sm btn-outline-secondary"'
-                        + ' href="' + escapeAttr(value) + '" rel="noopener">' + label + '</a>';
+                if (turn.answerEl.textContent.trim() === '') {
+                    turn.answerEl.textContent = 'Connection to the server was interrupted.';
                 }
-                return '<button type="button"'
-                    + ' class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--' + escapeAttr(type) + ' btn btn-sm btn-outline-primary"'
-                    + ' data-suggestion-value="' + escapeAttr(value) + '">' + label + '</button>';
-            }).join('');
-            suggestionsEl.innerHTML =
-                (heading ? '<small class="text-muted d-block mb-2">' + escapeText(heading) + '</small>' : '')
-                + '<div class="d-flex flex-wrap gap-2">' + buttons + '</div>';
+            };
         }
     }
 
-    function renderSources(sources) {
+    function renderSuggestions(container, items, heading) {
+        if (!container) return;
+        if (!items.length) { container.innerHTML = ''; return; }
+        const buttons = items.map(function (s) {
+            const label = escapeText((s.label || '').toString());
+            const value = (s.value || '').toString();
+            const type = (s.type || 'followup').toString();
+            if (type === 'recommend') {
+                return '<a class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--recommend btn btn-sm btn-outline-secondary"'
+                    + ' href="' + escapeAttr(value) + '" rel="noopener">' + label + '</a>';
+            }
+            return '<button type="button"'
+                + ' class="ws-meilisearch-rag-suggestion ws-meilisearch-rag-suggestion--' + escapeAttr(type) + ' btn btn-sm btn-outline-primary"'
+                + ' data-suggestion-value="' + escapeAttr(value) + '">' + label + '</button>';
+        }).join('');
+        container.innerHTML =
+            (heading ? '<small class="text-muted d-block mb-2">' + escapeText(heading) + '</small>' : '')
+            + '<div class="d-flex flex-wrap gap-2">' + buttons + '</div>';
+    }
+
+    function renderSources(sources, label) {
         if (sources.length === 0) return '';
         const items = sources.map(function (s) {
             const id = (s.id || '').toString();
@@ -200,7 +221,7 @@
                 : escapeText(title);
             return '<li data-source-id="' + escapeAttr(id) + '"><code>' + escapeText(id) + '</code> ' + linked + '</li>';
         }).join('');
-        return '<strong>Quellen:</strong><ul>' + items + '</ul>';
+        return '<small class="text-muted d-block mb-1">' + escapeText(label) + '</small><ul>' + items + '</ul>';
     }
 
     function markCitedSources(container, citedIds) {
