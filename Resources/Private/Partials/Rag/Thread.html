@@ -28,7 +28,7 @@
                         <small class="text-primary d-block mb-1">
                             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant"/>
                         </small>
-                        <p class="card-text mb-0" style="white-space: pre-wrap;">{turn.displayAnswer}</p>
+                        <p class="card-text mb-0" style="white-space: pre-wrap;"><f:format.raw>{turn.displayAnswerHtml}</f:format.raw></p>
                         <f:if condition="{turn.citedIds}">
                             <div class="mt-2">
                                 <small class="text-muted">

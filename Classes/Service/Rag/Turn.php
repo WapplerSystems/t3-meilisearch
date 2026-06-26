@@ -21,13 +21,16 @@ final class Turn
     ) {}
 
     /**
-     * Answer for display: inline "[id=…]" citation markers removed (incl. a
-     * preceding space). The sources are surfaced separately, so the markers
-     * are noise in the rendered transcript. The raw {@see $answer} keeps them
-     * for any citation-aware processing.
+     * Answer rendered for the transcript: inline "[id=…]" citation markers
+     * removed (sources are shown separately), HTML-escaped, then **bold**
+     * rendered as <strong>. Mirrors RagAnswer::getAnswerHtml() so a server-
+     * rendered history turn looks identical to a freshly streamed one. Output
+     * is safe HTML — render with <f:format.raw>.
      */
-    public function getDisplayAnswer(): string
+    public function getDisplayAnswerHtml(): string
     {
-        return (string)preg_replace('/\s*\[\s*id\s*=\s*[^\]]*\]/i', '', $this->answer);
+        $text = (string)preg_replace('/\s*\[\s*id\s*=\s*[^\]]*\]/i', '', $this->answer);
+        $html = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return (string)preg_replace('/\*\*([^*\n]+?)\*\*/u', '<strong>$1</strong>', $html);
     }
 }
