@@ -242,7 +242,13 @@
         const items = sources.map(function (s) {
             const id = (s.id || '').toString();
             const title = (s.title || '').toString();
+            const type = (s.type || '').toString();
             const url = (s.uri || s.publicUrl || '').toString();
+            // Help / knowledge-resource hits are the internal RAG grounding
+            // corpus — show the title but don't link it or expose the raw id.
+            if (type === 'knowledge_resource') {
+                return '<li data-source-id="' + escapeAttr(id) + '">' + escapeText(title) + '</li>';
+            }
             const linked = url
                 ? '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">' + escapeText(title) + '</a>'
                 : escapeText(title);
