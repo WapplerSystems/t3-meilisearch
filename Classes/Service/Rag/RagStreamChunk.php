@@ -19,6 +19,9 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  *   failed  → terminal alternative to done; carries an error message.
  *   noContext / disabled → terminal alternatives when retrieval found
  *             nothing or RAG isn't configured. No tokens are emitted.
+ *   clarify → terminal alternative when the triage step decided the
+ *             question is too ambiguous / underspecified to answer. Carries
+ *             one clarifying question; no sources or tokens are emitted.
  */
 final class RagStreamChunk
 {
@@ -30,6 +33,7 @@ final class RagStreamChunk
     public const TYPE_DISABLED = 'disabled';
     public const TYPE_SUGGESTIONS = 'suggestions';
     public const TYPE_END = 'end';
+    public const TYPE_CLARIFY = 'clarify';
 
     /**
      * @param array<string,mixed> $data
@@ -91,5 +95,15 @@ final class RagStreamChunk
     public static function disabled(): self
     {
         return new self(self::TYPE_DISABLED, []);
+    }
+
+    /**
+     * Terminal frame: the triage step asked one clarifying question back
+     * instead of answering. No `sources`/`token`/`end` follow — the client
+     * renders the question and closes the stream.
+     */
+    public static function clarify(string $question): self
+    {
+        return new self(self::TYPE_CLARIFY, ['question' => $question]);
     }
 }

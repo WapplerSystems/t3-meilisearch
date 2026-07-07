@@ -58,6 +58,7 @@ final class RagService implements LoggerAwareInterface
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly QueryRewriter $queryRewriter,
         private readonly SuggestionGenerator $suggestionGenerator,
+        private readonly QueryClassifier $queryClassifier,
     ) {}
 
     /**
@@ -132,6 +133,23 @@ final class RagService implements LoggerAwareInterface
         }
         if ($hits === []) {
             $answer = RagAnswer::noContext();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
+            return $answer;
+        }
+
+        // Triage before generating: if the question is too ambiguous /
+        // underspecified to answer from these hits, ask one clarifying
+        // question back instead of guessing. Skips the answer call entirely.
+        $clarification = $this->queryClassifier->classify(
+            $provider,
+            $settings,
+            $conversation,
+            $event->question,
+            $hits,
+            $llmOptions,
+        );
+        if ($clarification->needed) {
+            $answer = RagAnswer::clarification($clarification->question);
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
             return $answer;
         }
@@ -253,6 +271,29 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
                 $event->question,
                 RagAnswer::noContext(),
+                $site,
+                $this->resolveLanguageId($options),
+            ));
+            return;
+        }
+
+        // Triage before streaming any tokens: an ambiguous / underspecified
+        // question gets one clarifying question back instead of a guessed
+        // answer. Emitted before the `sources` frame so the UI never shows a
+        // "found N documents" preview it then has to pivot away from.
+        $clarification = $this->queryClassifier->classify(
+            $provider,
+            $settings,
+            $conversation,
+            $event->question,
+            $hits,
+            $llmOptions,
+        );
+        if ($clarification->needed) {
+            yield RagStreamChunk::clarify($clarification->question);
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
+                $event->question,
+                RagAnswer::clarification($clarification->question),
                 $site,
                 $this->resolveLanguageId($options),
             ));

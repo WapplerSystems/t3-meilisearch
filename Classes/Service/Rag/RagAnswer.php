@@ -59,6 +59,17 @@ final class RagAnswer
     }
 
     /**
+     * The question was too ambiguous / underspecified to answer well, so the
+     * assistant asks one clarifying question back instead of guessing. The
+     * clarifying question is carried in {@see $answer} so the template renders
+     * it in the answer bubble; there are no sources or citations.
+     */
+    public static function clarification(string $question): self
+    {
+        return new self(trim($question), [], [], 'clarify', null);
+    }
+
+    /**
      * Sources the FE template may show as a clickable citation list.
      * Strips hits of type 'knowledge_resource' — those are internal
      * RAG-grounding corpus (DITA topics imported via the

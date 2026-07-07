@@ -1,0 +1,162 @@
+<?php
+declare(strict_types=1);
+
+namespace WapplerSystems\Meilisearch\Service\Rag;
+
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
+use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
+
+/**
+ * Pre-answer triage: decide whether the user's question can be answered from
+ * the retrieved context, or whether it is too ambiguous / underspecified and
+ * the assistant should ask ONE clarifying question back instead of guessing.
+ *
+ * This is the "recognise not-knowing and ask" lever of agentic RAG. It runs
+ * after retrieval — so it can see the actual candidate document titles and
+ * offer concrete options — but before generation, so a clarification skips
+ * the expensive answer call entirely.
+ *
+ * One cheap, deterministic LLM call (temp=0, small maxTokens). Degrades to
+ * "answerable" whenever the feature is disabled, on the turn right after a
+ * clarification (never ask twice in a row), or on any parse/transport error,
+ * so a flaky triage never blocks an answer.
+ */
+final class QueryClassifier implements LoggerAwareInterface
+{
+    use LoggerAwareTrait;
+
+    private const SYSTEM_PROMPT = <<<'PROMPT'
+You are the triage step of a documentation assistant. Decide whether the user's latest question can be answered from the available documentation, or whether it is too ambiguous or underspecified to answer well without exactly one clarifying question.
+
+You are given the conversation so far, the latest question, and the TITLES of the documents a search retrieved for it.
+
+Rules:
+- Strongly default to ANSWERABLE. Only ask for clarification when a genuinely important detail is missing, or the question could clearly mean different things, such that answering directly would likely be wrong or misleading.
+- A broad question that the retrieved documents can plausibly answer is ANSWERABLE.
+- When clarification is needed, ask ONE short, specific question in the same language as the user's latest message. Prefer concrete options taken from the retrieved titles (e.g. product or edition names) over a generic "please be more specific".
+- Never ask the user merely to rephrase. Ask for the specific missing fact.
+
+Output ONLY minified JSON, nothing else:
+{"answerable": true}
+or
+{"answerable": false, "question": "<your single clarifying question>"}
+PROMPT;
+
+    /**
+     * @param object $settings Site settings (->get()).
+     * @param list<array<string,mixed>> $hits retrieved candidate documents.
+     * @param array<string,mixed> $baseLlmOptions provider connection options
+     *     (model, apiKey, url, timeout, …). temperature + maxTokens are
+     *     overridden here for a short, deterministic verdict.
+     */
+    public function classify(
+        LlmProviderInterface $provider,
+        object $settings,
+        Conversation $conversation,
+        string $question,
+        array $hits,
+        array $baseLlmOptions,
+    ): Clarification {
+        if (!(bool)$settings->get('meilisearch.rag.clarify.enabled', false)) {
+            return Clarification::answerable();
+        }
+        // Never ask for clarification twice in a row: the user's reply to a
+        // clarifying question is by definition the answer to it.
+        if ($conversation->lastTurnIsClarification()) {
+            return Clarification::answerable();
+        }
+
+        $historyTurns = max(1, (int)$settings->get('meilisearch.rag.rewriteHistoryTurns', 3));
+        $messages = [
+            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+            ['role' => 'user', 'content' =>
+                "Conversation so far:\n" . $this->renderHistory($conversation, $historyTurns)
+                . "\n\nLatest question: " . $question
+                . "\n\nRetrieved document titles:\n" . $this->renderTitles($hits)
+                . "\n\nVerdict JSON:",
+            ],
+        ];
+
+        // Short + deterministic, like the query rewriter: our temperature /
+        // maxTokens win; provider connection bits come from the caller.
+        $options = ['temperature' => 0.0, 'maxTokens' => 200] + $baseLlmOptions;
+
+        try {
+            $raw = $provider->complete($messages, $options);
+        } catch (\Throwable $e) {
+            $this->logger?->info('RAG query classification failed, treating as answerable: {message}', [
+                'message' => $e->getMessage(),
+            ]);
+            return Clarification::answerable();
+        }
+
+        return $this->parse($raw);
+    }
+
+    private function renderHistory(Conversation $conversation, int $maxTurns): string
+    {
+        $turns = $conversation->turns;
+        if ($turns === []) {
+            return '(none)';
+        }
+        if (count($turns) > $maxTurns) {
+            $turns = array_slice($turns, -$maxTurns);
+        }
+        $lines = [];
+        foreach ($turns as $turn) {
+            $lines[] = 'User: ' . $turn->question;
+            $answer = trim($turn->answer);
+            if (mb_strlen($answer) > 300) {
+                $answer = mb_substr($answer, 0, 300) . '…';
+            }
+            $lines[] = 'Assistant: ' . $answer;
+        }
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $hits
+     */
+    private function renderTitles(array $hits): string
+    {
+        $lines = [];
+        foreach ($hits as $hit) {
+            $title = trim((string)($hit['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+            $type = trim((string)($hit['type'] ?? ''));
+            $lines[] = $type !== '' ? sprintf('- %s (%s)', $title, $type) : '- ' . $title;
+        }
+        return $lines === [] ? '(none)' : implode("\n", $lines);
+    }
+
+    private function parse(string $raw): Clarification
+    {
+        $raw = trim($raw);
+        // Strip ```json fences some models wrap around the JSON.
+        if (str_starts_with($raw, '```')) {
+            $raw = trim((string)preg_replace('/^```[a-zA-Z]*\s*|\s*```$/', '', $raw));
+        }
+        // Grab the first {...} block so trailing prose can't break decoding.
+        if (preg_match('/\{.*\}/s', $raw, $m)) {
+            $raw = $m[0];
+        }
+        try {
+            $data = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return Clarification::answerable();
+        }
+        if (!is_array($data) || ($data['answerable'] ?? true) !== false) {
+            return Clarification::answerable();
+        }
+        $question = trim((string)($data['question'] ?? ''));
+        // A "not answerable" verdict without an actual question is useless —
+        // answer rather than show an empty clarification bubble.
+        if ($question === '' || mb_strlen($question) > 400) {
+            return Clarification::answerable();
+        }
+        return Clarification::needed($question);
+    }
+}

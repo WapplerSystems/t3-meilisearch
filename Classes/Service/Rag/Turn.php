@@ -8,17 +8,33 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  * stored — the next turn re-runs retrieval, and re-rendering past
  * sources from cached state would lie about whether they were actually
  * the basis of that answer.
+ *
+ * $kind distinguishes a normal answered turn ('answer') from a turn where
+ * the assistant asked a clarifying question back instead of answering
+ * ('clarification'). Both are kept in history so the follow-up reply gets
+ * resolved by the query rewriter, but the clarification kind lets the
+ * triage step avoid asking twice in a row (see QueryClassifier).
  */
 final class Turn
 {
+    public const KIND_ANSWER = 'answer';
+    public const KIND_CLARIFICATION = 'clarification';
+
     /**
      * @param list<string> $citedIds source IDs the LLM cited for this answer
+     * @param self::KIND_* $kind
      */
     public function __construct(
         public readonly string $question,
         public readonly string $answer,
         public readonly array $citedIds = [],
+        public readonly string $kind = self::KIND_ANSWER,
     ) {}
+
+    public function isClarification(): bool
+    {
+        return $this->kind === self::KIND_CLARIFICATION;
+    }
 
     /**
      * Answer rendered for the transcript: inline "[id=…]" citation markers

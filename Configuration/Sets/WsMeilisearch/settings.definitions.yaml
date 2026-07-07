@@ -502,7 +502,7 @@ settings:
     label: 'System prompt'
     description: 'System message that instructs the LLM how to answer. Reference {{language}} for the site language label.'
     type: text
-    default: "You are a helpful site assistant. Answer the user's question strictly using the provided context excerpts. If the answer cannot be derived from the context, say so. Cite each fact by appending [id] markers that match the IDs in the context. Respond in the user's language."
+    default: "You are a helpful site assistant. Answer the user's question strictly using the provided context excerpts. Do not use outside knowledge and never invent facts, names, numbers, or links. If the context does not contain enough information to answer, say so plainly rather than guessing. Cite each fact by appending [id] markers that match the IDs in the context. Respond in the user's language."
 
   meilisearch.rag.conversationalRewrite:
     label: 'RAG: conversational query rewriting'
@@ -515,6 +515,12 @@ settings:
     description: 'How many of the most recent conversation turns are shown to the rewriting model when reformulating a follow-up into a standalone search query. Higher values resolve longer-range references at the cost of a larger rewrite prompt.'
     type: int
     default: 3
+
+  meilisearch.rag.clarify.enabled:
+    label: 'RAG: ask a clarifying question when unsure'
+    description: 'When true, a short triage LLM call runs after retrieval and before the answer. If the question is too ambiguous or underspecified to answer well from the retrieved documents, the assistant asks ONE clarifying question back instead of guessing (one extra short LLM call, temperature 0). Best combined with multi-turn conversation memory (meilisearch.rag.conversation.enabled) so the visitor''s reply is resolved against the clarifying question on the next turn. Never asks twice in a row. Default: disabled.'
+    type: bool
+    default: false
 
   meilisearch.rag.suggestions.enabled:
     label: 'RAG: action suggestions under the answer'

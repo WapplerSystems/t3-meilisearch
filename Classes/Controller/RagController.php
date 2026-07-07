@@ -126,8 +126,13 @@ final class RagController extends ActionController
 
         $answer = $this->ragService->ask($site, $q, $options);
 
-        if ($answer->status === 'ok' && $this->conversationEnabled($site)) {
-            $turn = new Turn($q, $answer->answer, $answer->citedIds);
+        // Persist answered turns and clarification turns alike: the reply to a
+        // clarifying question needs the question in history so the query
+        // rewriter can resolve it on the next turn. The kind lets the triage
+        // step avoid asking for clarification twice in a row.
+        if (($answer->status === 'ok' || $answer->status === 'clarify') && $this->conversationEnabled($site)) {
+            $kind = $answer->status === 'clarify' ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER;
+            $turn = new Turn($q, $answer->answer, $answer->citedIds, $kind);
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
             $conversation = $conversation->withTurn($turn, $maxTurns);
             $sessionKey = $this->sessionKey($site);

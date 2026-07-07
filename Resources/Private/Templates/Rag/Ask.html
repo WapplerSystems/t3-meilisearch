@@ -117,6 +117,22 @@
                                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.no_context"/>
                             </div>
                         </f:case>
+                        <f:case value="clarify">
+                            <f:comment>
+                                Triage asked one clarifying question back
+                                instead of guessing. answer.answer holds the
+                                question (no sources / citations). The visitor's
+                                next message answers it; with conversation
+                                memory on, the rewriter resolves it into a
+                                standalone query.
+                            </f:comment>
+                            <div class="alert alert-info ws-meilisearch-rag-clarify" role="status">
+                                <p class="fw-semibold mb-1">
+                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.clarify.heading"/>
+                                </p>
+                                <p class="mb-0" style="white-space: pre-wrap;"><f:format.raw>{answer.answerHtml}</f:format.raw></p>
+                            </div>
+                        </f:case>
                         <f:case value="failed">
                             <div class="alert alert-danger" role="alert">
                                 <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.failed"

@@ -117,7 +117,9 @@ final class RagStreamMiddleware implements MiddlewareInterface
         $finalChunk = null;
         foreach ($stream as $chunk) {
             $this->emitFrame($chunk);
-            if ($chunk->type === RagStreamChunk::TYPE_DONE) {
+            // Both `done` (answered) and `clarify` (asked back) are terminal
+            // states worth persisting as a turn.
+            if ($chunk->type === RagStreamChunk::TYPE_DONE || $chunk->type === RagStreamChunk::TYPE_CLARIFY) {
                 $finalChunk = $chunk;
             }
             if (connection_aborted()) {
@@ -125,17 +127,28 @@ final class RagStreamMiddleware implements MiddlewareInterface
             }
         }
 
-        // Persist the conversation turn if we actually produced an
-        // answer. We can't piggy-back this on the controller (the
-        // controller never runs for streaming requests), so the
-        // middleware owns the write-back.
+        // Persist the conversation turn if we produced an answer or asked a
+        // clarifying question. We can't piggy-back this on the controller (the
+        // controller never runs for streaming requests), so the middleware
+        // owns the write-back. A clarification turn is stored with its own
+        // kind and the clarifying question as the assistant text, so the
+        // user's reply resolves against it on the next turn.
         if ($finalChunk !== null && $this->conversationEnabled($site)) {
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
-            $turn = new Turn(
-                $question,
-                (string)($finalChunk->data['answer'] ?? ''),
-                array_values(array_map('strval', (array)($finalChunk->data['citedIds'] ?? []))),
-            );
+            if ($finalChunk->type === RagStreamChunk::TYPE_CLARIFY) {
+                $turn = new Turn(
+                    $question,
+                    (string)($finalChunk->data['question'] ?? ''),
+                    [],
+                    Turn::KIND_CLARIFICATION,
+                );
+            } else {
+                $turn = new Turn(
+                    $question,
+                    (string)($finalChunk->data['answer'] ?? ''),
+                    array_values(array_map('strval', (array)($finalChunk->data['citedIds'] ?? []))),
+                );
+            }
             $conversation = $conversation->withTurn($turn, $maxTurns);
             $this->conversationStore->save($request, $this->sessionKey($site), $conversation);
         }

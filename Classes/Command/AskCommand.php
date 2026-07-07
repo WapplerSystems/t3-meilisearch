@@ -74,6 +74,15 @@ final class AskCommand extends Command
         }
 
         $answer = $this->ragService->ask($site, $question, $options);
+        if ($answer->status === 'clarify') {
+            // Triage asked a clarifying question back instead of answering;
+            // the question is carried in ->answer. Show it so the test
+            // operator sees what the assistant would ask the visitor.
+            $io->warning('Status: clarify — the assistant asked for clarification instead of answering');
+            $io->writeln('<info>Clarifying question:</info>');
+            $io->writeln($answer->answer);
+            return Command::SUCCESS;
+        }
         if ($answer->status !== 'ok') {
             $io->warning('Status: ' . $answer->status . ($answer->error !== null ? ' — ' . $answer->error : ''));
             return $answer->status === 'failed' ? Command::FAILURE : Command::SUCCESS;

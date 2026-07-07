@@ -14,6 +14,9 @@ services:
       - '../Classes/Service/Llm/LlmProviderInterface.php'
       - '../Classes/Service/Llm/LlmException.php'
       - '../Classes/Service/Rag/RagAnswer.php'
+      # Plain value object built by QueryClassifier (private constructor);
+      # never injected.
+      - '../Classes/Service/Rag/Clarification.php'
       # ExtIndexOrigin is a per-event marker instantiated by the listener;
       # registering it as a singleton service would also pull it into the
       # schema_provider iterator via _instanceof, which is wrong (it returns

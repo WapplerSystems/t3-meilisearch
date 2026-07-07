@@ -186,6 +186,20 @@
 
             es.addEventListener('end', function () { finish(); });
 
+            // Terminal clarify frame: the assistant asks one question back
+            // instead of answering. Render it as the assistant turn (styled as
+            // a clarification) and close the stream — no sources/suggestions
+            // follow. The user's next message answers it.
+            es.addEventListener('clarify', function (ev) {
+                turn.answerEl.dataset.streaming = 'false';
+                setBusy(false);
+                var q = '';
+                try { q = (JSON.parse(ev.data).question || '').toString(); } catch (_) { /* ignore */ }
+                turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(q));
+                turn.answerEl.classList.add('ws-meilisearch-rag-answer--clarify');
+                finish();
+            });
+
             es.addEventListener('failed', terminate.bind(null, 'Sorry, something went wrong: '));
             es.addEventListener('no_context', terminate.bind(null, 'No matching documents found.', false));
             es.addEventListener('disabled', terminate.bind(null, 'RAG is not configured for this site.', false));

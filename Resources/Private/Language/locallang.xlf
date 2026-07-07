@@ -54,6 +54,9 @@
             <trans-unit id="rag.status.failed">
                 <source>Sorry, something went wrong: %s</source>
             </trans-unit>
+            <trans-unit id="rag.status.clarify.heading">
+                <source>One quick question</source>
+            </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
             </trans-unit>

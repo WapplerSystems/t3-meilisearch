@@ -71,6 +71,10 @@
                 <source>Sorry, something went wrong: %s</source>
                 <target>Entschuldigung, etwas ist schiefgegangen: %s</target>
             </trans-unit>
+            <trans-unit id="rag.status.clarify.heading">
+                <source>One quick question</source>
+                <target>Eine kurze Rückfrage</target>
+            </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
                 <target>Sie</target>

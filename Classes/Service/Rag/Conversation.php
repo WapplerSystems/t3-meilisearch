@@ -12,7 +12,7 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  * TYPO3 frontend user session (or any other storage that takes JSON-safe
  * data).
  *
- * @phpstan-type TurnArray array{question:string,answer:string,citedIds:list<string>}
+ * @phpstan-type TurnArray array{question:string,answer:string,citedIds:list<string>,kind?:string}
  */
 final class Conversation
 {
@@ -75,8 +75,21 @@ final class Conversation
                 'question' => $t->question,
                 'answer' => $t->answer,
                 'citedIds' => $t->citedIds,
+                'kind' => $t->kind,
             ], $this->turns),
         ];
+    }
+
+    /**
+     * True when the most recent turn was a clarifying question the assistant
+     * asked back (rather than an answer). The triage step uses this to avoid
+     * asking for clarification twice in a row — the user's reply to a
+     * clarifying question is always treated as answerable.
+     */
+    public function lastTurnIsClarification(): bool
+    {
+        $last = $this->turns[array_key_last($this->turns)] ?? null;
+        return $last instanceof Turn && $last->isClarification();
     }
 
     /**
@@ -92,10 +105,12 @@ final class Conversation
             if (!is_array($row)) {
                 continue;
             }
+            $kind = (string)($row['kind'] ?? Turn::KIND_ANSWER);
             $turns[] = new Turn(
                 question: (string)($row['question'] ?? ''),
                 answer: (string)($row['answer'] ?? ''),
                 citedIds: array_values(array_map('strval', (array)($row['citedIds'] ?? []))),
+                kind: $kind === Turn::KIND_CLARIFICATION ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER,
             );
         }
         return new self($turns);
