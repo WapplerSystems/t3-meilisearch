@@ -65,6 +65,9 @@
         if (!(input instanceof HTMLInputElement) || !(menu instanceof HTMLElement)) return;
 
         const endpoint = root.dataset.endpoint || DEFAULT_ENDPOINT;
+        // Page-subtree scope (KB-style search): mirror the search box's
+        // restriction so typeahead suggestions stay inside the same subtree.
+        const scope = root.getAttribute('data-ws-meilisearch-scope') || '0';
         // Labels arrive pre-translated from the Fluid template via
         // data-label-* attributes on the wrapper. English fallbacks
         // keep the dropdown usable if the template forgets to wire one.
@@ -152,7 +155,7 @@
             if (pending) pending.abort();
             const ctrl = new AbortController();
             pending = ctrl;
-            fetch(endpoint + '?q=' + encodeURIComponent(query), {
+            fetch(endpoint + '?q=' + encodeURIComponent(query) + (scope && scope !== '0' ? '&scope=' + encodeURIComponent(scope) : ''), {
                 signal: ctrl.signal,
                 credentials: 'same-origin',
                 headers: { 'Accept': 'application/json' },

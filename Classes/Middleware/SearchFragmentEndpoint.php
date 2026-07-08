@@ -69,6 +69,10 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         $page = max(1, (int)($params['page'] ?? 1));
         $rawFilters = $params['filters'] ?? [];
         $filters = $this->sanitiseFilters(is_array($rawFilters) ? $rawFilters : []);
+        // Clean facet selections for the template (no server-injected raw
+        // filters leak into links). Scope: 0 = none/cleared, >0 = subtree.
+        $viewFilters = $filters;
+        $scope = max(0, (int)($params['scope'] ?? 0));
         $sort = trim((string)($params['sort'] ?? ''));
         $hybridRequested = (int)($params['hybrid'] ?? 0) === 1;
 
@@ -96,6 +100,13 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         // FE-access-control: visitor only sees public docs + their
         // group-restricted docs. AND-conjoined with the user filters.
         $filters = $this->accessControlFilter->applyTo($filters, $site, $request);
+
+        // Page-subtree scope (KB-style search): filter on the `rootline`
+        // index field so the AJAX-refreshed result set stays inside the
+        // configured subtree, just like the full-page resultsAction.
+        if ($scope > 0) {
+            $filters['__rawFilters'][] = 'rootline = ' . $scope;
+        }
 
         $result = $this->searchService->search($site, $q, [
             'page' => $page,
@@ -134,10 +145,20 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             'query' => $q,
             'page' => $page,
             'result' => $result,
-            'filters' => $filters,
+            // Clean facet selections only (server-injected raw filters stay
+            // out of links — see sanitiseFilters / the scope block above).
+            'filters' => $viewFilters,
             'hybrid' => $useHybrid ? 1 : 0,
             'hybridAvailable' => $hybridAvailable,
             'sort' => $sort,
+            // Scope chip: re-rendered on every AJAX refresh so it survives
+            // facet/sort/pagination. The clear link is hijacked by
+            // search-ajax.js (there is no plugin page context here).
+            'scope' => $scope,
+            'scopePageUid' => $scope,
+            'scopePageTitle' => $scope > 0 ? $this->resolvePageTitle($scope) : '',
+            'scopeActive' => $scope > 0,
+            'currentPageUid' => 0,
             'sortOptions' => $this->configProvider->sortOptions($site) ?: $this->fallbackSortOptions(),
             'facetConfigs' => $this->indexFacetConfigs($site),
             'languageLabels' => $languageLabels,
@@ -147,6 +168,24 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         ] + $this->paginationBoundaries($result->page, $result->getTotalPages()));
 
         return new HtmlResponse($view->render());
+    }
+
+    /**
+     * Language-overlaid title of a page (nav_title preferred), for the scope
+     * chip. Empty when the page is gone/inaccessible.
+     */
+    private function resolvePageTitle(int $uid): string
+    {
+        if ($uid <= 0) {
+            return '';
+        }
+        $pageRepository = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Domain\Repository\PageRepository::class);
+        $page = $pageRepository->getPage($uid, true);
+        if ($page === []) {
+            return '';
+        }
+        $navTitle = trim((string)($page['nav_title'] ?? ''));
+        return $navTitle !== '' ? $navTitle : trim((string)($page['title'] ?? ''));
     }
 
     /**
@@ -163,6 +202,12 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             // attribute name is used as a Meilisearch facet identifier — only
             // allow safe chars to keep the query well-formed.
             if (preg_match('/^[a-zA-Z0-9_]+$/', $attribute) !== 1) {
+                continue;
+            }
+            // Reserved keys (e.g. __rawFilters) carry verbatim Meilisearch
+            // filter expressions and are SERVER-BUILT only — never honour
+            // them from the request, or a crafted URL could inject filters.
+            if (str_starts_with($attribute, '__')) {
                 continue;
             }
             $list = [];

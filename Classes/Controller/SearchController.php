@@ -4,9 +4,11 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Controller;
 
 use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use WapplerSystems\Meilisearch\Configuration\SearchConfigurationProvider;
 use WapplerSystems\Meilisearch\Service\AccessControlFilter;
@@ -51,16 +53,65 @@ final class SearchController extends ActionController
         return null;
     }
 
-    public function searchAction(string $q = ''): ResponseInterface
+    public function searchAction(string $q = '', int $scope = -1): ResponseInterface
     {
+        $this->assignScopeVars($this->effectiveScope($scope));
         $this->view->assign('query', $q);
         return $this->htmlResponse();
     }
 
     /**
+     * Effective page-subtree scope for this request.
+     *
+     * A visitor-provided `scope` param wins so the result chip can drop it:
+     * >0 = explicit subtree, 0 = cleared (site-wide). The default -1 means
+     * "not provided" and inherits the per-plugin FlexForm
+     * settings.restrictToPageSubtree.
+     */
+    private function effectiveScope(int $scopeParam): int
+    {
+        if ($scopeParam >= 0) {
+            return $scopeParam;
+        }
+        $raw = (string)($this->settings['restrictToPageSubtree'] ?? '');
+        // group/pages stores "123" or legacy "pages_123" — pull the uid out.
+        return preg_match('/\d+/', $raw, $m) === 1 ? (int)$m[0] : 0;
+    }
+
+    /**
+     * Assign the scope view variables shared by search + results templates:
+     * the effective uid (carried through forms/pagination as `scope`), the
+     * overlaid page title for the placeholder/chip, and a boolean flag.
+     */
+    private function assignScopeVars(int $scopeUid): void
+    {
+        $this->view->assignMultiple([
+            'scope' => $scopeUid,
+            'scopePageUid' => $scopeUid,
+            'scopePageTitle' => $scopeUid > 0 ? $this->resolvePageTitle($scopeUid) : '',
+            'scopeActive' => $scopeUid > 0,
+        ]);
+    }
+
+    /**
+     * Language-overlaid title of a page (nav_title preferred). Empty when the
+     * page is gone/inaccessible so the scope silently degrades to site-wide.
+     */
+    private function resolvePageTitle(int $uid): string
+    {
+        $pageRepository = GeneralUtility::makeInstance(PageRepository::class);
+        $page = $pageRepository->getPage($uid, true);
+        if ($page === []) {
+            return '';
+        }
+        $navTitle = trim((string)($page['nav_title'] ?? ''));
+        return $navTitle !== '' ? $navTitle : trim((string)($page['title'] ?? ''));
+    }
+
+    /**
      * @param array<string,array<int,string>> $filters
      */
-    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0, string $sort = ''): ResponseInterface
+    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0, string $sort = '', int $scope = -1): ResponseInterface
     {
         if (strtoupper($this->request->getMethod()) === 'POST') {
             return $this->redirect('results', null, null, [
@@ -69,12 +120,33 @@ final class SearchController extends ActionController
                 'filters' => $filters,
                 'hybrid' => $hybrid,
                 'sort' => $sort,
+                'scope' => $scope,
             ]);
         }
 
         $site = $this->resolveSite();
         if (!$site instanceof Site) {
             return $this->htmlResponse();
+        }
+
+        // Raw Meilisearch filter expressions are SERVER-BUILT only (access
+        // control, language, scope). Never honour them from the request —
+        // otherwise a crafted URL could inject arbitrary filters or a stale
+        // scope would survive "remove filter". Strip before use; keep a
+        // clean copy of the user's facet selections for building template
+        // URLs (pagination / chip) so the server-side raw filters don't
+        // leak into links and get replayed.
+        unset($filters['__rawFilters']);
+        $viewFilters = $filters;
+
+        // Page-subtree scope (KB-style search). Effective uid inherits the
+        // per-plugin FlexForm default unless the visitor cleared it via the
+        // result chip (scope=0). Filters on the `rootline` index field
+        // (list of ancestor page uids, contributed by EXT:linear_knowledge).
+        $scopeUid = $this->effectiveScope($scope);
+        $this->assignScopeVars($scopeUid);
+        if ($scopeUid > 0) {
+            $filters['__rawFilters'][] = 'rootline = ' . $scopeUid;
         }
         // Per-plugin TypoScript / FlexForm wins when explicitly set
         // (preserves operator overrides on existing site packages); otherwise
@@ -213,7 +285,9 @@ final class SearchController extends ActionController
             'query' => $q,
             'page' => max(1, $page),
             'result' => $result,
-            'filters' => $filters,
+            // Clean facet selections only — server-injected raw filters stay
+            // out of pagination/chip URLs (see the unset above).
+            'filters' => $viewFilters,
             'hybrid' => $useHybrid ? 1 : 0,
             'hybridAvailable' => $hybridAvailable,
             'sort' => $sortOption,

@@ -11,6 +11,18 @@
                 <source>Search</source>
                 <target>Suchen</target>
             </trans-unit>
+            <trans-unit id="search.form.placeholder.scoped">
+                <source>Search in %s…</source>
+                <target>In %s suchen…</target>
+            </trans-unit>
+            <trans-unit id="search.scope.label">
+                <source>Scope: %s</source>
+                <target>Bereich: %s</target>
+            </trans-unit>
+            <trans-unit id="search.scope.clear">
+                <source>Remove filter</source>
+                <target>Filter entfernen</target>
+            </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
                 <target>Keine Treffer für „%s".</target>

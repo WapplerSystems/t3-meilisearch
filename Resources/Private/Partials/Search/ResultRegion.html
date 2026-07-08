@@ -14,6 +14,18 @@
       hybridAvailable (bool), sort (string),
       sortOptions (list of {value, labelKey}), languageLabels (map).
 </f:comment>
+<f:if condition="{scopeActive}">
+    <div class="ws-meilisearch-scope mb-3" data-ws-meilisearch-scope-chip>
+        <span class="ws-meilisearch-scope__chip badge rounded-pill text-bg-light border">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.scope.label" arguments="{0: scopePageTitle}"/>
+            <a class="ws-meilisearch-scope__clear"
+                href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: 1, filters: filters, hybrid: hybrid, sort: sort, scope: 0}')}"
+                data-ws-meilisearch-scope-clear
+                aria-label="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.scope.clear')}"
+                title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.scope.clear')}">&times;</a>
+        </span>
+    </div>
+</f:if>
 <f:if condition="{result.totalHits} > 0">
     <f:then>
         <div class="ws-meilisearch-controls d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
@@ -78,7 +90,7 @@
                         <ul class="pagination justify-content-center mb-0">
                             <li class="page-item {f:if(condition: '{result.hasPreviousPage}', else: 'disabled')}">
                                 <a class="page-link"
-                                    href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: \'{result.page - 1}\', filters: filters, hybrid: hybrid, sort: sort}')}"
+                                    href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: \'{result.page - 1}\', filters: filters, hybrid: hybrid, sort: sort, scope: scope}')}"
                                     data-ws-meilisearch-page="{result.page - 1}"
                                     rel="prev">
                                     <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.previous"/>
@@ -88,7 +100,7 @@
                             <f:if condition="{paginationFirst} > 1">
                                 <li class="page-item">
                                     <a class="page-link"
-                                        href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: 1, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                        href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: 1, filters: filters, hybrid: hybrid, sort: sort, scope: scope}')}"
                                         data-ws-meilisearch-page="1">1</a>
                                 </li>
                                 <f:if condition="{paginationFirst} > 2">
@@ -102,7 +114,7 @@
                                         <f:then><span class="page-link" aria-current="page">{n}</span></f:then>
                                         <f:else>
                                             <a class="page-link"
-                                                href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: n, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                                href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: n, filters: filters, hybrid: hybrid, sort: sort, scope: scope}')}"
                                                 data-ws-meilisearch-page="{n}">{n}</a>
                                         </f:else>
                                     </f:if>
@@ -115,14 +127,14 @@
                                 </f:if>
                                 <li class="page-item">
                                     <a class="page-link"
-                                        href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: result.totalPages, filters: filters, hybrid: hybrid, sort: sort}')}"
+                                        href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: result.totalPages, filters: filters, hybrid: hybrid, sort: sort, scope: scope}')}"
                                         data-ws-meilisearch-page="{result.totalPages}">{result.totalPages}</a>
                                 </li>
                             </f:if>
 
                             <li class="page-item {f:if(condition: '{result.hasNextPage}', else: 'disabled')}">
                                 <a class="page-link"
-                                    href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: \'{result.page + 1}\', filters: filters, hybrid: hybrid, sort: sort}')}"
+                                    href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: query, page: \'{result.page + 1}\', filters: filters, hybrid: hybrid, sort: sort, scope: scope}')}"
                                     data-ws-meilisearch-page="{result.page + 1}"
                                     rel="next">
                                     <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.pagination.next"/>

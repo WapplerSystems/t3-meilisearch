@@ -100,6 +100,13 @@ final class SuggestEndpoint implements MiddlewareInterface
         // empty) always pass through.
         $filters = $this->accessControlFilter->applyTo($filters, $site, $request);
 
+        // Page-subtree scope: keep suggestions inside the same subtree as the
+        // scoped search box (filters on the `rootline` index field).
+        $scope = max(0, (int)($request->getQueryParams()['scope'] ?? 0));
+        if ($scope > 0) {
+            $filters['__rawFilters'][] = 'rootline = ' . $scope;
+        }
+
         $settings = $site->getSettings();
         $limit = max(1, (int)$settings->get('meilisearch.suggest.limit', self::LIMIT));
         $groupByType = (bool)$settings->get('meilisearch.suggest.groupByType', false);

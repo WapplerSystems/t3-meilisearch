@@ -13,15 +13,18 @@
 </f:comment>
 
 <f:section name="Main">
+    <f:comment>Scoped-search placeholder: "Search in &lt;page&gt;" when the plugin is restricted to a page subtree (settings.restrictToPageSubtree), else the generic placeholder.</f:comment>
+    <f:variable name="scopePlaceholder"><f:if condition="{scopeActive}"><f:then><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder.scoped" arguments="{0: scopePageTitle}"/></f:then><f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/></f:else></f:if></f:variable>
     <div class="ws-meilisearch">
         <form class="ws-meilisearch-form" action="{f:uri.page()}" method="get" role="search">
             <input type="hidden" name="tx_wsmeilisearch_search[action]" value="results"/>
             <input type="hidden" name="tx_wsmeilisearch_search[controller]" value="Search"/>
+            <input type="hidden" name="tx_wsmeilisearch_search[scope]" value="{scope}"/>
 
             <label for="ws-meilisearch-q" class="visually-hidden">
-                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder"/>
+                {scopePlaceholder}
             </label>
-            <div class="input-group input-group-lg ws-meilisearch-suggest" data-ws-meilisearch-suggest
+            <div class="input-group input-group-lg ws-meilisearch-suggest" data-ws-meilisearch-suggest data-ws-meilisearch-scope="{scope}"
                 data-label-recent="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.recent.heading')}"
                 data-label-more="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:suggest.more')}">
                 <input type="search"
@@ -29,7 +32,7 @@
                     class="form-control"
                     name="tx_wsmeilisearch_search[q]"
                     value="{query}"
-                    placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.form.placeholder')}"
+                    placeholder="{scopePlaceholder}"
                     autocomplete="off"
                     data-suggest-input="data-suggest-input"/>
                 <button type="submit" class="btn btn-primary">

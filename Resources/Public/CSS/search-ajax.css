@@ -6,3 +6,22 @@
     pointer-events: none;
     transition: opacity 120ms ease-in-out;
 }
+
+/* Scope chip (search restricted to a page subtree) */
+.ws-meilisearch-scope__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .8rem;
+    padding: .35rem .7rem;
+}
+.ws-meilisearch-scope__clear {
+    display: inline-flex;
+    line-height: 1;
+    font-size: 1.05rem;
+    text-decoration: none;
+    color: #888;
+}
+.ws-meilisearch-scope__clear:hover {
+    color: #c0392b;
+}

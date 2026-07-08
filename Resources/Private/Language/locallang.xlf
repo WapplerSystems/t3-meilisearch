@@ -9,6 +9,15 @@
             <trans-unit id="search.form.submit">
                 <source>Search</source>
             </trans-unit>
+            <trans-unit id="search.form.placeholder.scoped">
+                <source>Search in %s…</source>
+            </trans-unit>
+            <trans-unit id="search.scope.label">
+                <source>Scope: %s</source>
+            </trans-unit>
+            <trans-unit id="search.scope.clear">
+                <source>Remove filter</source>
+            </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
             </trans-unit>

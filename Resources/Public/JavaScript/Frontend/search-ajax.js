@@ -31,6 +31,7 @@
     const SORT_SELECTOR = '[data-ws-meilisearch-sort]';
     const HYBRID_SELECTOR = '[data-ws-meilisearch-hybrid]';
     const PAGE_LINK_SELECTOR = '[data-ws-meilisearch-page]';
+    const SCOPE_CLEAR_SELECTOR = '[data-ws-meilisearch-scope-clear]';
     const FRAGMENT_ENDPOINT = '/_ws_meilisearch/search-fragment';
     const EXTBASE_PREFIX = 'tx_wsmeilisearch_search[';
 
@@ -211,8 +212,23 @@
         }
     });
 
-    // ---- Hijack: pagination link clicks via delegation -------------------
+    // ---- Hijack: pagination + scope-clear clicks via delegation ----------
     region.addEventListener('click', (event) => {
+        // "Remove filter" on the scope chip: drop the subtree restriction.
+        // Full navigation (not an Ajax refresh) so the search box outside the
+        // region — its placeholder still reads "Search in <page>" — is
+        // re-rendered without the scope too.
+        const clear = event.target instanceof Element ? event.target.closest(SCOPE_CLEAR_SELECTOR) : null;
+        if (clear) {
+            event.preventDefault();
+            const url = buildUrl({
+                'tx_wsmeilisearch_search[scope]': 0,
+                'tx_wsmeilisearch_search[page]': 1,
+            });
+            window.location.assign(url.toString());
+            return;
+        }
+
         const link = event.target instanceof Element ? event.target.closest(PAGE_LINK_SELECTOR) : null;
         if (!link) return;
         if (link.closest('.disabled, .active')) {
