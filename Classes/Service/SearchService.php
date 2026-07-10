@@ -192,6 +192,23 @@ final class SearchService implements LoggerAwareInterface
 
         $highlightFields = $this->configProvider->highlightAttributes($site) ?: self::FALLBACK_HIGHLIGHT_FIELDS;
         $cropFields = $this->configProvider->cropAttributes($site) ?: self::FALLBACK_CROP_FIELDS;
+        // `content` is the canonical full-text field (page body, file text).
+        // Always make it highlightable + croppable so result templates can
+        // render a snippet even for docs without a dedicated description /
+        // teaser — e.g. Content-Block pages whose body lives only in `content`.
+        if (!in_array('content', $highlightFields, true)) {
+            $highlightFields[] = 'content';
+        }
+        $hasContentCrop = false;
+        foreach ($cropFields as $cropField) {
+            if ($cropField === 'content' || str_starts_with((string)$cropField, 'content:')) {
+                $hasContentCrop = true;
+                break;
+            }
+        }
+        if (!$hasContentCrop) {
+            $cropFields[] = 'content:' . (int)$site->getSettings()->get('meilisearch.frontend.cropLength', 200);
+        }
         $params['attributesToHighlight'] = $highlightFields;
         $params['highlightPreTag'] = $this->configProvider->highlightPreTag($site);
         $params['highlightPostTag'] = $this->configProvider->highlightPostTag($site);

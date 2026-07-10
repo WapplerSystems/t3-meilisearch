@@ -71,6 +71,17 @@
                 <f:format.raw>{hit._formatted.bodytext}</f:format.raw>
             </p>
         </f:if>
+        <f:comment>
+            Fallback snippet from the canonical `content` field (page body,
+            file text). Shown only when the doc has no dedicated teaser /
+            description / bodytext preview — e.g. Content-Block pages whose
+            text lives solely in `content`.
+        </f:comment>
+        <f:if condition="{hit._formatted.content} && !{hit._formatted.teaser} && !{hit.teaser} && !{hit._formatted.description} && !{hit.description} && !{hit._formatted.bodytext}">
+            <p class="card-text text-muted small mb-1">
+                <f:format.raw>{hit._formatted.content}</f:format.raw>
+            </p>
+        </f:if>
 
         <f:if condition="{hit.languageLabel}">
             <p class="card-text mb-0">
