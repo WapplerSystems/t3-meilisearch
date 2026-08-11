@@ -127,9 +127,20 @@ final class SearchEngineFactory
             }
         }
 
-        return new Schema([
-            $indexName => new Index($indexName, $fields),
-        ]);
+        $indexes = [$indexName => new Index($indexName, $fields)];
+
+        // Zero-downtime reindex builds into a "<name>_draft" index and then
+        // atomically swaps it in. The SEAL engine can only operate on indexes
+        // declared in its schema (existIndex/createIndex/saveDocument resolve
+        // the Index by name), so the draft must be registered too — otherwise
+        // ensureSchema() crashes with "existIndex(): … null given". Only added
+        // when the mode is enabled to keep the default schema minimal.
+        if ((bool)$site->getSettings()->get('meilisearch.indexing.zeroDowntime', false)) {
+            $draftName = $this->getDraftIndexName($site);
+            $indexes[$draftName] = new Index($draftName, $fields);
+        }
+
+        return new Schema($indexes);
     }
 
     /**
