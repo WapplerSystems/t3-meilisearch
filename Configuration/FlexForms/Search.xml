@@ -99,7 +99,7 @@
 
                     <settings.restrictToPageSubtree>
                         <label>Restrict to page subtree</label>
-                        <description>Pick a page: the search only returns documents from that page and its descendants (filter `rootline = <uid>`). Requires the `rootline` field in the index (contributed e.g. by EXT:linear_knowledge). The search box placeholder becomes "Search in &lt;page&gt;". Visitors can drop the scope via the result chip.</description>
+                        <description>Pick a page: the search only returns documents from that page and its descendants (filter `rootline = &lt;uid&gt;`). Requires the `rootline` field in the index (contributed e.g. by EXT:linear_knowledge). The search box placeholder becomes "Search in &lt;page&gt;". Visitors can drop the scope via the result chip.</description>
                         <config>
                             <type>group</type>
                             <allowed>pages</allowed>
