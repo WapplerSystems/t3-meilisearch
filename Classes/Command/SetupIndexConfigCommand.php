@@ -73,7 +73,11 @@ final class SetupIndexConfigCommand extends Command
             'partial_indexing' => $this->normaliseList((string)$input->getOption('partial-indexing'), ['datamap', 'cmdmap', 'clearcache']),
             'file_mounts' => $this->normaliseUids((string)$input->getOption('file-mounts')),
             'file_types' => $this->normaliseList((string)$input->getOption('file-types'), null),
-            'content_indexing' => 1,
+            // 0 = one aggregated document per page. With 1, EXT:index emits an
+            // event per content element and every one of them is written under
+            // the same `pages-<uid>` id — the last element wins and the rest of
+            // the page never reaches the index.
+            'content_indexing' => 0,
             'skip_no_search_pages' => 1,
         ];
 

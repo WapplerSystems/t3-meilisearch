@@ -327,6 +327,12 @@ settings:
     type: int
     default: 0
 
+  meilisearch.indexing.stripWebsiteTitle:
+    label: 'Strip the website title from indexed page titles'
+    description: 'EXT:index appends " | <websiteTitle>" to every page title it hands over (same for its News/Address content types). In the index that suffix is noise — it is identical on every hit and it bleeds into the embedder documentTemplate. When true (default) the suffix is removed again at index time, per-language website titles included. Set to false to keep the titles exactly as EXT:index built them.'
+    type: bool
+    default: true
+
   meilisearch.embedder.precompute:
     label: 'Precompute embeddings in PHP'
     description: 'When true, PHP fetches the embedding from the configured provider before saveDocument and writes it into _vectors.default. The embedder on the Meilisearch index is registered as `userProvided`. Use this when the provider rate-limits per minute and Meilisearch internal auto-batching would otherwise burst past the cap. Pairs with meilisearch.indexing.requestsPerMinute.'

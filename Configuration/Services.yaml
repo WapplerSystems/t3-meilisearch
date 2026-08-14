@@ -109,6 +109,11 @@ services:
       - name: monolog.logger
         channel: ws_meilisearch_extindex
 
+  WapplerSystems\Meilisearch\Integration\ExtIndex\EventListener\ContainerChildrenListener:
+    tags:
+      - name: monolog.logger
+        channel: ws_meilisearch_extindex
+
   WapplerSystems\Meilisearch\Integration\ExtIndex\FileExtraction\TikaFileExtractor:
     tags:
       - name: monolog.logger

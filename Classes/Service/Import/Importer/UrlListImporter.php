@@ -67,6 +67,7 @@ final class UrlListImporter implements KnowledgeResourceSourceImporter
     public function __construct(
         private readonly KnowledgeResourceRepository $repository,
         private readonly RequestFactory $requestFactory,
+        private readonly \WapplerSystems\Meilisearch\Service\HtmlToText $htmlToTextService,
     ) {}
 
     public function name(): string
@@ -319,16 +320,10 @@ final class UrlListImporter implements KnowledgeResourceSourceImporter
 
     /**
      * Cheap HTML → text fallback for the case where Tika doesn't accept
-     * text/html (default Tika mime list doesn't include it). Strips
-     * <script> / <style> and collapses whitespace.
+     * text/html (default Tika mime list doesn't include it).
      */
     private function htmlToText(string $html): string
     {
-        $html = (string)preg_replace('#<script\b[^>]*>.*?</script>#is', '', $html);
-        $html = (string)preg_replace('#<style\b[^>]*>.*?</style>#is', '', $html);
-        $text = strip_tags($html);
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = (string)preg_replace('/\s+/u', ' ', $text);
-        return trim($text);
+        return $this->htmlToTextService->convert($html);
     }
 }

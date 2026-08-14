@@ -163,7 +163,7 @@ final class DoctorCommand extends Command
         $rootPid = (int)($site->getRootPageId() ?? 0);
         try {
             $qb = $this->connectionPool->getQueryBuilderForTable('tx_index_domain_model_configuration');
-            $row = $qb->select('uid', 'title', 'technology', 'levels', 'partial_indexing')
+            $row = $qb->select('uid', 'title', 'technology', 'levels', 'partial_indexing', 'content_indexing')
                 ->from('tx_index_domain_model_configuration')
                 ->where(
                     $qb->expr()->eq('pid', $qb->createNamedParameter($rootPid, \Doctrine\DBAL\ParameterType::INTEGER)),
@@ -192,6 +192,16 @@ final class DoctorCommand extends Command
                 (int)$row['levels'],
                 $partialNote,
             ));
+            // Per-content-element indexing does not survive our document id
+            // strategy: every element of a page is pushed as `pages-<uid>`,
+            // so the last one wins and the rest of the page is lost. One
+            // aggregated document per page is what this integration expects.
+            if ((int)($row['content_indexing'] ?? 0) === 1) {
+                $this->warn($io, sprintf(
+                    'IndexConfiguration #%d has content_indexing=1 — each content element overwrites the page document, only the last one is indexed. Set it to 0.',
+                    (int)$row['uid'],
+                ));
+            }
         }
 
         // 6. EXT:index integration — pages flow through it

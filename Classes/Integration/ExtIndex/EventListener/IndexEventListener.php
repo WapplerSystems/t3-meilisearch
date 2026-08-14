@@ -17,6 +17,7 @@ use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
+use WapplerSystems\Meilisearch\Service\HtmlToText;
 use WapplerSystems\Meilisearch\Service\LanguageDetector;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
@@ -47,6 +48,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly BoostCalculator $boostCalculator,
         private readonly EmbeddingPrecomputer $embeddingPrecomputer,
         private readonly LanguageDetector $languageDetector,
+        private readonly HtmlToText $htmlToText,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -79,7 +81,7 @@ final class IndexEventListener implements LoggerAwareInterface
             'uid' => $event->pageUid,
             'pid' => $pageMeta['pid'],
             'language' => $event->language,
-            'title' => $event->title,
+            'title' => $this->stripWebsiteTitleSuffix($event->title, $event->site, $event->language),
             'subtitle' => $pageMeta['subtitle'],
             'description' => $pageMeta['description'],
             'abstract' => $pageMeta['abstract'],
@@ -189,16 +191,56 @@ final class IndexEventListener implements LoggerAwareInterface
         }
     }
 
+    /**
+     * EXT:index glues the site title onto every page title
+     * (`DatabaseIndexingHandler`: `$pageRow['title'] . ' | ' . websiteTitle`,
+     * and identically in its News/Address content types). In a search index
+     * that suffix is noise: it repeats on every single hit, it is the same
+     * for the whole site, and it bleeds into the embedder's
+     * documentTemplate (`{{ doc.title }}. {{ doc.content }}`) where it
+     * costs tokens and blurs the vector. Peel it back off — per-language
+     * website title included, since a site may override it per language.
+     *
+     * Opt out with `meilisearch.indexing.stripWebsiteTitle: false`.
+     */
+    private function stripWebsiteTitleSuffix(string $title, \TYPO3\CMS\Core\Site\Entity\Site $site, int $language): string
+    {
+        if (!(bool)$site->getSettings()->get('meilisearch.indexing.stripWebsiteTitle', true)) {
+            return $title;
+        }
+
+        $websiteTitles = [(string)($site->getConfiguration()['websiteTitle'] ?? '')];
+        try {
+            $websiteTitles[] = $site->getLanguageById($language)->getWebsiteTitle();
+        } catch (\Throwable) {
+            // Language not configured on this site — the site-level title is all we have.
+        }
+
+        foreach ($websiteTitles as $websiteTitle) {
+            $websiteTitle = trim($websiteTitle);
+            if ($websiteTitle === '') {
+                continue;
+            }
+            $suffix = ' | ' . $websiteTitle;
+            if (!str_ends_with($title, $suffix)) {
+                continue;
+            }
+            $stripped = rtrim(substr($title, 0, -strlen($suffix)));
+            // A page whose own title is empty would strip down to nothing —
+            // an empty title is worse than a redundant one, so keep the original.
+            if ($stripped !== '') {
+                return $stripped;
+            }
+        }
+
+        return $title;
+    }
+
     private function normalize(string $content): string
     {
         // EXT:index's database technology hands over HTML; frontend/http
         // technologies do the same. SEAL/Meilisearch indexes plain text.
-        // Insert a space at every tag boundary first, otherwise strip_tags
-        // collapses "Foo</p><p>Bar" into "FooBar".
-        $padded = preg_replace('/></u', '> <', $content) ?? $content;
-        $stripped = strip_tags($padded);
-        $collapsed = preg_replace('/\s+/u', ' ', $stripped);
-        return trim((string)$collapsed);
+        return $this->htmlToText->convert($content);
     }
 
     private function resolveSysFileUid(string $combinedIdentifier): ?int

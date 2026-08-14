@@ -13,6 +13,7 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceInterface;
 use WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceRegistry;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
+use WapplerSystems\Meilisearch\Service\HtmlToText;
 
 final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareInterface
 {
@@ -23,6 +24,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         private readonly BoostCalculator $boostCalculator,
         private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
         private readonly PluginRecordSourceRegistry $recordSourceRegistry,
+        private readonly HtmlToText $htmlToText,
     ) {}
 
     public function getTable(): string
@@ -159,7 +161,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
     private function toDocument(array $row, Site $site, ?PluginRecordSourceInterface $source = null): array
     {
         $teaser = (string)$row['teaser'];
-        $bodytext = strip_tags((string)$row['bodytext']);
+        $bodytext = $this->htmlToText->convert((string)$row['bodytext']);
         // tx_wsmeilisearch_boost may legitimately be absent during the
         // first deploy before database:updateschema runs — treat that
         // as null so the calculator defaults to neutral.
