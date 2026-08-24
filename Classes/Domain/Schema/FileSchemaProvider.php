@@ -648,23 +648,36 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
     }
 
     /**
-     * Pre-reindex eviction of file documents that match the operator's
-     * current `excludeIdentifierPrefixes` site setting. Without this,
-     * docs that USED to be eligible but no longer pass the filter stay
-     * orphaned in the index (iterateDocuments only yields the new
-     * eligible set; it cannot reach docs outside its own iteration).
+     * Pre-reindex eviction of file documents that no longer pass the
+     * operator's current filters. Without this, docs that USED to be
+     * eligible stay orphaned in the index forever: iterateDocuments only
+     * yields the new eligible set, so it can never reach a document that
+     * has dropped out of it.
      *
-     * Uses Meilisearch's `uri CONTAINS "<prefix>"` filter to drop them
-     * in a single delete-task per prefix. CONTAINS is an experimental
-     * filter operator — Meilisearch returns `Using `CONTAINS` requires
-     * enabling the `contains filter` experimental feature` if the flag
-     * isn't enabled site-wide. The cleanup catches that case + logs a
-     * warning, never failing the reindex.
+     * Every filter the indexer applies at write time needs a counterpart
+     * here, otherwise tightening a setting has no effect on what is
+     * already indexed:
+     *
+     *   excludeIdentifierPrefixes → `uri CONTAINS "<prefix>"`
+     *   allowedExtensions         → `extension NOT IN [...]`
+     *   excludeExtensions         → `extension IN [...]`
+     *   minImageSizeKb            → `mimeType STARTS WITH "image/" AND fileSize < N`
+     *
+     * The extension and size rules were missing until 2026-08-24, which
+     * is why the LINEAR index still carried 96 documents — .exe
+     * installers, .form.yaml definitions and sub-10 KB logos — more than
+     * two months after the switch from a blacklist to a whitelist had
+     * made them ineligible.
+     *
+     * Each rule becomes one delete-task. `CONTAINS` is an experimental
+     * filter operator — Meilisearch answers `Using `CONTAINS` requires
+     * enabling the `contains filter` experimental feature` when the flag
+     * is off. Failures are logged per rule and never fail the reindex.
      */
     public function cleanupBeforeReindex(Site $site, Client $client, string $indexName): int
     {
-        $prefixes = $this->excludeIdentifierPrefixes($site);
-        if ($prefixes === []) {
+        $filters = $this->buildCleanupFilters($site);
+        if ($filters === []) {
             return 0;
         }
         // Skip on a fresh / empty index: a just-recreated index hasn't had
@@ -684,13 +697,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             return 0;
         }
         $total = 0;
-        foreach ($prefixes as $prefix) {
-            // Escape embedded double quotes in the literal (FAL paths
-            // generally don't contain them, but the filter syntax has to
-            // be defensive). Backslash-escape works in Meilisearch's
-            // expression grammar.
-            $literal = '"' . str_replace('"', '\\"', $prefix) . '"';
-            $filter = sprintf('uri CONTAINS %s', $literal);
+        foreach ($filters as $label => $filter) {
             try {
                 $task = $client->index($indexName)->deleteDocuments(['filter' => $filter]);
                 // Wait briefly so the operator sees the actual count in
@@ -706,13 +713,77 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
                 }
             } catch (\Throwable $e) {
                 $this->logger?->warning(
-                    'FileSchemaProvider pre-reindex cleanup failed for prefix {prefix}: {message}',
-                    ['prefix' => $prefix, 'message' => $e->getMessage()],
+                    'FileSchemaProvider pre-reindex cleanup failed for rule {rule}: {message}',
+                    ['rule' => $label, 'message' => $e->getMessage()],
                 );
                 continue;
+            }
+            if ($deleted > 0) {
+                $this->logger?->info(
+                    'FileSchemaProvider evicted {count} documents no longer matching {rule}',
+                    ['count' => $deleted, 'rule' => $label],
+                );
             }
             $total += $deleted;
         }
         return $total;
+    }
+
+    /**
+     * One Meilisearch filter expression per active eviction rule, keyed
+     * by a human-readable label for the log.
+     *
+     * `extension EXISTS` / `fileSize EXISTS` guard every rule that reads
+     * a field the EXT:index crawl bridge does not write: without it, a
+     * `NOT IN` matches documents that simply lack the attribute, and the
+     * cleanup would delete every crawl-indexed file document.
+     *
+     * @return array<string,string>
+     */
+    private function buildCleanupFilters(Site $site): array
+    {
+        $filters = [];
+
+        foreach ($this->excludeIdentifierPrefixes($site) as $prefix) {
+            // Escape embedded double quotes in the literal (FAL paths
+            // generally don't contain them, but the filter syntax has to
+            // be defensive). Backslash-escape works in Meilisearch's
+            // expression grammar.
+            $filters['identifier prefix ' . $prefix] = sprintf('uri CONTAINS %s', $this->quoteFilterValue($prefix));
+        }
+
+        // Whitelist wins when non-empty, mirroring iterateDocuments().
+        $allowed = $this->normaliseExtensionList($site, 'meilisearch.indexing.allowedExtensions');
+        if ($allowed !== []) {
+            $filters['allowedExtensions'] = sprintf(
+                'type = file AND extension EXISTS AND extension NOT IN [%s]',
+                implode(', ', array_map($this->quoteFilterValue(...), $allowed)),
+            );
+        } else {
+            $excluded = $this->normaliseExtensionList($site, 'meilisearch.indexing.excludeExtensions');
+            if ($excluded !== []) {
+                $filters['excludeExtensions'] = sprintf(
+                    'type = file AND extension IN [%s]',
+                    implode(', ', array_map($this->quoteFilterValue(...), $excluded)),
+                );
+            }
+        }
+
+        $minImageBytes = $this->minImageBytes($site);
+        if ($minImageBytes > 0) {
+            // Same scoping as the write path: only images are subject to
+            // the size floor, so a 200-byte README keeps its document.
+            $filters['minImageSizeKb'] = sprintf(
+                'type = file AND fileSize EXISTS AND mimeType STARTS WITH "image/" AND fileSize < %d',
+                $minImageBytes,
+            );
+        }
+
+        return $filters;
+    }
+
+    private function quoteFilterValue(string $value): string
+    {
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 }
