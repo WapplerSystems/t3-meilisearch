@@ -36,6 +36,11 @@ services:
       # QuotaStatus readonly DTO + interface marker.
       - '../Classes/Service/Quota/QuotaStatus.php'
       - '../Classes/Service/Quota/QuotaProviderInterface.php'
+      # Per-run objects and exceptions: DocumentBatchWriter is constructed
+      # by IndexerService with run-specific arguments (site, index names,
+      # mode flags) that no container can autowire, IndexWriteStats is its
+      # value object, and the two exception classes are plain throwables.
+      - '../Classes/Service/Indexing/*'
 
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:

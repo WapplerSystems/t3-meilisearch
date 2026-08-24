@@ -260,8 +260,102 @@ meilisearch:
 
 `ws_meilisearch:reindex --rebuild` pushes the embedder configuration to
 Meilisearch before populating documents, so the first hybrid query
-after rebuild sees a fully vectorized corpus. Without `--rebuild`,
-existing docs are re-sent and re-vectorized in place.
+after rebuild sees a fully vectorized corpus. Note that `--rebuild`
+drops the index and therefore throws away every existing vector —
+everything is re-embedded from scratch. Without it, the reindex writes
+in place and only pays for documents that actually changed (see
+[Incremental re-indexing](#incremental-re-indexing-what-a-reindex-actually-costs)).
+
+### Incremental re-indexing (what a reindex actually costs)
+
+Every document carries two fingerprints, written by `DocumentBatchWriter`:
+
+| field       | covers                                                              |
+|-------------|---------------------------------------------------------------------|
+| `docHash`   | the whole document except the vector — "nothing changed"             |
+| `embedHash` | the exact text sent to the embedder + embedder identity (source, model, dimensions, `maxInputChars`) — "the stored vector is still the right one" |
+
+Before writing a batch, the indexer reads those two fields back for the
+documents it is about to push (a cheap request — ids and two short
+strings, no vectors) and then decides per document:
+
+* `docHash` unchanged → **not written at all** (in-place mode)
+* `embedHash` unchanged → the existing vector is copied over and the new
+  keyword fields are written; **the embedding provider is not called**
+* otherwise → embed, then write
+
+Vectors are only transferred for the middle case, in a second request —
+a 3584-dimension vector is ~70 KB of JSON, so fetching them
+unconditionally would trade a token bill for a bandwidth bill.
+
+This is what makes re-indexing a large corpus affordable. Without it,
+every full reindex re-embeds every document: on a 45.000-document index
+against a rate-limited provider that means the run stalls in a silent
+429 retry loop and never finishes.
+
+The CLI reports the breakdown, so a run that is about to become
+expensive is visible immediately:
+
+```
+→ 45754 seen · 312 written (12 embedded, 300 vectors re-used) · 45442 unchanged/skipped · 0 failed
+```
+
+**Bootstrap.** Documents indexed before fingerprinting existed carry
+neither hash. A document that has a vector of the expected dimension is
+*adopted*: its vector is treated as current and re-used, so the first
+run after upgrading costs zero embeddings. Pass `--force-embed` to
+re-embed regardless — needed after an embedder model change, and the
+one flag that can exhaust a provider quota on purpose.
+
+**Zero-downtime mode** (`meilisearch.indexing.zeroDowntime`) cannot skip:
+every document has to land in the draft index or the swap would publish
+an index with holes. Fingerprints and vectors are then read from the
+primary and copied into the draft — still no embedding cost, but the
+vectors do go over the wire.
+
+### Rate control and failure handling
+
+With `meilisearch.embedder.precompute: true` the embeddings are fetched
+by PHP, so this integration owns the call rate:
+
+```yaml
+meilisearch:
+  indexing:
+    requestsPerMinute: 300   # minimum interval between provider calls
+    tokensPerMinute: 800000  # sliding 60s budget of *estimated* tokens
+    embedBatchSize: 8        # inputs per provider request
+    batchSize: 50            # documents per Meilisearch write
+  embedder:
+    maxInputChars: 8000      # hard truncation per document (default)
+    maxRetries: 5            # attempts per request on 429/5xx
+```
+
+`tokensPerMinute` is the setting that matters on providers that meter
+tokens rather than requests (Scaleway answers
+`INSUFFICIENT QUOTA … quota tokens per minute. Slow down`). A
+requests-per-minute cap does nothing against it: a handful of full page
+texts can exhaust a minute's token budget in a single call. The estimate
+is deliberately rough (chars/4); whenever the provider disagrees and
+answers 429, the retry path honours `Retry-After`, clears the window and
+backs off, which corrects the drift.
+
+`maxInputChars` bounds a single document's contribution. It is part of
+`embedHash`, so changing it invalidates the cached vectors and the
+affected documents are re-embedded on the next run.
+
+**Failures are loud.** With a `userProvided` embedder Meilisearch
+*rejects* any document that arrives without `_vectors.default`, and it
+does so asynchronously in its own task queue — a vectorless push looks
+successful from PHP while the document never lands. Documents whose
+embedding failed are therefore **not pushed at all**:
+
+* `ws_meilisearch:reindex` counts them, prints a warning and exits
+  non-zero,
+* the EXT:index crawl bridge lets the error escape so the Messenger
+  message fails and is retried later, instead of being acked with the
+  page silently missing,
+* three consecutive failed embedding batches abort the run rather than
+  marking the whole corpus as failed one batch at a time.
 
 Frontend: `?hybrid=1` on the results URL flips to hybrid mode; the
 `hybridAvailable` flag is exposed to Fluid so the toggle stays hidden
@@ -789,6 +883,10 @@ ddev exec vendor/bin/typo3 ws_meilisearch:reindex                        # all s
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main                    # one site, incremental
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --rebuild          # drop + recreate first
 ddev exec vendor/bin/typo3 ws_meilisearch:reindex main --skip-embedder    # leave embedder config untouched
+
+# --force-embed on either command re-embeds instead of re-using stored
+# vectors. Only needed after an embedder model change — on a large corpus
+# this is what exhausts the provider's token quota.
 
 # Scoped (re)indexing — one record or one whole table, no schema rebuild.
 # Cheaper than a full reindex when back-filling a single document type

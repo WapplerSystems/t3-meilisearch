@@ -9,8 +9,9 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Domain\Schema\PreReindexCleanupInterface;
 use WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface;
-use WapplerSystems\Meilisearch\Event\AfterDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
+use WapplerSystems\Meilisearch\Service\Indexing\DocumentBatchWriter;
+use WapplerSystems\Meilisearch\Service\Indexing\IndexWriteStats;
 
 /**
  * Orchestrates indexing: iterates schema providers, fetches documents, pushes
@@ -32,6 +33,56 @@ final class IndexerService implements LoggerAwareInterface
         private readonly EmbeddingPrecomputer $embeddingPrecomputer,
         private readonly IndexSettingsApplier $indexSettingsApplier,
     ) {}
+
+    /**
+     * Breakdown of the most recent indexing run — how many documents were
+     * skipped as unchanged, how many re-used their existing vector and how
+     * many actually cost an embedding call. The CLI commands print it; it
+     * is the only way to tell a cheap routine reindex from one that is
+     * about to run into the provider's token quota.
+     */
+    private ?IndexWriteStats $lastStats = null;
+
+    public function getLastStats(): ?IndexWriteStats
+    {
+        return $this->lastStats;
+    }
+
+    /**
+     * Assemble the buffered writer for one run. `readIndex` is where
+     * existing fingerprints and vectors are looked up: the primary index
+     * even when writing into a draft, because the draft starts empty.
+     */
+    private function createWriter(
+        Site $site,
+        ?\CmsIg\Seal\Engine $engine,
+        ?\Meilisearch\Client $client,
+        string $writeIndex,
+        ?string $readIndex,
+        bool $allowSkip,
+        bool $forceEmbed,
+        bool $strict,
+        ?callable $progress = null,
+    ): DocumentBatchWriter {
+        $writer = new DocumentBatchWriter(
+            $site,
+            $client,
+            $engine,
+            $writeIndex,
+            $readIndex,
+            $this->embeddingPrecomputer,
+            $this->eventDispatcher,
+            $this->embeddingPrecomputer->isEnabledForSite($site),
+            $allowSkip,
+            $forceEmbed,
+            $strict,
+        );
+        if ($this->logger !== null) {
+            $writer->setLogger($this->logger);
+        }
+        $writer->setProgressCallback($progress);
+        return $writer;
+    }
 
     /**
      * Site-setting–driven choice of where the next indexAll() writes:
@@ -105,7 +156,7 @@ final class IndexerService implements LoggerAwareInterface
         return true;
     }
 
-    public function indexAll(Site $site): int
+    public function indexAll(Site $site, bool $forceEmbed = false, ?callable $progress = null): int
     {
         $engine = $this->engineFactory->createForSite($site);
         if ($engine === null) {
@@ -150,45 +201,45 @@ final class IndexerService implements LoggerAwareInterface
             }
         }
 
-        // When precompute is on, PHP fetches the embedding itself before
-        // saveDocument and writes it into `_vectors.default`. The throttle
-        // sits inside EmbeddingPrecomputer (token bucket against the
-        // provider); the Meilisearch side gets pre-vectorized documents,
-        // so there is no embedder fan-out to worry about here.
+        // Documents go through DocumentBatchWriter, which fingerprints
+        // each one and only pays the embedding provider for documents
+        // whose text actually changed. See that class for why: a naive
+        // full reindex re-embedded all ~45k documents and stalled in
+        // Scaleway's tokens-per-minute quota.
         //
-        // We also bypass the SEAL engine's saveDocument for precompute
-        // docs and push directly via the raw Meilisearch client:
-        // SEAL's Marshaller copies fields by Schema definition only,
-        // and `_vectors` is not in the schema (Meilisearch treats it
-        // as a special field at the document level, not a regular
-        // field). Routing through saveDocument would silently strip
-        // the vector and Meilisearch would reject every document with
-        // "no vectors provided for document …" against the
-        // userProvided embedder.
-        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
+        // Fingerprints and re-usable vectors are read from the PRIMARY
+        // index — in zero-downtime mode the write target is a freshly
+        // emptied draft, so it has nothing to compare against. That mode
+        // also forbids skipping: every document must physically land in
+        // the draft or the swap would publish an index with holes.
+        $writer = $this->createWriter(
+            $site,
+            $engine,
+            $client,
+            $indexName,
+            $primaryName,
+            !$zeroDowntime,
+            $forceEmbed,
+            false,
+            $progress,
+        );
 
-        $count = 0;
         foreach ($this->schemaProviders as $provider) {
             foreach ($provider->iterateDocuments($site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                $doc = $event->document;
-                if ($precompute) {
-                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
-                    if ($client !== null) {
-                        $client->index($indexName)->addDocuments([$doc], 'id');
-                    } else {
-                        // No raw client (site lacks meilisearch.url) — fall
-                        // back to engine push; the vector will be stripped
-                        // but the doc still lands for keyword search.
-                        $engine->saveDocument($indexName, $doc);
-                    }
-                } else {
-                    $engine->saveDocument($indexName, $doc);
-                }
-                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
-                $count++;
+                $writer->push($event->document, $provider);
             }
+        }
+        $writer->flush();
+        $this->lastStats = $writer->stats;
+        $count = $writer->stats->written + $writer->stats->skipped;
+
+        if ($writer->stats->failed > 0) {
+            $this->logger?->error(
+                'Reindex of site {site} finished with {failed} documents missing — embedding failed for them, see the errors above',
+                ['site' => $site->getIdentifier(), 'failed' => $writer->stats->failed],
+            );
         }
 
         // Zero-downtime cutover: swap the draft (where we just wrote
@@ -232,41 +283,41 @@ final class IndexerService implements LoggerAwareInterface
         return $count;
     }
 
-    public function indexRecord(string $table, int $uid, Site $site): bool
+    public function indexRecord(string $table, int $uid, Site $site, bool $forceEmbed = false): bool
     {
         $engine = $this->engineFactory->createForSite($site);
         if ($engine === null) {
             return false;
         }
         $indexName = $this->engineFactory->getIndexName($site);
-        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
-        // Raw Meilisearch client for the precompute-push path — see the
-        // long comment in indexAll() about why SEAL's saveDocument
-        // strips `_vectors`.
-        $client = $precompute ? $this->engineFactory->createClientForSite($site) : null;
+        $client = $this->engineFactory->createClientForSite($site);
 
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
                 continue;
             }
+            // A single record is written in place, so unchanged documents
+            // can be skipped outright — an editor re-saving a record
+            // without touching indexed fields costs nothing.
+            $writer = $this->createWriter(
+                $site,
+                $engine,
+                $client,
+                $indexName,
+                $indexName,
+                true,
+                $forceEmbed,
+                false,
+            );
             $any = false;
             foreach ($provider->fetchDocuments($uid, $site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                $doc = $event->document;
-                if ($precompute) {
-                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
-                    if ($client !== null) {
-                        $client->index($indexName)->addDocuments([$doc], 'id');
-                    } else {
-                        $engine->saveDocument($indexName, $doc);
-                    }
-                } else {
-                    $engine->saveDocument($indexName, $doc);
-                }
-                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
+                $writer->push($event->document, $provider);
                 $any = true;
             }
+            $writer->flush();
+            $this->lastStats = $writer->stats;
             if (!$any) {
                 // Record vanished or got hidden — drop every document variant
                 // we might have written previously (per-language, etc.).
@@ -274,7 +325,11 @@ final class IndexerService implements LoggerAwareInterface
                     $engine->deleteDocument($indexName, $docId);
                 }
             }
-            return true;
+            // false when embedding failed: the document was deliberately
+            // NOT pushed (Meilisearch rejects vectorless documents against
+            // the userProvided embedder), so the caller must not treat
+            // this record as indexed.
+            return $writer->stats->failed === 0;
         }
         return false;
     }
@@ -290,41 +345,37 @@ final class IndexerService implements LoggerAwareInterface
      * Returns the number of documents pushed, or -1 when no provider supports
      * the table.
      */
-    public function indexTable(string $table, Site $site): int
+    public function indexTable(string $table, Site $site, bool $forceEmbed = false): int
     {
         $engine = $this->engineFactory->createForSite($site);
         if ($engine === null) {
             return -1;
         }
         $indexName = $this->engineFactory->getIndexName($site);
-        $precompute = $this->embeddingPrecomputer->isEnabledForSite($site);
-        // Raw client for the precompute push — see indexAll() on why
-        // saveDocument() would strip `_vectors`.
-        $client = $precompute ? $this->engineFactory->createClientForSite($site) : null;
+        $client = $this->engineFactory->createClientForSite($site);
 
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
                 continue;
             }
-            $count = 0;
+            $writer = $this->createWriter(
+                $site,
+                $engine,
+                $client,
+                $indexName,
+                $indexName,
+                true,
+                $forceEmbed,
+                false,
+            );
             foreach ($provider->iterateDocuments($site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
-                $doc = $event->document;
-                if ($precompute) {
-                    $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
-                    if ($client !== null) {
-                        $client->index($indexName)->addDocuments([$doc], 'id');
-                    } else {
-                        $engine->saveDocument($indexName, $doc);
-                    }
-                } else {
-                    $engine->saveDocument($indexName, $doc);
-                }
-                $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($provider, $doc));
-                $count++;
+                $writer->push($event->document, $provider);
             }
-            return $count;
+            $writer->flush();
+            $this->lastStats = $writer->stats;
+            return $writer->stats->written + $writer->stats->skipped;
         }
         return -1;
     }

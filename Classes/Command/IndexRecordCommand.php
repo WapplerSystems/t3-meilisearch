@@ -45,7 +45,8 @@ final class IndexRecordCommand extends Command
         $this->addArgument('table', InputArgument::REQUIRED, 'Table, e.g. tx_wsmeilisearch_knowledge_resource, tx_news_domain_model_news, sys_file')
             ->addArgument('uid', InputArgument::OPTIONAL, 'Record uid. Omit to (re)index every record the provider yields for the table.')
             ->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (default: first Meilisearch-configured site)')
-            ->addOption('remove', null, InputOption::VALUE_NONE, 'Remove the record from the index instead of indexing it (requires uid).');
+            ->addOption('remove', null, InputOption::VALUE_NONE, 'Remove the record from the index instead of indexing it (requires uid).')
+            ->addOption('force-embed', null, InputOption::VALUE_NONE, 'Re-embed instead of re-using the vector already stored for the document.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -55,6 +56,7 @@ final class IndexRecordCommand extends Command
         $uidArg = $input->getArgument('uid');
         $uid = $uidArg !== null ? (int)$uidArg : null;
         $remove = (bool)$input->getOption('remove');
+        $forceEmbed = (bool)$input->getOption('force-embed');
 
         if ($remove && $uid === null) {
             $io->error('--remove requires a uid.');
@@ -75,20 +77,31 @@ final class IndexRecordCommand extends Command
         }
 
         if ($uid !== null) {
-            $ok = $this->indexer->indexRecord($table, $uid, $site);
-            $io->writeln(sprintf('%s indexed %s:%d on site %s.',
-                $ok ? '<info>✓</info>' : '<comment>no provider for</comment>', $table, $uid, $site->getIdentifier()));
+            $ok = $this->indexer->indexRecord($table, $uid, $site, $forceEmbed);
+            $stats = $this->indexer->getLastStats();
+            $io->writeln(sprintf('%s %s:%d on site %s.%s',
+                $ok ? '<info>✓ indexed</info>' : '<comment>✗ NOT indexed</comment>',
+                $table,
+                $uid,
+                $site->getIdentifier(),
+                $stats !== null ? ' ' . $stats->summary() : ''));
             return $ok ? Command::SUCCESS : Command::FAILURE;
         }
 
         // Whole-table mode.
-        $count = $this->indexer->indexTable($table, $site);
+        $count = $this->indexer->indexTable($table, $site, $forceEmbed);
         if ($count < 0) {
             $io->error(sprintf('No schema provider supports table "%s".', $table));
             return Command::FAILURE;
         }
-        $io->success(sprintf('Indexed %d document(s) for table "%s" on site %s.', $count, $table, $site->getIdentifier()));
-        return Command::SUCCESS;
+        $stats = $this->indexer->getLastStats();
+        $io->success(sprintf(
+            'Table "%s" on site %s: %s',
+            $table,
+            $site->getIdentifier(),
+            $stats?->summary() ?? sprintf('%d document(s) indexed', $count),
+        ));
+        return ($stats?->failed ?? 0) > 0 ? Command::FAILURE : Command::SUCCESS;
     }
 
     private function resolveSite(?string $siteId): ?Site

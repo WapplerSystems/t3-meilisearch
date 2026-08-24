@@ -12,7 +12,8 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
-use WapplerSystems\Meilisearch\Event\AfterDocumentIndexedEvent;
+use WapplerSystems\Meilisearch\Service\Indexing\DocumentBatchWriter;
+use WapplerSystems\Meilisearch\Service\Indexing\EmbeddingFailedException;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
@@ -160,28 +161,47 @@ final class IndexEventListener implements LoggerAwareInterface
             $before = new BeforeDocumentIndexedEvent($origin, $document);
             $this->eventDispatcher->dispatch($before);
             $doc = $before->document;
-            if ($this->embeddingPrecomputer->isEnabledForSite($site)) {
-                // Precompute mode: attach the vector and push via the raw
-                // Meilisearch client. SEAL's marshaller drops fields not
-                // declared in the schema — `_vectors` is special-cased by
-                // Meilisearch but not a SEAL schema field, so routing
-                // through saveDocument() would silently strip the vector
-                // and Meilisearch would reject every page with
-                // "no vectors provided for document" against the
-                // userProvided embedder. Same fix as in IndexerService.
-                $doc = $this->embeddingPrecomputer->attachEmbedding($site, $doc);
-                $client = $this->engineFactory->createClientForSite($site);
-                if ($client !== null) {
-                    $client->index($indexName)->addDocuments([$doc], 'id');
-                } else {
-                    /** @phpstan-ignore-next-line — SEAL Engine type is known at runtime */
-                    $engine->saveDocument($indexName, $doc);
-                }
-            } else {
-                /** @phpstan-ignore-next-line — SEAL Engine type is known at runtime */
-                $engine->saveDocument($indexName, $doc);
+            // The writer fingerprints the document, re-uses the vector
+            // that is already in the index when the text is unchanged and
+            // only then falls back to the embedding provider. That is what
+            // makes a re-crawl affordable: EXT:index re-visits every page,
+            // but only pages whose text actually changed cost tokens.
+            //
+            // strict: true — an embedding failure must escape this method.
+            // See the catch block below.
+            $writer = new DocumentBatchWriter(
+                $site,
+                $this->engineFactory->createClientForSite($site),
+                $engine instanceof \CmsIg\Seal\Engine ? $engine : null,
+                $indexName,
+                $indexName,
+                $this->embeddingPrecomputer,
+                $this->eventDispatcher,
+                $this->embeddingPrecomputer->isEnabledForSite($site),
+                true,
+                false,
+                true,
+                1,
+            );
+            if ($this->logger !== null) {
+                $writer->setLogger($this->logger);
             }
-            $this->eventDispatcher->dispatch(new AfterDocumentIndexedEvent($origin, $doc));
+            $writer->push($doc, $origin);
+            $writer->flush();
+        } catch (EmbeddingFailedException $e) {
+            // Do NOT swallow this one. The index runs a userProvided
+            // embedder, so a document without a vector is rejected by
+            // Meilisearch asynchronously — the crawl would ack its
+            // Messenger message, empty the queue and leave the page
+            // silently on its old state, with the only trace in
+            // `GET /tasks?statuses=failed`. Letting the exception escape
+            // fails the message instead, so Messenger retries it once the
+            // provider's quota window has moved on.
+            $this->logger?->warning(
+                'EXT:index-integration: embedding unavailable for document {id} — failing the message so it is retried: {message}',
+                ['id' => $document['id'] ?? '?', 'message' => $e->getMessage()],
+            );
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger?->error('EXT:index-integration failed to index document {id}: {message}', [
                 'id' => $document['id'] ?? '?',

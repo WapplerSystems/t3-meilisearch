@@ -188,6 +188,14 @@ final class SearchEngineFactory
             // boost into actual ranking influence by adding "boost:desc" to
             // meilisearch.defaults.rankingRules (between attribute and sort).
             'boost'       => new FloatField('boost', searchable: false, sortable: true),
+            // Change fingerprints written by DocumentBatchWriter. They are
+            // what lets a reindex tell "unchanged, leave it alone" from
+            // "text changed, needs a new vector" — without them every run
+            // re-embeds the whole corpus and walks into the embedding
+            // provider's tokens-per-minute quota. Not searchable and not
+            // filterable: they are read back by id, never queried.
+            'docHash'     => new TextField('docHash', searchable: false),
+            'embedHash'   => new TextField('embedHash', searchable: false),
         ];
     }
 }
