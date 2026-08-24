@@ -583,6 +583,14 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
 
         return match ($source) {
             'scaleway' => 'https://api.scaleway.ai/v1/embeddings',
+            // Ollama exposes both dialects; this class speaks the
+            // OpenAI-compatible one, while the embedder pushed to
+            // Meilisearch needs the native /api/embeddings. See
+            // EmbedderConfigurator::normaliseOllamaUrl().
+            'ollama' => EmbedderConfigurator::normaliseOllamaUrl(
+                trim((string)$settings->get('meilisearch.embedder.url', '')),
+                true,
+            ) ?: 'http://localhost:11434/v1/embeddings',
             'infomaniak' => 'https://api.infomaniak.com/1/ai/'
                 . rawurlencode((string)$settings->get('meilisearch.infomaniak.productId', ''))
                 . '/openai/v1/embeddings',

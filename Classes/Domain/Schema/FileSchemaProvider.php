@@ -749,7 +749,17 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             // generally don't contain them, but the filter syntax has to
             // be defensive). Backslash-escape works in Meilisearch's
             // expression grammar.
-            $filters['identifier prefix ' . $prefix] = sprintf('uri CONTAINS %s', $this->quoteFilterValue($prefix));
+            // `type = file` is not decoration: the prefixes describe FAL
+            // identifiers, but the filter runs against `uri`, and other
+            // document types can carry a URI containing the same
+            // fragment. A help document served from
+            // /hilfe/fileadmin/chatbot-hilfe/uploads/… was being deleted
+            // by the `/uploads/` rule on every single reindex, then
+            // re-created by its own provider moments later.
+            $filters['identifier prefix ' . $prefix] = sprintf(
+                'type = file AND uri CONTAINS %s',
+                $this->quoteFilterValue($prefix),
+            );
         }
 
         // Whitelist wins when non-empty, mirroring iterateDocuments().

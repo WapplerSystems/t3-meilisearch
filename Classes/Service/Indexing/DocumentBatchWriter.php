@@ -106,6 +106,12 @@ final class DocumentBatchWriter implements LoggerAwareInterface
 
     private int $bufferedChars = 0;
 
+    /**
+     * Memoised answer to "can this run look fingerprints up at all?".
+     * Null until the first lookup decides.
+     */
+    private ?bool $lookupAvailable = null;
+
     /** @var (callable(IndexWriteStats): void)|null */
     private $progressCallback = null;
 
@@ -417,6 +423,15 @@ final class DocumentBatchWriter implements LoggerAwareInterface
         if ($ids === [] || $this->client === null || $this->readIndex === null) {
             return [];
         }
+        if ($this->lookupAvailable === false) {
+            return [];
+        }
+        if ($this->lookupAvailable === null) {
+            $this->lookupAvailable = $this->readIndexHasDocuments();
+            if (!$this->lookupAvailable) {
+                return [];
+            }
+        }
         try {
             $result = $this->client->index($this->readIndex)->getDocuments(
                 (new DocumentsQuery())
@@ -456,6 +471,31 @@ final class DocumentBatchWriter implements LoggerAwareInterface
             ];
         }
         return $known;
+    }
+
+    /**
+     * Is there anything to compare against yet?
+     *
+     * A freshly created index answers no, and that case has to be
+     * distinguished from a broken lookup: `filter: id IN [...]` fails on
+     * a brand-new index because the index is created first and
+     * `filterableAttributes` are pushed in a separate, asynchronous
+     * task — for a moment `id` is simply not filterable. Treating that
+     * as a fatal lookup failure aborted every `--rebuild` and every
+     * first run on a new installation.
+     *
+     * An empty index also has no fingerprints by definition, so skipping
+     * the lookup is not just a workaround, it is the correct answer.
+     */
+    private function readIndexHasDocuments(): bool
+    {
+        try {
+            $stats = $this->client?->index((string)$this->readIndex)->stats();
+        } catch (\Throwable) {
+            // Index does not exist yet — nothing to compare against.
+            return false;
+        }
+        return (int)($stats['numberOfDocuments'] ?? 0) > 0;
     }
 
     /**

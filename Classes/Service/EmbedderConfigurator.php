@@ -202,12 +202,60 @@ final class EmbedderConfigurator implements LoggerAwareInterface
                 continue;
             }
             $stringValue = trim((string)$value);
+            if ($field === 'url' && $source === 'ollama') {
+                // Meilisearch insists on Ollama's NATIVE endpoint here
+                // ("unsupported Ollama URL … must end with /api/embed or
+                // /api/embeddings"), while the precompute path in
+                // EmbeddingPrecomputer speaks the OpenAI-compatible
+                // /v1/embeddings dialect against the same server. One
+                // setting, two incompatible shapes — so each consumer
+                // coerces it instead of making the integrator guess
+                // which one the current `precompute` value needs.
+                $stringValue = self::normaliseOllamaUrl($stringValue, false);
+            }
             if ($stringValue !== '') {
                 $embedder[$field] = $stringValue;
             }
         }
 
         return [self::EMBEDDER_NAME => $embedder];
+    }
+
+    /**
+     * Point an Ollama base URL at the endpoint the caller needs.
+     *
+     * `$openAiCompatible` selects between the two dialects the same
+     * server exposes: `/v1/embeddings` (OpenAI shape, used by
+     * EmbeddingPrecomputer) and `/api/embeddings` (native, the only one
+     * Meilisearch accepts for `source: ollama`).
+     *
+     * A known endpoint suffix is stripped before the wanted one is
+     * appended, so a reverse-proxy prefix such as
+     * `https://ai.example.com/ollama/v1/embeddings` survives the
+     * rewrite as `https://ai.example.com/ollama/api/embeddings`.
+     */
+    public static function normaliseOllamaUrl(string $url, bool $openAiCompatible): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return $url;
+        }
+        $parts = parse_url($url);
+        if ($parts === false || !isset($parts['host'])) {
+            // Not a URL we can reason about — hand it back untouched and
+            // let the provider complain rather than mangling it.
+            return $url;
+        }
+        $base = ($parts['scheme'] ?? 'http') . '://' . $parts['host']
+            . (isset($parts['port']) ? ':' . $parts['port'] : '');
+        $path = rtrim($parts['path'] ?? '', '/');
+        foreach (['/v1/embeddings', '/api/embeddings', '/api/embed'] as $suffix) {
+            if (str_ends_with($path, $suffix)) {
+                $path = substr($path, 0, -strlen($suffix));
+                break;
+            }
+        }
+        return $base . $path . ($openAiCompatible ? '/v1/embeddings' : '/api/embeddings');
     }
 
     /**
