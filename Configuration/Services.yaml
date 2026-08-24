@@ -70,6 +70,12 @@ services:
     arguments:
       $schemaProviders: !tagged_iterator ws_meilisearch.schema_provider
 
+  # Read-only audit: iterates the same providers as a reindex but only
+  # collects ids, so it needs the same tagged iterator.
+  WapplerSystems\Meilisearch\Command\IndexAuditCommand:
+    arguments:
+      $schemaProviders: !tagged_iterator ws_meilisearch.schema_provider
+
   WapplerSystems\Meilisearch\Service\SearchService:
     public: true
 
