@@ -334,10 +334,27 @@ meilisearch:
 tokens rather than requests (Scaleway answers
 `INSUFFICIENT QUOTA … quota tokens per minute. Slow down`). A
 requests-per-minute cap does nothing against it: a handful of full page
-texts can exhaust a minute's token budget in a single call. The estimate
-is deliberately rough (chars/4); whenever the provider disagrees and
-answers 429, the retry path honours `Retry-After`, clears the window and
-backs off, which corrects the drift.
+texts can exhaust a minute's token budget in a single call.
+
+You usually do not have to configure it. Every response carries the
+provider's own accounting, and it is trusted over the local estimate:
+
+```
+x-ratelimit-limit-requests: 300
+x-ratelimit-limit-tokens: 200000      # ← Scaleway, bge-multilingual-gemma2
+x-ratelimit-remaining-tokens: 99997
+x-ratelimit-reset-tokens: 200ms
+```
+
+The reported limit becomes the default budget, and a request that no
+longer fits into `remaining` waits out `reset` before it is sent. The
+local chars/4 estimate only has to carry the very first call; from then
+on the numbers are the provider's. If the provider answers 429 anyway,
+the retry path honours `Retry-After`, clears the window and backs off.
+
+For scale: at 200.000 tokens/minute, re-embedding a 45.000-document
+corpus of ~2000 tokens each takes over seven hours of uninterrupted
+provider time. That is the bill the fingerprinting above avoids.
 
 `maxInputChars` bounds a single document's contribution. It is part of
 `embedHash`, so changing it invalidates the cached vectors and the

@@ -86,6 +86,18 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
      */
     private array $tokenWindow = [];
 
+    /**
+     * What the provider itself last said about the remaining budget,
+     * parsed from its `x-ratelimit-*` response headers. Far better than
+     * our own chars/4 estimate: Scaleway reports the real limit (300
+     * requests and 200.000 tokens per minute for bge-multilingual-gemma2)
+     * plus how much of it is left and when it resets. When the provider
+     * tells us, we stop guessing.
+     *
+     * @var array<string,array{limit:int,remaining:int,resetAtUs:int}>
+     */
+    private array $providerBudget = [];
+
     public function __construct(
         private readonly RequestFactory $requestFactory,
     ) {}
@@ -268,6 +280,7 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
         $lastError = '';
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             $this->reserveTokens($site, $estimatedTokens);
+            $this->awaitProviderBudget($site, $estimatedTokens);
             $this->throttle($site);
             try {
                 return $this->postEmbeddings($site, $inputs);
@@ -355,6 +368,13 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
     private function reserveTokens(Site $site, int $tokens): void
     {
         $tpm = (int)$site->getSettings()->get('meilisearch.indexing.tokensPerMinute', 0);
+        if ($tpm <= 0) {
+            // Nothing configured — fall back to the limit the provider
+            // reported on the previous call, so a fresh installation is
+            // throttled correctly without anyone having to look the
+            // number up.
+            $tpm = $this->providerBudget[$site->getIdentifier()]['limit'] ?? 0;
+        }
         if ($tpm <= 0 || $tokens <= 0) {
             return;
         }
@@ -436,6 +456,8 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
             ));
         }
 
+        $this->recordProviderBudget($site, $response);
+
         $payload = json_decode((string)$response->getBody(), true, 32, JSON_THROW_ON_ERROR);
         $data = $payload['data'] ?? null;
         if (!is_array($data) || $data === []) {
@@ -454,6 +476,83 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
         }
         ksort($vectors);
         return array_values($vectors);
+    }
+
+    /**
+     * Remember what the provider reported about its token budget.
+     * OpenAI-compatible gateways (Scaleway among them) answer with
+     * `x-ratelimit-limit-tokens`, `x-ratelimit-remaining-tokens` and
+     * `x-ratelimit-reset-tokens`.
+     */
+    private function recordProviderBudget(Site $site, \Psr\Http\Message\ResponseInterface $response): void
+    {
+        $limit = $response->getHeaderLine('x-ratelimit-limit-tokens');
+        $remaining = $response->getHeaderLine('x-ratelimit-remaining-tokens');
+        if ($limit === '' && $remaining === '') {
+            return;
+        }
+        $resetUs = $this->parseDurationToMicroseconds($response->getHeaderLine('x-ratelimit-reset-tokens'));
+        $key = $site->getIdentifier();
+        $this->providerBudget[$key] = [
+            'limit' => is_numeric($limit) ? (int)$limit : ($this->providerBudget[$key]['limit'] ?? 0),
+            'remaining' => is_numeric($remaining) ? (int)$remaining : 0,
+            'resetAtUs' => (int)(microtime(true) * 1_000_000) + $resetUs,
+        ];
+    }
+
+    /**
+     * Wait out the provider's own reset window when its reported
+     * remaining budget cannot cover the next request. This is the
+     * accurate half of the rate control — the chars/4 estimate only has
+     * to carry us until the first response comes back.
+     */
+    private function awaitProviderBudget(Site $site, int $tokens): void
+    {
+        $budget = $this->providerBudget[$site->getIdentifier()] ?? null;
+        if ($budget === null || $budget['limit'] <= 0) {
+            return;
+        }
+        if ($budget['remaining'] >= $tokens) {
+            return;
+        }
+        $waitUs = $budget['resetAtUs'] - (int)(microtime(true) * 1_000_000);
+        if ($waitUs <= 0) {
+            return;
+        }
+        // Never sleep longer than the window the limit is expressed in;
+        // a bogus header must not park an indexing run for hours.
+        usleep(min($waitUs, 60_000_000));
+    }
+
+    /**
+     * `x-ratelimit-reset-*` is a Go-style duration: "0ms", "200ms",
+     * "1.5s", "2m3s". Returns microseconds, 0 when unparseable.
+     */
+    private function parseDurationToMicroseconds(string $duration): int
+    {
+        $duration = trim($duration);
+        if ($duration === '') {
+            return 0;
+        }
+        if (is_numeric($duration)) {
+            // Bare number: seconds, as in the OpenAI spec.
+            return (int)round((float)$duration * 1_000_000);
+        }
+        $total = 0.0;
+        if (preg_match_all('/([0-9]*\.?[0-9]+)(ms|us|s|m|h)/', $duration, $matches, PREG_SET_ORDER) === 0) {
+            return 0;
+        }
+        foreach ($matches as $match) {
+            $value = (float)$match[1];
+            $total += match ($match[2]) {
+                'us' => $value,
+                'ms' => $value * 1_000,
+                's' => $value * 1_000_000,
+                'm' => $value * 60_000_000,
+                'h' => $value * 3_600_000_000,
+            };
+        }
+        return (int)round($total);
     }
 
     /**
