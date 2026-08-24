@@ -99,7 +99,12 @@ final class IndexAuditCommand extends Command
         $perProvider = [];    // provider => count
         $totalYielded = 0;
         foreach ($this->schemaProviders as $provider) {
-            $name = (new \ReflectionClass($provider))->getShortName();
+            // Fully qualified, not the short name: two packages can ship
+            // a provider class with the SAME short name (a project
+            // package and the extension both had a WhatsnewSchemaProvider
+            // registered, which made the duplicate report read as one
+            // provider yielding twice instead of two providers colliding).
+            $name = $provider::class;
             $count = 0;
             foreach ($provider->iterateDocuments($site) as $document) {
                 $id = (string)($document['id'] ?? '');
@@ -149,7 +154,7 @@ final class IndexAuditCommand extends Command
 
         $io->writeln(sprintf('  produced by providers : %d yielded, %d distinct ids', $totalYielded, count($produced)));
         foreach ($perProvider as $name => $count) {
-            $io->writeln(sprintf('      %-34s %d', $name, $count));
+            $io->writeln(sprintf('      %-62s %d', $name, $count));
         }
         $io->writeln(sprintf('  in index              : %d', count($indexed)));
         $io->newLine();
@@ -164,7 +169,7 @@ final class IndexAuditCommand extends Command
             }
             arsort($byProducers);
             foreach ($byProducers as $combination => $count) {
-                $io->writeln(sprintf('      %-56s %d', $combination, $count));
+                $io->writeln(sprintf('      %s%s%d', $combination, PHP_EOL . '        → ', $count));
             }
             foreach (array_slice($duplicates, 0, $show, true) as $id => $producers) {
                 $io->writeln(sprintf('      %s (%d× — %s)', $id, count($producers), implode(', ', $producers)));
