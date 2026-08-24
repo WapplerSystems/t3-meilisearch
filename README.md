@@ -917,6 +917,7 @@ ddev exec vendor/bin/typo3 ws_meilisearch:index-record sys_file 99 main --remove
 ddev exec vendor/bin/typo3 ws_meilisearch:setup-index-config main         # create/repair the EXT:index Configuration row
 ddev exec vendor/bin/typo3 index:queue --limitSiteIdentifiers=main        # seed the message queue
 ddev exec vendor/bin/typo3 messenger:consume index --limit=500            # drain the queue (bridge writes to Meilisearch)
+# In production the queue needs a PERMANENT consumer — see below.
 
 # Diagnostics
 ddev exec vendor/bin/typo3 ws_meilisearch:doctor                          # health-check all sites
@@ -941,6 +942,54 @@ ddev exec vendor/bin/typo3 ws_meilisearch:run-rag-tests --show-answers     # ver
 ddev exec vendor/bin/typo3 ws_meilisearch:check-quotas                     # all sites, mail on over-threshold
 ddev exec vendor/bin/typo3 ws_meilisearch:check-quotas main --dry-run      # one site, print table, no mail
 ```
+
+### Keeping the crawl queue consumed (production)
+
+Page indexing is asynchronous: `index:queue` only *enqueues* work, and the
+bridge writes to Meilisearch when a worker consumes the message. Without a
+permanent consumer the queue silently grows and the page corpus goes stale
+without a single error anywhere — no failed task, no log entry, just an
+index that stops changing. On the LINEAR production host that went unnoticed
+for ten days and 8.675 messages.
+
+Do not schedule this with cron. Use a systemd template so a dead worker is
+replaced in seconds rather than at the next tick, and so `systemctl status`
+and journald give you a handle on it:
+
+```ini
+# /etc/systemd/system/typo3-index-worker@.service
+[Unit]
+Description=TYPO3 messenger:consume index (Worker %i)
+After=network.target mysql.service
+
+[Service]
+User=www-data
+WorkingDirectory=/var/www/example
+ExecStart=/usr/bin/php -d memory_limit=512M /var/www/example/vendor/bin/typo3 messenger:consume index --time-limit=3600 --memory-limit=400M
+Restart=always
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl enable --now typo3-index-worker@{1,2,3}
+```
+
+Three points that are easy to get wrong:
+
+* `--memory-limit` must stay **below** PHP's own `memory_limit`, otherwise the
+  worker is killed by PHP instead of exiting cleanly, and the message it was
+  working on is left unacked.
+* `--time-limit` recycles the process against memory creep; `Restart=always`
+  is what brings it back, so the two belong together.
+* Run several instances — the Doctrine transport uses
+  `SELECT … FOR UPDATE SKIP LOCKED`, so workers never take the same message.
+  Match the count to the box (three is sensible on four cores); page rendering,
+  not Meilisearch, is the bottleneck.
 
 ## What's wired
 
