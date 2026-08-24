@@ -95,8 +95,9 @@ final class IndexAuditCommand extends Command
         //    (that is the point — the id is only known afterwards) but
         //    discarded immediately; only ids and types are kept.
         $produced = [];       // id => type
-        $duplicates = [];     // id => count
+        $duplicates = [];     // id => list of producing providers
         $perProvider = [];    // provider => count
+        $totalYielded = 0;
         foreach ($this->schemaProviders as $provider) {
             $name = (new \ReflectionClass($provider))->getShortName();
             $count = 0;
@@ -106,15 +107,26 @@ final class IndexAuditCommand extends Command
                     continue;
                 }
                 if (isset($produced[$id])) {
-                    $duplicates[$id] = ($duplicates[$id] ?? 1) + 1;
+                    // Record who produced it, both times — a class name
+                    // appearing twice means the same provider yields the
+                    // id twice, two different names mean two providers
+                    // are fighting over it. That distinction is the
+                    // whole point of the report.
+                    $duplicates[$id][] = $name;
+                } else {
+                    $duplicates[$id] = [$name];
                 }
                 $produced[$id] = (string)($document['type'] ?? '?');
                 $count++;
+                $totalYielded++;
             }
-            if ($count > 0) {
-                $perProvider[$name] = $count;
-            }
+            // += rather than =: a provider class registered twice in the
+            // container is iterated twice, and overwriting would hide
+            // exactly the situation being investigated.
+            $perProvider[$name] = ($perProvider[$name] ?? 0) + $count;
         }
+        // Only ids seen more than once are interesting.
+        $duplicates = array_filter($duplicates, static fn(array $p): bool => count($p) > 1);
 
         // 2. What is in the index?
         $indexed = [];
@@ -135,7 +147,7 @@ final class IndexAuditCommand extends Command
         $phantom = array_diff_key($produced, $indexed);
         $stale = array_diff_key($indexed, $produced);
 
-        $io->writeln(sprintf('  produced by providers : %d (%d distinct)', array_sum($perProvider), count($produced)));
+        $io->writeln(sprintf('  produced by providers : %d yielded, %d distinct ids', $totalYielded, count($produced)));
         foreach ($perProvider as $name => $count) {
             $io->writeln(sprintf('      %-34s %d', $name, $count));
         }
@@ -146,8 +158,16 @@ final class IndexAuditCommand extends Command
         $this->report($io, 'STALE — in the index but no longer produced', $stale, $show, true);
         if ($duplicates !== []) {
             $io->writeln(sprintf('<comment>DUPLICATE — same id produced more than once: %d</comment>', count($duplicates)));
-            foreach (array_slice($duplicates, 0, $show, true) as $id => $times) {
-                $io->writeln(sprintf('      %s (%d×)', $id, $times));
+            $byProducers = [];
+            foreach ($duplicates as $producers) {
+                $byProducers[implode(' + ', $producers)] = ($byProducers[implode(' + ', $producers)] ?? 0) + 1;
+            }
+            arsort($byProducers);
+            foreach ($byProducers as $combination => $count) {
+                $io->writeln(sprintf('      %-56s %d', $combination, $count));
+            }
+            foreach (array_slice($duplicates, 0, $show, true) as $id => $producers) {
+                $io->writeln(sprintf('      %s (%d× — %s)', $id, count($producers), implode(', ', $producers)));
             }
             $io->newLine();
         }
@@ -182,6 +202,8 @@ final class IndexAuditCommand extends Command
         }
         if ($staleNote) {
             $io->writeln('      (a reindex never removes these — only an eviction rule or --rebuild does)');
+            $io->writeln('      NOTE: `page` documents come from the EXT:index crawl bridge, not from a');
+            $io->writeln('      schema provider, so they always appear here. Not a defect.');
         }
         $io->newLine();
     }
