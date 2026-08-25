@@ -138,13 +138,38 @@ final class ContainerChildrenListener implements LoggerAwareInterface
         return $this->childrenByParent[$parentUid] ?? [];
     }
 
+    /**
+     * The parent container's uid.
+     *
+     * `Record::get()` resolves relations, so for a child element this hands
+     * back the parent as a Record object rather than its uid — and casting an
+     * object to int yields 1, silently, for every child on the page. Every
+     * child then landed under parent uid 1, the lookup for the real container
+     * found nothing, and the whole feature was a no-op that logged nothing.
+     * On the LINEAR site that hid ~270k characters across 102 pages; the home
+     * page reached the index with 49 of its 6053 characters.
+     *
+     * Unwrap the relation instead of casting it, and keep the scalar path for
+     * records where the field was never resolved.
+     */
     private function containerParent(Record $record): int
     {
         try {
-            return (int)$record->get('tx_container_parent');
+            $value = $record->get('tx_container_parent');
         } catch (\Throwable) {
             return 0;
         }
+        if ($value instanceof Record) {
+            return (int)$value->getUid();
+        }
+        if (is_array($value)) {
+            $first = reset($value);
+            if ($first instanceof Record) {
+                return (int)$first->getUid();
+            }
+            return is_scalar($first) ? (int)$first : 0;
+        }
+        return is_scalar($value) ? (int)$value : 0;
     }
 
     private function recordUid(Record $record): int
