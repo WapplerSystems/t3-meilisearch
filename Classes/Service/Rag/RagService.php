@@ -68,6 +68,64 @@ final class RagService implements LoggerAwareInterface
      * @return array<string,mixed>
      */
     /**
+     * The exact context retrieval the answer path uses: search, then the
+     * relaxation fallbacks when nothing came back.
+     *
+     * Split out so a retrieval check can exercise the same code instead of
+     * an approximation of it. A harness that reimplements retrieval measures
+     * the harness, not the product.
+     *
+     * @param array<string,mixed> $searchOptions
+     * @return list<array<string,mixed>>
+     */
+    private function searchForContext(Site $site, string $query, array $searchOptions, int $maxHits): array
+    {
+        $searchResult = $this->searchService->search($site, $query, $searchOptions);
+        $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        if ($hits === []) {
+            $hits = $this->retrieveWithFallbacks($site, $query, $searchOptions, $maxHits);
+        }
+        return $hits;
+    }
+
+    /**
+     * Run only the retrieval half of the pipeline and return the hits that
+     * would have been fed to the LLM. No provider call, no answer, no cost.
+     *
+     * This exists because everything about RAG quality was measured through
+     * the finished answer — a metric that needs an LLM call per test and
+     * still swings by 0.10 between runs. Whether the right document even
+     * reached the context is a yes/no question with zero variance, and it
+     * is the first thing to check when an answer is wrong.
+     *
+     * The conversational rewrite is deliberately skipped: it is a no-op for
+     * a single-shot question (QueryRewriter returns early on an empty
+     * conversation), and skipping it keeps this method free of LLM calls.
+     *
+     * @param array<string,mixed> $options
+     * @return list<array<string,mixed>>
+     */
+    public function retrieveOnly(Site $site, string $question, array $options = []): array
+    {
+        $question = trim($question);
+        if ($question === '') {
+            return [];
+        }
+        $settings = $site->getSettings();
+        $maxHits = max(1, (int)$settings->get('meilisearch.rag.maxContextHits', 5));
+        $useHybrid = (bool)$settings->get('meilisearch.rag.useHybrid', true)
+            && trim((string)$settings->get('meilisearch.embedder.source', '')) !== '';
+
+        $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
+            $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
+            $options,
+        ));
+        $this->eventDispatcher->dispatch($event);
+
+        return $this->searchForContext($site, $event->question, $event->options, $maxHits);
+    }
+
+    /**
      * Pick the LLM options a caller may override. Deliberately a whitelist:
      * an arbitrary $options array must not be able to swap the model or the
      * API key of a site.
@@ -154,11 +212,7 @@ final class RagService implements LoggerAwareInterface
         // prompt below and the analytics, so nothing user-visible changes.
         $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
 
-        $searchResult = $this->searchService->search($site, $retrievalQuestion, $event->options);
-        $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
-        if ($hits === []) {
-            $hits = $this->retrieveWithFallbacks($site, $retrievalQuestion, $event->options, $maxHits);
-        }
+        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
@@ -285,15 +339,9 @@ final class RagService implements LoggerAwareInterface
         // drive the reply.
         $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
 
-        $searchResult = $this->searchService->search($site, $retrievalQuestion, $event->options);
-        $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
-        if ($hits === []) {
-            // Reuse the same retrieval-fallback ladder ask() uses
-            // (frequency → last → drop-leading-verb-token) so the
-            // streaming RAG path doesn't degrade differently than
-            // non-streaming on identical questions.
-            $hits = $this->retrieveWithFallbacks($site, $retrievalQuestion, $event->options, $maxHits);
-        }
+        // Same retrieval as ask() — including the fallback ladder — so the
+        // streaming path cannot degrade differently on identical questions.
+        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits);
         if ($hits === []) {
             yield RagStreamChunk::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(

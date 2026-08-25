@@ -76,6 +76,12 @@ CREATE TABLE tx_wsmeilisearch_ragtest (
     -- Which site to run the test against. Empty = first site that has
     -- a RAG provider configured.
     site_identifier       VARCHAR(64) DEFAULT '' NOT NULL,
+    -- Document ids that MUST appear in the retrieved context for this
+    -- question, comma-separated (e.g. "help-3684"). Checked by
+    -- ws_meilisearch:retrieval-check without calling an LLM: whether the
+    -- right source reached the context is a yes/no question, unlike the
+    -- similarity score of the finished answer. Empty = not checked.
+    expected_doc_ids      VARCHAR(255) DEFAULT '' NOT NULL,
     -- Persisted state of the last run — read by the BE List module so
     -- editors can see pass / fail at a glance without re-running.
     last_run_at           INT(11) UNSIGNED DEFAULT 0 NOT NULL,

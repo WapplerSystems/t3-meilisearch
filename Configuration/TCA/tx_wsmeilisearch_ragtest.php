@@ -30,7 +30,7 @@ return [
             'showitem' =>
                 'title, question, expected_answer,'
                 . ' --div--;LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:ragtest.tab.config,'
-                . ' site_identifier, similarity_threshold,'
+                . ' site_identifier, similarity_threshold, expected_doc_ids,'
                 . ' --div--;LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:ragtest.tab.lastrun,'
                 . ' --palette--;;lastrun,'
                 . ' --div--;LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_core.xlf:tabs.access,'
@@ -85,6 +85,16 @@ return [
                 'type' => 'input',
                 'size' => 30,
                 'placeholder' => 'main',
+            ],
+        ],
+        'expected_doc_ids' => [
+            'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:ragtest.expected_doc_ids',
+            'description' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:ragtest.expected_doc_ids.description',
+            'config' => [
+                'type' => 'input',
+                'size' => 40,
+                'max' => 255,
+                'eval' => 'trim',
             ],
         ],
         'last_status' => [

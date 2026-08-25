@@ -87,6 +87,12 @@
             <trans-unit id="tca.boost.veryHigh">
                 <source>Very high (2×)</source>
             </trans-unit>
-        </body>
+              <trans-unit id="ragtest.expected_doc_ids">
+        <source>Expected documents in context</source>
+      </trans-unit>
+      <trans-unit id="ragtest.expected_doc_ids.description">
+        <source>Comma-separated document ids that must appear in the retrieved context for this question, e.g. "help-3684". Checked by ws_meilisearch:retrieval-check without an LLM call. Leave empty to skip the retrieval check for this test.</source>
+      </trans-unit>
+    </body>
     </file>
 </xliff>
