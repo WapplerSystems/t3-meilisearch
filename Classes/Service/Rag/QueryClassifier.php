@@ -64,6 +64,10 @@ PROMPT;
         if (!(bool)$settings->get('meilisearch.rag.clarify.enabled', false)) {
             return Clarification::answerable();
         }
+        if (!$this->productAmbiguityPresent($settings, $question, $hits)) {
+            // Nothing to disambiguate — don't even spend an LLM call on it.
+            return Clarification::answerable();
+        }
         // Never ask for clarification twice in a row: the user's reply to a
         // clarifying question is by definition the answer to it.
         if ($conversation->lastTurnIsClarification()) {
@@ -161,5 +165,61 @@ PROMPT;
             return Clarification::answerable();
         }
         return Clarification::needed($question);
+    }
+
+    /**
+     * Deterministic gate in front of the LLM triage: only questions that are
+     * ambiguous *about the product* may be clarified at all.
+     *
+     * The triage prompt alone could not carry this. Told to weigh whether an
+     * answer "would materially differ", the model still invented a conflict
+     * out of the brand name itself — asking whether "LINEAR" meant the
+     * software or a specific product for a licence question the pipeline
+     * answers perfectly well (0.768 with the classifier switched off).
+     *
+     * So the decision is made from data instead of judgement:
+     *
+     *   - the user already named a product  → answerable, they were specific
+     *   - the retrieved titles mention fewer than two products → answerable,
+     *     there is nothing to choose between
+     *   - otherwise → let the LLM decide, as before
+     *
+     * Terms come from `meilisearch.rag.clarify.productTerms`. An empty list
+     * leaves the gate open, so existing installations keep their behaviour.
+     *
+     * @param list<array<string,mixed>> $hits
+     */
+    private function productAmbiguityPresent(object $settings, string $question, array $hits): bool
+    {
+        $terms = $settings->get('meilisearch.rag.clarify.productTerms', []);
+        if (!is_array($terms) || $terms === []) {
+            return true;
+        }
+        $terms = array_values(array_filter(array_map(
+            static fn ($t): string => mb_strtolower(trim((string)$t)),
+            $terms,
+        ), static fn (string $t): bool => $t !== ''));
+        if ($terms === []) {
+            return true;
+        }
+
+        $askedFor = mb_strtolower($question);
+        foreach ($terms as $term) {
+            if (str_contains($askedFor, $term)) {
+                return false;
+            }
+        }
+
+        $haystack = '';
+        foreach ($hits as $hit) {
+            $haystack .= ' ' . mb_strtolower((string)($hit['title'] ?? ''));
+        }
+        $found = [];
+        foreach ($terms as $term) {
+            if (str_contains($haystack, $term)) {
+                $found[$term] = true;
+            }
+        }
+        return count($found) >= 2;
     }
 }
