@@ -91,7 +91,7 @@
         <source>Expected documents in context</source>
       </trans-unit>
       <trans-unit id="ragtest.expected_doc_ids.description">
-        <source>Comma-separated document ids that must appear in the retrieved context for this question, e.g. "help-3684". Checked by ws_meilisearch:retrieval-check without an LLM call. Leave empty to skip the retrieval check for this test.</source>
+        <source>Document ids that must appear in the retrieved context for this question. Comma = all required, pipe = any one is enough (e.g. "help-761, help-780|help-132"). The pipe form matters because the same topic exists once per product and per medium. Checked by ws_meilisearch:retrieval-check without an LLM call. Leave empty to skip the retrieval check for this test.</source>
       </trans-unit>
     </body>
     </file>

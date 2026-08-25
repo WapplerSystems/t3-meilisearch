@@ -87,18 +87,28 @@ final class RetrievalCheckCommand extends Command
                 $io->error('No site for test #' . $test['uid']);
                 return Command::FAILURE;
             }
-            $expected = $this->splitIds($test['expected_doc_ids']);
+            $groups = $this->parseExpectations($test['expected_doc_ids']);
+            $expected = array_merge(...$groups ?: [[]]);
             $hits = $this->ragService->retrieveOnly($site, $test['question']);
             $ids = array_map(static fn (array $h): string => (string)($h['id'] ?? ''), $hits);
 
             $found = [];
             $missing = [];
-            foreach ($expected as $id) {
-                $rank = array_search($id, $ids, true);
-                if ($rank === false) {
-                    $missing[] = $id;
+            foreach ($groups as $alternatives) {
+                $hitId = null;
+                $rank = null;
+                foreach ($alternatives as $candidate) {
+                    $position = array_search($candidate, $ids, true);
+                    if ($position !== false) {
+                        $hitId = $candidate;
+                        $rank = $position + 1;
+                        break;
+                    }
+                }
+                if ($hitId === null) {
+                    $missing[] = implode('|', $alternatives);
                 } else {
-                    $found[] = $id . ' (#' . ($rank + 1) . ')';
+                    $found[] = $hitId . ' (#' . $rank . ')';
                 }
             }
             if ($missing !== []) {
@@ -144,11 +154,35 @@ final class RetrievalCheckCommand extends Command
     }
 
     /**
-     * @return list<string>
+     * Parse the expectation string into requirement groups.
+     *
+     * Comma separates requirements that must ALL be satisfied; a pipe inside
+     * one requirement means any of those documents satisfies it. The corpus
+     * makes this necessary rather than clever: the same topic exists once per
+     * product ("…_AC_hz.html" next to "…_hz.html") and once per medium, so a
+     * general question like "how do I calculate a pipe network" is answered
+     * correctly by any of several overview topics. Pinning one id would fail
+     * the check for an answer that is perfectly good.
+     *
+     *   "help-761"                     → help-761 must be retrieved
+     *   "help-780|help-132"            → either one is fine
+     *   "help-761, help-780|help-132"  → both requirements must hold
+     *
+     * @return list<list<string>>
      */
-    private function splitIds(string $raw): array
+    private function parseExpectations(string $raw): array
     {
-        return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $s): bool => $s !== ''));
+        $groups = [];
+        foreach (explode(',', $raw) as $chunk) {
+            $alternatives = array_values(array_filter(
+                array_map('trim', explode('|', $chunk)),
+                static fn (string $s): bool => $s !== '',
+            ));
+            if ($alternatives !== []) {
+                $groups[] = $alternatives;
+            }
+        }
+        return $groups;
     }
 
     /**
