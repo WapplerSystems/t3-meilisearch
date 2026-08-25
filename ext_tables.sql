@@ -82,6 +82,16 @@ CREATE TABLE tx_wsmeilisearch_ragtest (
     -- right source reached the context is a yes/no question, unlike the
     -- similarity score of the finished answer. Empty = not checked.
     expected_doc_ids      VARCHAR(255) DEFAULT '' NOT NULL,
+    -- How much of the retrieved context must come from the right subject
+    -- area, as "<min>:<pattern>" (comma-separated for several rules). The
+    -- pattern is matched case-insensitively against a document's id, title
+    -- and helpSourcePath, so a DITA chapter code works as well as a word:
+    --   "4:daVo"        at least 4 hits from the "Datenumgebung" chapter
+    --   "3:schema"      at least 3 hits mentioning schema
+    -- A single expected document can sit at rank 1 while the other four
+    -- slots are filled with unrelated tool topics — that is a weak context
+    -- and expected_doc_ids alone cannot see it. Empty = not checked.
+    context_requirement   VARCHAR(255) DEFAULT '' NOT NULL,
     -- Persisted state of the last run — read by the BE List module so
     -- editors can see pass / fail at a glance without re-running.
     last_run_at           INT(11) UNSIGNED DEFAULT 0 NOT NULL,

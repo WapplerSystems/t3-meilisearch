@@ -93,6 +93,12 @@
       <trans-unit id="ragtest.expected_doc_ids.description">
         <source>Document ids that must appear in the retrieved context for this question. Comma = all required, pipe = any one is enough (e.g. "help-761, help-780|help-132"). The pipe form matters because the same topic exists once per product and per medium. Checked by ws_meilisearch:retrieval-check without an LLM call. Leave empty to skip the retrieval check for this test.</source>
       </trans-unit>
+      <trans-unit id="ragtest.context_requirement">
+        <source>Required context coverage</source>
+      </trans-unit>
+      <trans-unit id="ragtest.context_requirement.description">
+        <source>How much of the retrieved context must come from the right subject area, as "&lt;min&gt;:&lt;pattern&gt;", comma-separated for several rules (e.g. "4:daVo" or "3:schema"). The pattern is matched case-insensitively against a document\'s id, title and helpSourcePath, so a DITA chapter code works as well as a word. Catches a context where the one expected document ranks first but the remaining slots are filled with unrelated topics. Leave empty to skip.</source>
+      </trans-unit>
     </body>
     </file>
 </xliff>

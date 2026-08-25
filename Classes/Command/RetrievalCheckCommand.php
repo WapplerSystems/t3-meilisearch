@@ -111,23 +111,26 @@ final class RetrievalCheckCommand extends Command
                     $found[] = $hitId . ' (#' . $rank . ')';
                 }
             }
-            if ($missing !== []) {
+            $coverage = $this->checkCoverage($test['context_requirement'], $hits);
+            $failed = $missing !== [] || $coverage['failed'] !== [];
+            if ($failed) {
                 $misses++;
             }
             $rows[] = [
                 $test['uid'],
-                mb_substr($test['title'], 0, 34),
-                $missing === [] ? '<fg=green>HIT</>' : '<fg=red>MISS</>',
+                mb_substr($test['title'], 0, 30),
+                $failed ? '<fg=red>MISS</>' : '<fg=green>HIT</>',
                 implode(', ', $found) ?: '—',
                 implode(', ', $missing) ?: '—',
+                $coverage['label'],
             ];
-            if ($missing !== [] && $output->isVerbose()) {
+            if ($failed && $output->isVerbose()) {
                 $io->writeln('  <comment>#' . $test['uid'] . '</comment> retrieved instead:');
                 $this->printHits($io, $hits, $show, $expected);
             }
         }
 
-        $io->table(['uid', 'title', 'result', 'found (rank)', 'missing'], $rows);
+        $io->table(['uid', 'title', 'result', 'found (rank)', 'missing', 'coverage'], $rows);
         $io->writeln(sprintf(
             '<info>Summary:</info> %d of %d questions retrieved every expected document.',
             count($rows) - $misses,
@@ -151,6 +154,60 @@ final class RetrievalCheckCommand extends Command
             $mark = in_array($id, $expected, true) ? '<fg=green>*</>' : ' ';
             $io->writeln(sprintf('    %s #%d %-14s %s', $mark, $i + 1, $id, mb_substr((string)($hit['title'] ?? ''), 0, 60)));
         }
+    }
+
+    /**
+     * Evaluate the "<min>:<pattern>" coverage rules against the retrieved
+     * documents.
+     *
+     * expected_doc_ids answers "did the right document arrive". This answers
+     * "was the rest of the context about the same thing" — a distinction with
+     * teeth: improving a query moved the expected document of one regression
+     * test from rank 3 to rank 1 while the answer got *worse*, because the
+     * other four slots had filled up with editor tool topics. Rank alone
+     * could not see that; this can.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return array{failed:list<string>,label:string}
+     */
+    private function checkCoverage(string $requirement, array $hits): array
+    {
+        $requirement = trim($requirement);
+        if ($requirement === '') {
+            return ['failed' => [], 'label' => '—'];
+        }
+        $haystacks = array_map(
+            static fn (array $h): string => mb_strtolower(
+                (string)($h['id'] ?? '') . ' ' . (string)($h['title'] ?? '') . ' ' . (string)($h['helpSourcePath'] ?? ''),
+            ),
+            $hits,
+        );
+
+        $failed = [];
+        $labels = [];
+        foreach (explode(',', $requirement) as $rule) {
+            $rule = trim($rule);
+            if ($rule === '' || !str_contains($rule, ':')) {
+                continue;
+            }
+            [$minRaw, $pattern] = explode(':', $rule, 2);
+            $min = max(1, (int)trim($minRaw));
+            $pattern = mb_strtolower(trim($pattern));
+            if ($pattern === '') {
+                continue;
+            }
+            $matches = 0;
+            foreach ($haystacks as $haystack) {
+                if (str_contains($haystack, $pattern)) {
+                    $matches++;
+                }
+            }
+            $labels[] = sprintf('%s %d/%d', $pattern, $matches, $min);
+            if ($matches < $min) {
+                $failed[] = $rule;
+            }
+        }
+        return ['failed' => $failed, 'label' => implode(', ', $labels) ?: '—'];
     }
 
     /**
@@ -186,17 +243,20 @@ final class RetrievalCheckCommand extends Command
     }
 
     /**
-     * @return list<array{uid:int,title:string,question:string,expected_doc_ids:string,site_identifier:string}>
+     * @return list<array{uid:int,title:string,question:string,expected_doc_ids:string,context_requirement:string,site_identifier:string}>
      */
     private function fetchTests(): array
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_ragtest');
-        $rows = $qb->select('uid', 'title', 'question', 'expected_doc_ids', 'site_identifier')
+        $rows = $qb->select('uid', 'title', 'question', 'expected_doc_ids', 'context_requirement', 'site_identifier')
             ->from('tx_wsmeilisearch_ragtest')
             ->where(
                 $qb->expr()->eq('deleted', $qb->createNamedParameter(0, ParameterType::INTEGER)),
                 $qb->expr()->eq('hidden', $qb->createNamedParameter(0, ParameterType::INTEGER)),
-                $qb->expr()->neq('expected_doc_ids', $qb->createNamedParameter('')),
+                $qb->expr()->or(
+                    $qb->expr()->neq('expected_doc_ids', $qb->createNamedParameter('')),
+                    $qb->expr()->neq('context_requirement', $qb->createNamedParameter('')),
+                ),
             )
             ->orderBy('uid', 'ASC')
             ->executeQuery()
@@ -207,6 +267,7 @@ final class RetrievalCheckCommand extends Command
             'title' => (string)$r['title'],
             'question' => (string)$r['question'],
             'expected_doc_ids' => (string)$r['expected_doc_ids'],
+            'context_requirement' => (string)$r['context_requirement'],
             'site_identifier' => (string)$r['site_identifier'],
         ], $rows);
     }
