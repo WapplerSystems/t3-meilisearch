@@ -67,7 +67,30 @@ final class RagService implements LoggerAwareInterface
      *
      * @return array<string,mixed>
      */
-    private function buildLlmOptions(object $settings): array
+    /**
+     * Pick the LLM options a caller may override. Deliberately a whitelist:
+     * an arbitrary $options array must not be able to swap the model or the
+     * API key of a site.
+     *
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function llmOverridesFrom(array $options): array
+    {
+        $overrides = [];
+        if (array_key_exists('temperature', $options)) {
+            $overrides['temperature'] = (float)$options['temperature'];
+        }
+        return $overrides;
+    }
+
+    /**
+     * @param array<string,mixed> $overrides caller-supplied LLM options that
+     *     win over the site settings. Currently used by the regression test
+     *     runner to force temperature 0 — see RagTestRunner for why a
+     *     sampled answer cannot be compared against a fixed threshold.
+     */
+    private function buildLlmOptions(object $settings, array $overrides = []): array
     {
         $llmOptions = [
             'model' => (string)$settings->get('meilisearch.rag.model', ''),
@@ -83,6 +106,11 @@ final class RagService implements LoggerAwareInterface
         if ($maxTokens > 0) {
             $llmOptions['maxTokens'] = $maxTokens;
         }
+        // Caller overrides win over the site settings.
+        foreach ($overrides as $key => $value) {
+            $llmOptions[$key] = $value;
+        }
+
         return $llmOptions;
     }
 
@@ -119,7 +147,7 @@ final class RagService implements LoggerAwareInterface
         ));
         $this->eventDispatcher->dispatch($event);
 
-        $llmOptions = $this->buildLlmOptions($settings);
+        $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         // Fold conversation history into the *retrieval* query so a follow-up
         // ("und der Preis?") searches for the right subject. Retrieval only —
         // $event->question (the user's actual wording) still drives the answer
@@ -251,7 +279,7 @@ final class RagService implements LoggerAwareInterface
         ));
         $this->eventDispatcher->dispatch($event);
 
-        $llmOptions = $this->buildLlmOptions($settings);
+        $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         // Conversational rewrite for retrieval only (see ask()); the streamed
         // answer still uses $event->question so the user's wording + history
         // drive the reply.

@@ -17,6 +17,14 @@ final readonly class RagTestResult
     public const FAIL = 'fail';
     public const ERROR = 'error';
 
+    /**
+     * The pipeline asked a clarifying question instead of answering. Not a
+     * failure of the system and not an error either — there simply is no
+     * answer to score. Counting it as ERROR made a deliberate behaviour
+     * change look like a malfunction and hid which tests were affected.
+     */
+    public const CLARIFY = 'clarify';
+
     public function __construct(
         public string $status,
         public ?float $score = null,
@@ -37,5 +45,10 @@ final readonly class RagTestResult
     public static function error(string $message, string $actualAnswer = ''): self
     {
         return new self(self::ERROR, null, $actualAnswer, $message);
+    }
+
+    public static function clarify(string $clarifyingQuestion): self
+    {
+        return new self(self::CLARIFY, null, $clarifyingQuestion, 'assistant asked a clarifying question');
     }
 }

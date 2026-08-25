@@ -119,9 +119,24 @@ final class RagTestRunner
         // the service directly with a single-shot question — we want
         // each test deterministic, no carry-over between rows.
         try {
-            $answer = $this->ragService->ask($site, $question);
+            // temperature 0: the score is a cosine similarity against a
+            // fixed expected answer, so a sampled answer turns the whole
+            // suite into a coin flip. Measured on the June history of these
+            // ten tests at the production default of 0.2, the same question
+            // with unchanged code scored anywhere from 0.227 to 0.927 —
+            // a spread far wider than any regression it is meant to catch.
+            // Production keeps its own temperature; only the harness is
+            // pinned.
+            $answer = $this->ragService->ask($site, $question, ['temperature' => 0.0]);
         } catch (\Throwable $e) {
             return RagTestResult::error('RAG ask failed: ' . $e->getMessage());
+        }
+        // A clarifying question is a defined outcome, not a breakdown:
+        // report it as such so the summary keeps error counts meaningful.
+        if ($answer->status === 'clarify') {
+            // RagAnswer carries the clarifying question in `answer`; there
+            // is no separate property for it.
+            return RagTestResult::clarify(trim((string)$answer->answer));
         }
         // RagAnswer uses literal status strings (no constants): 'ok',
         // 'failed', 'disabled', 'no_context'. Only 'ok' carries an

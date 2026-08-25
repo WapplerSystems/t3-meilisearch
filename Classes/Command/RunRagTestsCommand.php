@@ -68,6 +68,7 @@ final class RunRagTestsCommand extends Command
         $passes = 0;
         $fails = 0;
         $errors = 0;
+        $clarifies = 0;
         $rows = [];
         foreach ($results as $entry) {
             /** @var RagTestResult $r */
@@ -75,10 +76,12 @@ final class RunRagTestsCommand extends Command
             $statusLabel = match ($r->status) {
                 RagTestResult::PASS => '<fg=green>PASS</>',
                 RagTestResult::FAIL => '<fg=red>FAIL</>',
+                RagTestResult::CLARIFY => '<fg=cyan>CLARIFY</>',
                 default             => '<fg=yellow>ERROR</>',
             };
             $passes += $r->status === RagTestResult::PASS ? 1 : 0;
             $fails += $r->status === RagTestResult::FAIL ? 1 : 0;
+            $clarifies += $r->status === RagTestResult::CLARIFY ? 1 : 0;
             $errors += $r->status === RagTestResult::ERROR ? 1 : 0;
 
             $rows[] = [
@@ -95,12 +98,23 @@ final class RunRagTestsCommand extends Command
         $io->table(['uid', 'title', 'status', 'score', 'error'], $rows);
 
         $io->writeln(sprintf(
-            '<info>Summary:</info> %d passed, <error>%d failed</error>, <comment>%d errored</comment> (of %d tests)',
+            '<info>Summary:</info> %d passed, <error>%d failed</error>, <fg=cyan>%d clarified</>, <comment>%d errored</comment> (of %d tests)',
             $passes,
             $fails,
+            $clarifies,
             $errors,
             count($results),
         ));
+        if ($clarifies > 0) {
+            // Worth calling out: a clarified test produced no answer, so it
+            // silently drops out of the pass/fail picture. Four of these at
+            // once is how a too-eager clarifier hides behind a green-ish
+            // summary.
+            $io->note(sprintf(
+                '%d test(s) got a clarifying question instead of an answer — those are unscored, not passed.',
+                $clarifies,
+            ));
+        }
 
         if ($fails > 0) {
             return Command::FAILURE;
