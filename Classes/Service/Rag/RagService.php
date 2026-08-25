@@ -98,9 +98,12 @@ final class RagService implements LoggerAwareInterface
      * reached the context is a yes/no question with zero variance, and it
      * is the first thing to check when an answer is wrong.
      *
-     * The conversational rewrite is deliberately skipped: it is a no-op for
-     * a single-shot question (QueryRewriter returns early on an empty
-     * conversation), and skipping it keeps this method free of LLM calls.
+     * The query rewrite IS applied. It used to be skippable here because it
+     * did nothing on a first turn, but it now condenses the question into a
+     * keyword query — which is the single biggest influence on what gets
+     * retrieved. Leaving it out would measure a pipeline nobody runs. That
+     * costs one short completion per check; the answer call, which is the
+     * expensive part, is still avoided.
      *
      * @param array<string,mixed> $options
      * @return list<array<string,mixed>>
@@ -122,7 +125,20 @@ final class RagService implements LoggerAwareInterface
         ));
         $this->eventDispatcher->dispatch($event);
 
-        return $this->searchForContext($site, $event->question, $event->options, $maxHits);
+        $query = $event->question;
+        $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
+        $provider = $providerName !== '' ? $this->providerRegistry->get($providerName) : null;
+        if ($provider !== null) {
+            $query = $this->queryRewriter->rewrite(
+                $provider,
+                $settings,
+                Conversation::empty(),
+                $event->question,
+                $this->buildLlmOptions($settings),
+            );
+        }
+
+        return $this->searchForContext($site, $query, $event->options, $maxHits);
     }
 
     /**

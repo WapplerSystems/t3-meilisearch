@@ -18,13 +18,32 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
  * self-contained search query. It is used for retrieval ONLY; the answer
  * prompt still receives the user's original wording plus the full history.
  *
- * Degrades to the original question on any failure, when disabled via
- * setting, or on the first turn (no history) — so it can never block or
- * delay a first answer, and a flaky rewrite never breaks retrieval.
+ * On the FIRST turn there is no history to fold in, but the question still
+ * needs work: a natural-language question makes a poor keyword query. The
+ * stop-word filter alone does not get there — measured against the LINEAR
+ * help corpus, "Wie gebe ich eine nicht mehr benötigte LINEAR Lizenz wieder
+ * frei?" strips to "gebe benötigte LINEAR Lizenz frei" and retrieves
+ * NOTHING, after which the fallback ladder serves unrelated topics. The
+ * same question as "Lizenz freigeben" puts the correct document at rank 1.
+ * Reaching that form means turning "gebe … wieder frei" into the infinitive
+ * "freigeben" — German lemmatisation, which no word list does reliably, so
+ * the model does it.
+ *
+ * Degrades to the original question on any failure or when disabled via
+ * setting — so a flaky rewrite never breaks retrieval.
  */
 final class QueryRewriter implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
+
+    /**
+     * First turn: there is nothing to resolve, only to condense. Asking for
+     * "topic noun + action verb in the infinitive" is not stylistic — it is
+     * the shape that was measured to work: three of four regression
+     * questions land their expected document at rank 1 in that form and
+     * miss entirely as a full sentence.
+     */
+    private const KEYWORD_PROMPT = 'You turn a question into a short search query for a document search engine. Keep the topic noun and the action, with the verb in the infinitive: "Wie gebe ich eine Lizenz wieder frei?" becomes "Lizenz freigeben". Drop question words, articles, pronouns and filler. Keep domain and product terms verbatim, but drop a product name when it is not part of what is being asked about. Two to four words is usually right. Output ONLY the query text — no quotes, no labels, no explanation — in the same language as the question.';
 
     private const SYSTEM_PROMPT = 'You rewrite the user\'s latest message into a single, self-contained search query for a document search engine. Use the conversation so far only to resolve pronouns, ellipsis and the implicit subject. Keep the user\'s domain/product terms verbatim. Output ONLY the query text — no quotes, no labels, no explanation — in the same language as the latest message. If the latest message is already self-contained, output it unchanged.';
 
@@ -41,11 +60,19 @@ final class QueryRewriter implements LoggerAwareInterface
         string $question,
         array $baseLlmOptions,
     ): string {
-        if ($conversation->isEmpty()) {
-            return $question;
-        }
         if (!(bool)$settings->get('meilisearch.rag.conversationalRewrite', true)) {
             return $question;
+        }
+
+        if ($conversation->isEmpty()) {
+            if (!(bool)$settings->get('meilisearch.rag.keywordRewrite', true)) {
+                return $question;
+            }
+            $messages = [
+                ['role' => 'system', 'content' => self::KEYWORD_PROMPT],
+                ['role' => 'user', 'content' => $question . "\n\nSearch query:"],
+            ];
+            return $this->callProvider($provider, $messages, $baseLlmOptions, $question);
         }
 
         $historyTurns = max(1, (int)$settings->get('meilisearch.rag.rewriteHistoryTurns', 3));
@@ -61,6 +88,23 @@ final class QueryRewriter implements LoggerAwareInterface
         // Short + deterministic: our temperature/maxTokens win over the
         // RAG answer settings; the provider connection bits (model, apiKey,
         // url, timeout) come from the caller's options.
+        return $this->callProvider($provider, $messages, $baseLlmOptions, $question);
+    }
+
+    /**
+     * One short, deterministic completion, with the original question as the
+     * safety net. Shared by both rewrite modes so a failure degrades the same
+     * way in each: retrieval continues with what the user actually typed.
+     *
+     * @param list<array{role:string,content:string}> $messages
+     * @param array<string,mixed> $baseLlmOptions
+     */
+    private function callProvider(
+        LlmProviderInterface $provider,
+        array $messages,
+        array $baseLlmOptions,
+        string $question,
+    ): string {
         $options = ['temperature' => 0.0, 'maxTokens' => 64] + $baseLlmOptions;
 
         try {
