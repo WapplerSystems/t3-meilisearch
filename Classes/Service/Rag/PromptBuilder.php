@@ -16,7 +16,21 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  */
 final class PromptBuilder
 {
-    private const FIELDS_PREFERRED = ['bodytext', 'description', 'abstract', 'teaser'];
+    /**
+     * Which field carries the text the LLM should ground its answer in,
+     * best first.
+     *
+     * `content` was missing here, and knowledge-resource documents have
+     * neither `bodytext` nor `description` — so every help topic reached the
+     * model as its `abstract` alone, the one-sentence DITA shortdesc. The
+     * documentation itself was indexed, searchable and correctly ranked, and
+     * never shown to the model. Answers came back as paraphrases of the
+     * intro sentence ("umfasst Informationen zum entsprechenden Workflow")
+     * and looked like the sources were empty; they were not, they were never
+     * passed. `abstract` stays as the fallback for records that carry only a
+     * summary.
+     */
+    private const FIELDS_PREFERRED = ['bodytext', 'content', 'description', 'abstract', 'teaser'];
 
     /**
      * Map of ISO-639-1 language codes to English language names. Used to
