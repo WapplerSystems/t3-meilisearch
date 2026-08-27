@@ -613,9 +613,16 @@ final class DocumentBatchWriter implements LoggerAwareInterface
         if ($this->engine === null) {
             return;
         }
-        foreach ($documents as $document) {
-            $this->engine->saveDocument($this->writeIndex, $document);
-        }
+        // One request for the whole batch instead of one per document.
+        // saveDocument() would marshall and POST each document on its own, and
+        // Meilisearch turns every POST into a task it processes serially at
+        // roughly half a second — which capped the EXT:index crawl at ~1,4
+        // documents/second regardless of how many worker processes ran.
+        // bulk() marshalls through the same adapter code path (so field
+        // transformations stay identical) but sends one addDocuments() call per
+        // chunk. bulkSize is the batch we already assembled, so it stays one
+        // request; the max() guards against SEAL's chunker being handed 0.
+        $this->engine->bulk($this->writeIndex, $documents, [], max(1, count($documents)));
     }
 
     private function resolveBatchSize(): int

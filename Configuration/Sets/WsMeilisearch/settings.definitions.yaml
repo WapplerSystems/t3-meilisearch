@@ -327,6 +327,12 @@ settings:
     type: int
     default: 0
 
+  meilisearch.indexing.crawlBatchSize:
+    label: 'Crawl: documents buffered per Meilisearch write'
+    description: 'How many documents the EXT:index crawl buffers before writing them to Meilisearch as one batch. Default 1 (one write per document). Meilisearch processes its task queue serially at roughly 0.5 s per task, so at 1 a crawl tops out near 1.4 documents/second no matter how many worker processes run — measured 1.78/s with three workers. Raising this to 100 turns a multi-hour bulk reindex into minutes. The trade-off: batching moves the write AFTER the Messenger acknowledgement, so a worker killed mid-batch loses up to this many documents together with their queue entries, and the only symptom is a page silently keeping its old indexed state. Ignored (forced to 1) while a userProvided embedder computes vectors in PHP, because there a failed embedding must fail its own message.'
+    type: int
+    default: 1
+
   meilisearch.indexing.stripWebsiteTitle:
     label: 'Strip the website title from indexed page titles'
     description: 'EXT:index appends " | <websiteTitle>" to every page title it hands over (same for its News/Address content types). In the index that suffix is noise — it is identical on every hit and it bleeds into the embedder documentTemplate. When true (default) the suffix is removed again at index time, per-language website titles included. Set to false to keep the titles exactly as EXT:index built them.'

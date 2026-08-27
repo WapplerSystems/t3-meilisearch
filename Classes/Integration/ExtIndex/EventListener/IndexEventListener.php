@@ -9,6 +9,8 @@ use Lochmueller\Index\Event\IndexPageEvent;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Symfony\Component\Messenger\Event\WorkerRunningEvent;
+use Symfony\Component\Messenger\Event\WorkerStoppedEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
@@ -36,10 +38,30 @@ use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
  *   pages-<uid>             for pages (uid = pageUid)
  *   sys_file-<uid>          for files where we can resolve sys_file.uid,
  *                            else sys_file-h<crc> as a stable fallback.
+ *
+ * Batching: EXT:index delivers one page per Messenger message, so the naive
+ * mapping is one Meilisearch write per document — and Meilisearch processes its
+ * task queue serially at roughly half a second per task. Measured on a 27.000-page
+ * crawl that ceiling sits near 1,4 documents/second and does not move with more
+ * worker processes (three workers: 1,78/s, i.e. +25 % for 3× the processes).
+ * The writer this class already used can buffer, so documents are now collected
+ * across messages and flushed as a batch. See {@see resolveCrawlBatchSize()} for
+ * the trade-off that keeps the default at 1.
  */
 final class IndexEventListener implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
+
+    /**
+     * One buffering writer per site + index, reused across Messenger messages.
+     * The class is a shared service, so the buffer survives from one handled
+     * message to the next inside the same worker process.
+     *
+     * @var array<string, DocumentBatchWriter>
+     */
+    private array $writers = [];
+
+    private bool $shutdownFlushRegistered = false;
 
     public function __construct(
         private readonly SearchEngineFactory $engineFactory,
@@ -161,33 +183,12 @@ final class IndexEventListener implements LoggerAwareInterface
             $before = new BeforeDocumentIndexedEvent($origin, $document);
             $this->eventDispatcher->dispatch($before);
             $doc = $before->document;
-            // The writer fingerprints the document, re-uses the vector
-            // that is already in the index when the text is unchanged and
-            // only then falls back to the embedding provider. That is what
-            // makes a re-crawl affordable: EXT:index re-visits every page,
-            // but only pages whose text actually changed cost tokens.
-            //
-            // strict: true — an embedding failure must escape this method.
-            // See the catch block below.
-            $writer = new DocumentBatchWriter(
-                $site,
-                $this->engineFactory->createClientForSite($site),
-                $engine instanceof \CmsIg\Seal\Engine ? $engine : null,
-                $indexName,
-                $indexName,
-                $this->embeddingPrecomputer,
-                $this->eventDispatcher,
-                $this->embeddingPrecomputer->isEnabledForSite($site),
-                true,
-                false,
-                true,
-                1,
-            );
-            if ($this->logger !== null) {
-                $writer->setLogger($this->logger);
-            }
+            $writer = $this->writerFor($site, $indexName, $engine);
+            // push() flushes on its own once the batch is full. With the
+            // default batch size of 1 that is the historical behaviour:
+            // one document, one Meilisearch write, before the message is
+            // acknowledged.
             $writer->push($doc, $origin);
-            $writer->flush();
         } catch (EmbeddingFailedException $e) {
             // Do NOT swallow this one. The index runs a userProvided
             // embedder, so a document without a vector is rejected by
@@ -209,6 +210,126 @@ final class IndexEventListener implements LoggerAwareInterface
                 'exception' => $e,
             ]);
         }
+    }
+
+    /**
+     * The buffering writer for this site + index, created on first use.
+     *
+     * The writer fingerprints every document, re-uses the vector already in the
+     * index when the text is unchanged and only then falls back to the embedding
+     * provider. That is what makes a re-crawl affordable: EXT:index re-visits
+     * every page, but only pages whose text actually changed cost tokens.
+     *
+     * strict: true — an embedding failure must escape the caller so Messenger
+     * retries the message instead of acknowledging a document that never
+     * reached the index.
+     */
+    private function writerFor(
+        \TYPO3\CMS\Core\Site\Entity\Site $site,
+        string $indexName,
+        object $engine,
+    ): DocumentBatchWriter {
+        $key = $site->getIdentifier() . '/' . $indexName;
+        if (isset($this->writers[$key])) {
+            return $this->writers[$key];
+        }
+
+        $writer = new DocumentBatchWriter(
+            $site,
+            $this->engineFactory->createClientForSite($site),
+            $engine instanceof \CmsIg\Seal\Engine ? $engine : null,
+            $indexName,
+            $indexName,
+            $this->embeddingPrecomputer,
+            $this->eventDispatcher,
+            $this->embeddingPrecomputer->isEnabledForSite($site),
+            true,
+            false,
+            true,
+            $this->resolveCrawlBatchSize($site),
+        );
+        if ($this->logger !== null) {
+            $writer->setLogger($this->logger);
+        }
+        $this->registerShutdownFlush();
+
+        return $this->writers[$key] = $writer;
+    }
+
+    /**
+     * How many crawled documents may wait in the buffer before they are written.
+     *
+     * Default 1, i.e. unchanged behaviour, because batching moves the write
+     * AFTER the Messenger acknowledgement: with a batch of N, a worker that is
+     * killed mid-batch loses up to N documents together with their queue
+     * entries, and the only symptom is a page that silently keeps its old
+     * indexed state. Raise it deliberately for a bulk reindex — at 100 the same
+     * corpus that crawls in hours is done in minutes — and lower it again for
+     * steady-state operation, or accept the window.
+     *
+     * Forced back to 1 while a userProvided embedder computes vectors in PHP.
+     * There the caller relies on an EmbeddingFailedException escaping so
+     * Messenger retries THAT message; once documents are batched the exception
+     * surfaces while handling some later message and would fail the wrong one,
+     * acknowledging the documents that actually failed.
+     */
+    private function resolveCrawlBatchSize(\TYPO3\CMS\Core\Site\Entity\Site $site): int
+    {
+        if ($this->embeddingPrecomputer->isEnabledForSite($site)) {
+            return 1;
+        }
+        $configured = (int)$site->getSettings()->get('meilisearch.indexing.crawlBatchSize', 1);
+
+        return max(1, min(1000, $configured));
+    }
+
+    /**
+     * Write out whatever is still buffered. Called when the worker runs dry and
+     * when it stops; without the idle flush the last partial batch of a crawl
+     * would sit in memory until the process happens to exit.
+     */
+    public function flushBuffered(): void
+    {
+        foreach ($this->writers as $writer) {
+            try {
+                $writer->flush();
+            } catch (\Throwable $e) {
+                $this->logger?->error('EXT:index-integration failed to flush buffered documents: {message}', [
+                    'message' => $e->getMessage(),
+                    'exception' => $e,
+                ]);
+            }
+        }
+    }
+
+    #[AsEventListener('ws-meilisearch-ext-index-worker-idle')]
+    public function onWorkerRunning(WorkerRunningEvent $event): void
+    {
+        if ($event->isWorkerIdle()) {
+            $this->flushBuffered();
+        }
+    }
+
+    #[AsEventListener('ws-meilisearch-ext-index-worker-stopped')]
+    public function onWorkerStopped(WorkerStoppedEvent $event): void
+    {
+        $this->flushBuffered();
+    }
+
+    /**
+     * Last line of defence for entry points that emit no worker events at all —
+     * a backend request saving a record, or a CLI process exiting early. Without
+     * it a buffer filled outside a Messenger worker would never be written.
+     */
+    private function registerShutdownFlush(): void
+    {
+        if ($this->shutdownFlushRegistered) {
+            return;
+        }
+        $this->shutdownFlushRegistered = true;
+        register_shutdown_function(function (): void {
+            $this->flushBuffered();
+        });
     }
 
     /**
