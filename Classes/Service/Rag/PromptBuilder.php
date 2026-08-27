@@ -122,9 +122,6 @@ final class PromptBuilder
         $userContent = "Context excerpts:\n\n" . $contextSection
             . "\n\n---\n\nQuestion: " . trim($question);
 
-        // >>> TEMP DEBUG
-        @file_put_contents('/tmp/rag_prompt.txt', $userContent);
-        // <<< TEMP DEBUG
         return [
             ['role' => 'system', 'content' => $resolvedSystem],
             ['role' => 'user', 'content' => $userContent],
