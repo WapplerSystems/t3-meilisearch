@@ -72,6 +72,13 @@ final class PromptBuilder
      * @param list<array<string,mixed>> $hits
      * @param int|null $forcedLanguageId  Caller-provided active language id;
      *     when null, falls back to the first hit's language (legacy path).
+     * @param list<string> $metaFields  Document fields to expose in each context
+     *     block's header, in addition to id and type. Without them the LLM only
+     *     ever sees `[id | type] Title` and cannot reason about any dimension the
+     *     documents carry — e.g. with several product-documentation releases
+     *     indexed side by side, it cannot tell which release an excerpt belongs
+     *     to and will silently answer from whichever copy ranked first. Fields
+     *     missing on a hit are skipped, so a heterogeneous corpus is fine.
      *
      * @return list<array{role:string,content:string}>
      */
@@ -82,6 +89,7 @@ final class PromptBuilder
         string $systemPrompt,
         int $maxContextChars,
         ?int $forcedLanguageId = null,
+        array $metaFields = [],
     ): array {
         if ($forcedLanguageId !== null) {
             $languageId = $forcedLanguageId;
@@ -105,7 +113,7 @@ final class PromptBuilder
 
         $contextBlocks = [];
         foreach ($hits as $hit) {
-            $contextBlocks[] = $this->renderHit($hit, $maxContextChars);
+            $contextBlocks[] = $this->renderHit($hit, $maxContextChars, $metaFields);
         }
         $contextSection = $contextBlocks === []
             ? '(no documents found)'
@@ -114,6 +122,9 @@ final class PromptBuilder
         $userContent = "Context excerpts:\n\n" . $contextSection
             . "\n\n---\n\nQuestion: " . trim($question);
 
+        // >>> TEMP DEBUG
+        @file_put_contents('/tmp/rag_prompt.txt', $userContent);
+        // <<< TEMP DEBUG
         return [
             ['role' => 'system', 'content' => $resolvedSystem],
             ['role' => 'user', 'content' => $userContent],
@@ -121,14 +132,18 @@ final class PromptBuilder
     }
 
     /**
+     * The text a hit contributes to the context, whitespace-normalised and not
+     * yet truncated.
+     *
+     * Public because retrieval has to decide whether two hits are "the same
+     * document" by exactly the text the LLM would see. A second copy of the
+     * field order over there would let the two drift apart, and the collapse
+     * would quietly stop matching without anything failing.
+     *
      * @param array<string,mixed> $hit
      */
-    private function renderHit(array $hit, int $maxContextChars): string
+    public static function contextBody(array $hit): string
     {
-        $id = (string)($hit['id'] ?? '');
-        $title = (string)($hit['title'] ?? '');
-        $type = (string)($hit['type'] ?? '');
-
         $body = '';
         foreach (self::FIELDS_PREFERRED as $field) {
             if (!empty($hit[$field]) && is_string($hit[$field])) {
@@ -136,12 +151,49 @@ final class PromptBuilder
                 break;
             }
         }
-        $body = trim(preg_replace('/\s+/', ' ', $body) ?? '');
+
+        return trim(preg_replace('/\s+/', ' ', $body) ?? '');
+    }
+
+    /**
+     * @param array<string,mixed> $hit
+     * @param list<string> $metaFields
+     */
+    private function renderHit(array $hit, int $maxContextChars, array $metaFields = []): string
+    {
+        $id = (string)($hit['id'] ?? '');
+        $title = (string)($hit['title'] ?? '');
+        $type = (string)($hit['type'] ?? '');
+
+        $body = self::contextBody($hit);
         if ($maxContextChars > 0 && mb_strlen($body) > $maxContextChars) {
             $body = mb_substr($body, 0, $maxContextChars) . '…';
         }
 
-        $header = sprintf('[id=%s | type=%s] %s', $id, $type, $title);
+        $parts = ['id=' . $id, 'type=' . $type];
+        foreach ($metaFields as $field) {
+            $field = trim((string)$field);
+            // `id` and `type` are already emitted; re-listing them would only
+            // duplicate the pair inside the same bracket.
+            if ($field === '' || $field === 'id' || $field === 'type') {
+                continue;
+            }
+            $value = $hit[$field] ?? null;
+            if (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            }
+            if (is_array($value)) {
+                // Multi-valued fields (e.g. a rootline) would blow up the header;
+                // join the scalars and let the caller decide not to list them.
+                $value = implode(',', array_filter($value, 'is_scalar'));
+            }
+            if ($value === null || $value === '' || !is_scalar($value)) {
+                continue;
+            }
+            $parts[] = $field . '=' . $value;
+        }
+
+        $header = sprintf('[%s] %s', implode(' | ', $parts), $title);
         return $body === '' ? $header : $header . "\n" . $body;
     }
 

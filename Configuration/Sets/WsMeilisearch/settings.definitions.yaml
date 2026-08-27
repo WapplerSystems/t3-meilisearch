@@ -558,6 +558,24 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.collapseIdenticalContext:
+    label: 'RAG: collapse identical documents in the context'
+    description: 'Drop retrieval hits whose text is byte-identical to one already kept, keeping the better-ranked copy. On by default. Matters for DITA-authored documentation, where one topic is reused across product areas: the same text can exist under half a dozen URLs, and a question matching it would otherwise fill the whole context with copies — the LLM answers from one source while every other source is crowded out. Retrieval over-fetches so the context still fills up. Turn off only when the corpus deliberately carries the same text under several entries and the answer must cite each.'
+    type: bool
+    default: true
+
+  meilisearch.rag.retrievalFilters:
+    label: 'RAG: additional raw retrieval filters'
+    description: 'Raw Meilisearch filter expressions AND-conjoined into RAG retrieval, e.g. ["type = \"page\" AND kbKey EXISTS AND kbIsCurrent = true"]. Use to ground on a page subtree instead of the curated corpus, or to pin retrieval to one release of a versioned documentation set. Raw because the useful expressions need EXISTS / AND / OR. Every field referenced must be in the index filterableAttributes — run ws_meilisearch:apply-settings after adding schema fields, or retrieval fails with an invalid_search_filter error.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.promptMetaFields:
+    label: 'RAG: document fields exposed in the prompt context'
+    description: 'Extra document fields written into each context block header, e.g. ["kbVersion", "kbProduct"]. Without them the LLM only sees `[id | type] Title` and cannot reason about any dimension the documents carry — with several documentation releases indexed side by side it cannot tell which release an excerpt belongs to and will answer from whichever copy ranked first. Fields absent on a hit are skipped. Keep the list short: every field costs context tokens on every hit.'
+    type: stringlist
+    default: []
+
   meilisearch.rag.conversation.enabled:
     label: 'Multi-turn conversation memory'
     description: 'When enabled, the RAG plugin keeps the last N (question, answer) pairs in the anonymous frontend user session and feeds them back to the LLM, so visitors can ask follow-ups without restating context. Default: disabled — each question is independent.'

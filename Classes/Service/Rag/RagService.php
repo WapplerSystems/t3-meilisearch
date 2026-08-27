@@ -31,6 +31,17 @@ use WapplerSystems\Meilisearch\Service\SearchService;
  */
 final class RagService implements LoggerAwareInterface
 {
+    /**
+     * How many extra hits to fetch when identical documents are collapsed.
+     * Four is the size of the largest reuse group observed in the LINEAR
+     * knowledge base (one topic under four schema generators), so a context
+     * of N still fills up when every hit has three twins.
+     */
+    private const COLLAPSE_OVERFETCH = 4;
+
+    /** Hard ceiling so a large maxContextHits cannot turn into a huge query. */
+    private const COLLAPSE_MAX_FETCH = 50;
+
     use LoggerAwareTrait;
 
     /**
@@ -78,14 +89,86 @@ final class RagService implements LoggerAwareInterface
      * @param array<string,mixed> $searchOptions
      * @return list<array<string,mixed>>
      */
-    private function searchForContext(Site $site, string $query, array $searchOptions, int $maxHits): array
-    {
+    private function searchForContext(
+        Site $site,
+        string $query,
+        array $searchOptions,
+        int $maxHits,
+        bool $collapseIdentical = true,
+    ): array {
+        if ($collapseIdentical) {
+            // Ask for more than we need: the collapse below can only promote a
+            // spare if one was fetched. Without the over-fetch a question whose
+            // top five hits are five copies of one topic would end up with a
+            // one-document context — worse than the duplication it fixes.
+            $searchOptions['perPage'] = min(
+                $maxHits * self::COLLAPSE_OVERFETCH,
+                self::COLLAPSE_MAX_FETCH,
+            );
+        }
+
         $searchResult = $this->searchService->search($site, $query, $searchOptions);
-        $hits = array_values(array_slice($searchResult->hits, 0, $maxHits));
+        $hits = array_values(array_slice(
+            $this->collapseIdenticalBodies($searchResult->hits, $collapseIdentical),
+            0,
+            $maxHits,
+        ));
         if ($hits === []) {
-            $hits = $this->retrieveWithFallbacks($site, $query, $searchOptions, $maxHits);
+            $hits = array_values(array_slice(
+                $this->collapseIdenticalBodies(
+                    $this->retrieveWithFallbacks($site, $query, $searchOptions, $maxHits),
+                    $collapseIdentical,
+                ),
+                0,
+                $maxHits,
+            ));
         }
         return $hits;
+    }
+
+    /**
+     * Drop hits whose context text is identical to one already kept, keeping the
+     * better-ranked copy.
+     *
+     * The knowledge base is authored in DITA, where one topic is reused across
+     * several product areas. "Rohrnetzberechnung eines Strangschemas durchführen"
+     * exists as eight documents in one release — four Revit schema generators
+     * (Heizung, Trinkwasser, Abwasser, Gas) and the same four for AutoCAD — with
+     * byte-identical text behind four different URLs. A question that matches it
+     * fills the entire context with copies: the LLM answers from a single source
+     * while the operator pays for eight, and nothing else fits alongside.
+     *
+     * Judged on the text the prompt would carry, never on title or URL: here
+     * those differ by design and the text does not. Hits without body text are
+     * always kept — an empty key would fold unrelated documents onto each other.
+     *
+     * @param iterable<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function collapseIdenticalBodies(iterable $hits, bool $enabled): array
+    {
+        $kept = [];
+        $seen = [];
+        foreach ($hits as $hit) {
+            $hit = (array)$hit;
+            if (!$enabled) {
+                $kept[] = $hit;
+                continue;
+            }
+            $body = PromptBuilder::contextBody($hit);
+            if ($body === '') {
+                $kept[] = $hit;
+                continue;
+            }
+            $key = md5($body);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $kept[] = $hit;
+        }
+
+        return $kept;
     }
 
     /**
@@ -138,7 +221,7 @@ final class RagService implements LoggerAwareInterface
             );
         }
 
-        return $this->searchForContext($site, $query, $event->options, $maxHits);
+        return $this->searchForContext($site, $query, $event->options, $maxHits, $this->collapsesIdentical($settings));
     }
 
     /**
@@ -228,7 +311,7 @@ final class RagService implements LoggerAwareInterface
         // prompt below and the analytics, so nothing user-visible changes.
         $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
 
-        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits);
+        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
@@ -260,6 +343,7 @@ final class RagService implements LoggerAwareInterface
             $systemPrompt,
             $maxChars,
             $this->resolveLanguageId($options),
+            $this->resolvePromptMetaFields($settings),
         );
 
         // Splice prior turns between the system prompt and the current
@@ -357,7 +441,7 @@ final class RagService implements LoggerAwareInterface
 
         // Same retrieval as ask() — including the fallback ladder — so the
         // streaming path cannot degrade differently on identical questions.
-        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits);
+        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
         if ($hits === []) {
             yield RagStreamChunk::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
@@ -406,6 +490,7 @@ final class RagService implements LoggerAwareInterface
             $systemPrompt,
             $maxChars,
             $this->resolveLanguageId($options),
+            $this->resolvePromptMetaFields($settings),
         );
         $messages = $this->withConversation($currentTurnMessages, $conversation);
 
@@ -540,6 +625,40 @@ final class RagService implements LoggerAwareInterface
         return [];
     }
 
+    /**
+     * Whether identical documents are collapsed out of the retrieval context.
+     *
+     * On by default: two documents with byte-identical text add nothing to an
+     * answer, they only crowd out a different source. A site turns it off only
+     * when its corpus deliberately carries the same text under several entries
+     * and the answer is supposed to cite each of them.
+     */
+    private function collapsesIdentical(object $settings): bool
+    {
+        return (bool)$settings->get('meilisearch.rag.collapseIdenticalContext', true);
+    }
+
+    /**
+     * Document fields the prompt should expose per context block, on top of id
+     * and type. Empty by default — a site opts in only for dimensions the answer
+     * must be able to name, e.g. a documentation-release field so the LLM can say
+     * which release an instruction belongs to instead of blending several.
+     *
+     * @return list<string>
+     */
+    private function resolvePromptMetaFields(object $settings): array
+    {
+        $fields = $settings->get('meilisearch.rag.promptMetaFields', null);
+        if (!is_array($fields)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn ($f) => trim((string)$f),
+            $fields,
+        ), static fn (string $f) => $f !== ''));
+    }
+
     private function buildRetrievalOptions(Site $site, object $settings, bool $useHybrid, int $maxHits): array
     {
         $opts = [
@@ -596,6 +715,26 @@ final class RagService implements LoggerAwareInterface
         }
         if ((bool)$settings->get('meilisearch.rag.restrictToKnowledgeResources', false)) {
             $opts['filters'] = ['type' => ['knowledge_resource']];
+        }
+        // Raw Meilisearch filter expressions, AND-conjoined into the retrieval.
+        // The escape hatch for corpus shapes this extension cannot know about:
+        // grounding on a page subtree instead of the curated corpus, pinning to
+        // one release of a versioned documentation set, excluding an archive.
+        // Kept as raw expressions because the useful ones need operators the
+        // field=value shape has no room for (EXISTS, AND, OR).
+        $rawFilters = $settings->get('meilisearch.rag.retrievalFilters', null);
+        if (is_array($rawFilters)) {
+            $expressions = array_values(array_filter(array_map(
+                static fn ($f) => trim((string)$f),
+                $rawFilters,
+            ), static fn (string $f) => $f !== ''));
+            if ($expressions !== []) {
+                $opts['filters'] ??= [];
+                $opts['filters']['__rawFilters'] = array_merge(
+                    (array)($opts['filters']['__rawFilters'] ?? []),
+                    $expressions,
+                );
+            }
         }
         return $opts;
     }
