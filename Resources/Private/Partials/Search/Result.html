@@ -42,6 +42,7 @@
                 <f:case value="file"><span class="badge text-bg-warning ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:case>
                 <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span></f:defaultCase>
             </f:switch>
+            <f:render partial="Search/Result/Badges" arguments="{hit: hit}"/>
         </div>
 
         <f:comment>

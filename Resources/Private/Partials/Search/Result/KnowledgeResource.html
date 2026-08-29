@@ -36,6 +36,7 @@
                         <f:case value="reference"><span class="badge text-bg-info ws-meilisearch-hit__type">Details</span></f:case>
                         <f:defaultCase><span class="badge text-bg-secondary ws-meilisearch-hit__type">Hilfe</span></f:defaultCase>
                     </f:switch>
+                    <f:render partial="Search/Result/Badges" arguments="{hit: hit}"/>
                 </div>
 
                 <f:if condition="{hit.parentTitle}">

@@ -39,6 +39,7 @@
                     </h3>
                     <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.file" default="file"/></f:variable>
                     <span class="badge text-bg-warning ws-meilisearch-hit__type">{typeLabel -> f:format.trim()}</span>
+                    <f:render partial="Search/Result/Badges" arguments="{hit: hit}"/>
                 </div>
 
                 <f:if condition="{hit._formatted.description} || {hit.description}">

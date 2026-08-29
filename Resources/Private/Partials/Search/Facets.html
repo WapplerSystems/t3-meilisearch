@@ -40,8 +40,20 @@
 
             <fieldset class="ws-meilisearch-facets__group {f:if(condition: '!{facetIter.isLast}', then: 'mb-3')} {f:if(condition: cfgCollapsed, then: 'ws-meilisearch-facets__group--collapsed')}">
                 <legend class="ws-meilisearch-facets__legend h6 text-uppercase text-muted small mb-2">
+                    <f:comment>
+                        The configured `label` is either an LLL key or the literal
+                        heading. f:translate returns an empty string for a literal,
+                        which made the heading fall back to the raw attribute name —
+                        a site that simply wrote `label: 'Product'` saw "kbProduct"
+                        in its panel. Decide by the LLL: prefix.
+                    </f:comment>
                     <f:if condition="{cfgLabel}">
-                        <f:then><f:translate key="{cfgLabel}" default="{attribute}"/></f:then>
+                        <f:then>
+                            <f:if condition="{cfgLabel -> f:format.crop(maxCharacters: 4, append: '')} == 'LLL:'">
+                                <f:then><f:translate key="{cfgLabel}" default="{attribute}"/></f:then>
+                                <f:else>{cfgLabel}</f:else>
+                            </f:if>
+                        </f:then>
                         <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.attr.{attribute}" default="{attribute}"/></f:else>
                     </f:if>
                 </legend>
@@ -55,24 +67,40 @@
                         </f:for>
                         <f:variable name="facetId" value="ws-meilisearch-{attribute}-{value}"/>
                         <f:comment>
-                            Resolve the display label for this facet value.
-                            - For attribute "language" the value is the numeric language id —
-                              show the site-language title from the controller-provided map,
-                              falling back to the raw id when the site has no such language.
-                            - For all other attributes look up a translation key
-                              facet.value.{attribute}.{value} and fall back to the raw value
-                              so unknown values still render readably.
+                            Resolve the display label for this facet value, in order:
+                            1. A `values:` map on the facet's own configuration, e.g.
+
+                                 - attribute: kbProduct
+                                   values:
+                                     ac: 'AutoCAD'
+
+                               This is the extension point for facets whose values
+                               are opaque keys the extension cannot know about —
+                               a product code, a tenant id, a status flag. Site
+                               settings own the wording, no XLF override needed.
+                            2. For attribute "language" the value is the numeric
+                               language id — show the site-language title from the
+                               controller-provided map.
+                            3. A translation key facet.value.{attribute}.{value},
+                               falling back to the raw value so unknown values
+                               still render readably.
                         </f:comment>
+                        <f:variable name="configuredLabel">{facetConfigs.{attribute}.extra.values.{value}}</f:variable>
                         <f:variable name="displayLabel">
-                            <f:if condition="{attribute} == 'language'">
-                                <f:then>
-                                    <f:if condition="{languageLabels.{value}}">
-                                        <f:then>{languageLabels.{value}}</f:then>
-                                        <f:else>{value}</f:else>
-                                    </f:if>
-                                </f:then>
+                            <f:if condition="{configuredLabel}">
+                                <f:then>{configuredLabel}</f:then>
                                 <f:else>
-                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.{attribute}.{value}" default="{value}"/>
+                                    <f:if condition="{attribute} == 'language'">
+                                        <f:then>
+                                            <f:if condition="{languageLabels.{value}}">
+                                                <f:then>{languageLabels.{value}}</f:then>
+                                                <f:else>{value}</f:else>
+                                            </f:if>
+                                        </f:then>
+                                        <f:else>
+                                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.{attribute}.{value}" default="{value}"/>
+                                        </f:else>
+                                    </f:if>
                                 </f:else>
                             </f:if>
                         </f:variable>

@@ -1,0 +1,32 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    Renders the extra badges a hit carries, next to its type badge.
+
+    This partial deliberately knows nothing about what a badge means. It is the
+    rendering half of an extension point: any extension may append badges to a
+    hit from an AfterSearchEvent listener, which receives the mutable
+    SearchResult and can replace it with one whose hits carry a `badges` key.
+
+    Contract — `hit.badges` is a list of maps:
+
+        label    required, plain text, rendered escaped
+        variant  optional Bootstrap contextual suffix (secondary, primary,
+                 info, …); defaults to "secondary"
+        title    optional, becomes the title attribute (tooltip)
+
+    Example listener output:
+
+        $hit['badges'] = [
+            ['label' => 'V25', 'variant' => 'secondary', 'title' => 'Release 25'],
+        ];
+
+    Hits without the key render nothing, so this is safe to include in every
+    result partial regardless of document type.
+</f:comment>
+<f:for each="{hit.badges}" as="badge">
+    <f:if condition="{badge.label}">
+        <span class="badge ws-meilisearch-hit__badge text-bg-{badge.variant -> f:or(alternative: 'secondary')}"
+              title="{badge.title}">{badge.label}</span>
+    </f:if>
+</f:for>
+</html>
