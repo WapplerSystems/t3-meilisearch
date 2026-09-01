@@ -220,7 +220,7 @@ final class RagService implements LoggerAwareInterface
                 $this->buildLlmOptions($settings),
                 // Retrieval is filtered to this language; a rewrite in another
                 // one cannot match anything.
-                $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
+                $this->resolveLanguageLabel($site, $options),
             );
         }
 
@@ -314,7 +314,7 @@ final class RagService implements LoggerAwareInterface
         // prompt below and the analytics, so nothing user-visible changes.
         $retrievalQuestion = $this->queryRewriter->rewrite(
             $provider, $settings, $conversation, $event->question, $llmOptions,
-            $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
+            $this->resolveLanguageLabel($site, $options),
         );
 
         $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
@@ -445,7 +445,7 @@ final class RagService implements LoggerAwareInterface
         // drive the reply.
         $retrievalQuestion = $this->queryRewriter->rewrite(
             $provider, $settings, $conversation, $event->question, $llmOptions,
-            $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
+            $this->resolveLanguageLabel($site, $options),
         );
 
         // Same retrieval as ask() — including the fallback ladder — so the
@@ -789,6 +789,21 @@ final class RagService implements LoggerAwareInterface
      *
      * @param array<string,mixed> $options
      */
+    /**
+     * The language label pins the rewritten query to the retrieval language.
+     * It only makes sense when we actually know the language: the streaming
+     * middleware runs on /_ws_meilisearch/rag/stream, a path without a
+     * language prefix, so TYPO3 resolves no SiteLanguage and $options carries
+     * no 'language'. Retrieval is then unfiltered, and pinning the rewrite to
+     * an arbitrary language would contradict it. null means "do not pin".
+     */
+    private function resolveLanguageLabel(Site $site, array $options): ?string
+    {
+        $languageId = $this->resolveLanguageId($options);
+
+        return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
     private function resolveLanguageId(array $options): ?int
     {
         if (!array_key_exists('language', $options)) {
