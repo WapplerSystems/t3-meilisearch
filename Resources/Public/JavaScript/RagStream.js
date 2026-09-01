@@ -147,6 +147,7 @@
             es.addEventListener('sources', function (ev) {
                 try {
                     const p = JSON.parse(ev.data);
+                    turn.sources = Array.isArray(p.sources) ? p.sources : [];
                     turn.sourcesEl.innerHTML = renderSources(p.sources || [], labels.sources);
                 } catch (_) { /* ignore */ }
             });
@@ -156,7 +157,7 @@
                     acc += JSON.parse(ev.data).text || '';
                     // Hide inline [id=…] citation markers — the sources are
                     // listed separately under the answer.
-                    turn.answerEl.textContent = stripCitations(acc);
+                    turn.answerEl.textContent = stripCitations(acc, turn.sources);
                     turn.answerEl.scrollIntoView({ block: 'nearest' });
                 } catch (_) { /* ignore */ }
             });
@@ -170,7 +171,7 @@
                 try {
                     const p = JSON.parse(ev.data);
                     const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : acc;
-                    turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(finalText));
+                    turn.answerEl.innerHTML = renderAnswerHtml(finalText, turn.sources);
                     if (Array.isArray(p.citedIds) && p.citedIds.length > 0) {
                         markCitedSources(turn.sourcesEl, p.citedIds);
                     }
@@ -195,7 +196,7 @@
                 setBusy(false);
                 var q = '';
                 try { q = (JSON.parse(ev.data).question || '').toString(); } catch (_) { /* ignore */ }
-                turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(q));
+                turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(q, turn.sources));
                 turn.answerEl.classList.add('ws-meilisearch-rag-answer--clarify');
                 finish();
             });
@@ -288,11 +289,74 @@
         });
     }
 
-    // Remove inline citation brackets like "[id=help-66]" or
-    // "[id=help-66, id=pages-7]" from the displayed answer (incl. a preceding
-    // space). Citations are surfaced in the separate sources list instead.
-    function stripCitations(text) {
-        return String(text).replace(/\s*\[\s*id\s*=\s*[^\]]*\]/gi, '');
+    // Index the sources of a turn by their document id.
+    function sourcesById(sources) {
+        const byId = Object.create(null);
+        (sources || []).forEach(function (src) {
+            const id = (src && src.id ? src.id : '').toString();
+            if (id !== '') { byId[id] = src; }
+        });
+        return byId;
+    }
+
+    // Walk the citation blocks the model emits and hand each one to `render`.
+    // Two formats occur in practice: the "[id=pages-7]" the prompt asks for
+    // and the bare "[pages-7, pages-9]" the model falls back to, so tokens are
+    // matched against the actual source ids rather than against a fixed shape.
+    // A block whose tokens are all unknown is prose ("[NOTE]") and stays as it
+    // is; a block of purely knowledge_resource hits is dropped, because that
+    // corpus is internal grounding and must not surface as a link or a raw id.
+    function rewriteCitations(text, sources, render) {
+        const byId = sourcesById(sources);
+        return String(text).replace(/(\s*)\[([^\[\]]+)\]/g, function (whole, leadingWs, inner) {
+            const tokens = inner.match(/[A-Za-z0-9_:.-]+/g);
+            if (!tokens) { return whole; }
+            const matched = [];
+            const seen = Object.create(null);
+            let knowledgeResourceMatches = 0;
+            tokens.forEach(function (token) {
+                const src = byId[token];
+                if (!src || seen[token]) { return; }
+                if ((src.type || '').toString() === 'knowledge_resource') {
+                    knowledgeResourceMatches++;
+                    return;
+                }
+                seen[token] = true;
+                matched.push({ id: token, src: src });
+            });
+            if (matched.length === 0) {
+                return knowledgeResourceMatches > 0 ? '' : whole;
+            }
+            return leadingWs + matched.map(render).join('');
+        });
+    }
+
+    // Plain-text pass used while tokens are still arriving: drop the markers
+    // rather than link them, so they don't flicker into place mid-stream. The
+    // second replace hides a citation the model has only half-written yet.
+    function stripCitations(text, sources) {
+        return rewriteCitations(text, sources, function () { return ''; })
+            .replace(/\s*\[[^\[\]]*$/, '');
+    }
+
+    // Final render: citation markers become links to the cited document.
+    // Mirrors RagAnswer::getAnswerHtml() so the streamed answer and the
+    // server-rendered one look the same, down to the markup and the tooltip.
+    function renderAnswerHtml(text, sources) {
+        const linked = rewriteCitations(escapeText(text), sources, function (hit) {
+            const title = (hit.src.title || '').toString().trim() || hit.id;
+            const type = (hit.src.type || '').toString().trim();
+            const tooltip = type !== '' ? type + ' \u00b7 ' + hit.id : hit.id;
+            const uri = (hit.src.uri || hit.src.publicUrl || '').toString();
+            if (uri === '') {
+                return '[<abbr title="' + escapeAttr(tooltip) + '">' + escapeText(title) + '</abbr>]';
+            }
+            return '[<a href="' + escapeAttr(uri) + '" title="' + escapeAttr(tooltip)
+                + '" rel="noopener" class="ws-meilisearch-rag-citation">' + escapeText(title) + '</a>]';
+        });
+        // **bold** last, exactly as the server does: escaping left the
+        // asterisks alone and the citation titles must not be re-scanned.
+        return linked.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
     }
 
     function renderMarkdownLight(text) {
