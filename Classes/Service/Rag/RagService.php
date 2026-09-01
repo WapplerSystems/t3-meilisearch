@@ -218,6 +218,9 @@ final class RagService implements LoggerAwareInterface
                 Conversation::empty(),
                 $event->question,
                 $this->buildLlmOptions($settings),
+                // Retrieval is filtered to this language; a rewrite in another
+                // one cannot match anything.
+                $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
             );
         }
 
@@ -309,7 +312,10 @@ final class RagService implements LoggerAwareInterface
         // ("und der Preis?") searches for the right subject. Retrieval only —
         // $event->question (the user's actual wording) still drives the answer
         // prompt below and the analytics, so nothing user-visible changes.
-        $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
+        $retrievalQuestion = $this->queryRewriter->rewrite(
+            $provider, $settings, $conversation, $event->question, $llmOptions,
+            $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
+        );
 
         $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
         if ($hits === []) {
@@ -437,7 +443,10 @@ final class RagService implements LoggerAwareInterface
         // Conversational rewrite for retrieval only (see ask()); the streamed
         // answer still uses $event->question so the user's wording + history
         // drive the reply.
-        $retrievalQuestion = $this->queryRewriter->rewrite($provider, $settings, $conversation, $event->question, $llmOptions);
+        $retrievalQuestion = $this->queryRewriter->rewrite(
+            $provider, $settings, $conversation, $event->question, $llmOptions,
+            $this->promptBuilder->resolveLanguageLabel($site, $this->resolveLanguageId($options)),
+        );
 
         // Same retrieval as ask() — including the fallback ladder — so the
         // streaming path cannot degrade differently on identical questions.

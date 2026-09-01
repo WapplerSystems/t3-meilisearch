@@ -43,9 +43,24 @@ final class QueryRewriter implements LoggerAwareInterface
      * questions land their expected document at rank 1 in that form and
      * miss entirely as a full sentence.
      */
-    private const KEYWORD_PROMPT = 'You turn a question into a short search query for a document search engine. Keep the topic noun and the action, with the verb in the infinitive: "Wie gebe ich eine Lizenz wieder frei?" becomes "Lizenz freigeben". Drop question words, articles, pronouns and filler. Keep domain and product terms verbatim, but drop a product name when it is not part of what is being asked about. Two to four words is usually right. Output ONLY the query text — no quotes, no labels, no explanation — in the same language as the question.';
+    private const KEYWORD_PROMPT = 'You turn a question into a short search query for a document search engine. Keep the topic noun and the action, with the verb in the infinitive: "Wie gebe ich eine Lizenz wieder frei?" becomes "Lizenz freigeben", and "How do I install software packages?" becomes "install software packages". Drop question words, articles, pronouns and filler. Keep domain and product terms verbatim, but drop a product name when it is not part of what is being asked about. Two to four words is usually right. Output ONLY the query text — no quotes, no labels, no explanation.';
 
-    private const SYSTEM_PROMPT = 'You rewrite the user\'s latest message into a single, self-contained search query for a document search engine. Use the conversation so far only to resolve pronouns, ellipsis and the implicit subject. Keep the user\'s domain/product terms verbatim. Output ONLY the query text — no quotes, no labels, no explanation — in the same language as the latest message. If the latest message is already self-contained, output it unchanged.';
+    private const SYSTEM_PROMPT = 'You rewrite the user\'s latest message into a single, self-contained search query for a document search engine. Use the conversation so far only to resolve pronouns, ellipsis and the implicit subject. Keep the user\'s domain/product terms verbatim. Output ONLY the query text — no quotes, no labels, no explanation. If the latest message is already self-contained, output it unchanged.';
+
+    /**
+     * Appended to both prompts when the caller names the retrieval language.
+     *
+     * "in the same language as the question" was already in the prompt and was
+     * NOT enough: the single German one-shot example anchored the output
+     * language harder than the trailing instruction, so English questions came
+     * back as German keyword queries — "How do I install software packages in
+     * LINEAR Revit?" became "Softwarepakete installieren Revit", which was then
+     * searched with `language = 1` and matched nothing. Measured against the
+     * live corpus, every English question failed that way, while German always
+     * worked. Naming the target language explicitly removes the guesswork; the
+     * examples now cover both languages so neither anchors the other away.
+     */
+    private const LANGUAGE_SUFFIX = ' The query MUST be written in %s, whatever language the question uses — it is matched against documents in %s only.';
 
     /**
      * @param object $settings Site settings (->get()).
@@ -59,17 +74,22 @@ final class QueryRewriter implements LoggerAwareInterface
         Conversation $conversation,
         string $question,
         array $baseLlmOptions,
+        ?string $languageLabel = null,
     ): string {
         if (!(bool)$settings->get('meilisearch.rag.conversationalRewrite', true)) {
             return $question;
         }
+
+        $pin = $languageLabel !== null && $languageLabel !== ''
+            ? sprintf(self::LANGUAGE_SUFFIX, $languageLabel, $languageLabel)
+            : '';
 
         if ($conversation->isEmpty()) {
             if (!(bool)$settings->get('meilisearch.rag.keywordRewrite', true)) {
                 return $question;
             }
             $messages = [
-                ['role' => 'system', 'content' => self::KEYWORD_PROMPT],
+                ['role' => 'system', 'content' => self::KEYWORD_PROMPT . $pin],
                 ['role' => 'user', 'content' => $question . "\n\nSearch query:"],
             ];
             return $this->callProvider($provider, $messages, $baseLlmOptions, $question);
@@ -77,7 +97,7 @@ final class QueryRewriter implements LoggerAwareInterface
 
         $historyTurns = max(1, (int)$settings->get('meilisearch.rag.rewriteHistoryTurns', 3));
         $messages = [
-            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+            ['role' => 'system', 'content' => self::SYSTEM_PROMPT . $pin],
             ['role' => 'user', 'content' =>
                 "Conversation so far:\n" . $this->renderHistory($conversation, $historyTurns)
                 . "\n\nLatest message: " . $question

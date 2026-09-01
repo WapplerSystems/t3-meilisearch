@@ -194,7 +194,12 @@ final class PromptBuilder
         return $body === '' ? $header : $header . "\n" . $body;
     }
 
-    private function resolveLanguageLabel(Site $site, int $languageId): string
+    /**
+     * Public because the query rewriter needs the same label: a rewrite that
+     * silently changes the query's language cannot match a retrieval filtered
+     * to that language.
+     */
+    public function resolveLanguageLabel(Site $site, int $languageId): string
     {
         try {
             $language = $site->getLanguageById($languageId);
