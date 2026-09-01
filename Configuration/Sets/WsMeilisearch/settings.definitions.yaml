@@ -180,6 +180,18 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.chatWidget.restrictToPageUid:
+    label: 'Chat widget: restrict to a single page'
+    description: 'Show the chat bubble on exactly this page uid and nowhere else. Subpages are NOT included — use restrictToSubtreeUid for that. 0 (default) means no restriction: the bubble appears on every page of the site. Evaluated as a TypoScript condition against the current page, so the verdict is part of the page-cache identifier. Only frontend requests carry a page context; in CLI/BE the gate is false, so nothing is emitted.'
+    type: int
+    default: 0
+
+  meilisearch.rag.chatWidget.restrictToSubtreeUid:
+    label: 'Chat widget: restrict to a page subtree'
+    description: 'Show the chat bubble only inside the subtree below this page uid, the page itself included — e.g. point it at a knowledge-base root to offer the chat there but not on the rest of the site. Matched against the page rootline, so any nesting depth counts. 0 (default) means no restriction. Combine with restrictToPageUid only if you want the intersection of both gates.'
+    type: int
+    default: 0
+
   meilisearch.rag.chatWidget.embedTypeNum:
     label: 'Chat widget embed page type'
     description: 'Page typeNum used for the bare chat view the widget iframe loads — renders ONLY the wsmeilisearch_rag plugin without the site header/nav/footer (styled by RagEmbed.css). The widget URL is built with this type appended. Change only if it collides with another page type on the site.'

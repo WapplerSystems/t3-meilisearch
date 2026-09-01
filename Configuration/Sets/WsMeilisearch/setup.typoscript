@@ -49,17 +49,26 @@ plugin.tx_wsmeilisearch_search {
 [END]
 
 # --- RAG floating chat widget --------------------------------------------
-# Site-setting–driven opt-in. When enabled, every FE page that includes
-# this Set gets a fixed bubble bottom-right that opens the RAG plugin
-# in a slide-up panel.
+# Site-setting-driven opt-in: a fixed bubble bottom-right opens the RAG
+# plugin in a slide-up panel.
 #
-# Target URL strategy:
-#   1) chatWidget.pageUid > 0  → resolved via TypoLink at render time, so
-#      the link follows the active language overlay (DE→/de/…, EN→/en/…)
-#      and survives slug renames.
-#   2) chatWidget.pageUid == 0 → fallback to the legacy hardcoded
-#      chatWidget.url string for backward compatibility.
-[site("settings").get("meilisearch.rag.chatWidget.enabled")]
+# Scope: by default EVERY FE page that includes this Set gets the bubble.
+# Two independent gates narrow that down. Each is inert at its default 0,
+# and a page must pass every active gate:
+#   1) chatWidget.restrictToPageUid    -> exactly that page, subpages excluded
+#   2) chatWidget.restrictToSubtreeUid -> that page plus everything below it
+# Set both only when you want the intersection; normally one is enough.
+#
+# The scope lives in the condition rather than in PHP because a condition
+# verdict is part of the page-cache identifier: per-page differences cache
+# correctly and cost nothing per request. Two caveats behind the shape of
+# this block:
+#   * TypoScript conditions do NOT nest - a `[...]` line implicitly closes
+#     the previous one - so the gates are one combined expression instead of
+#     an outer wrapper, and assets + markup share a single condition.
+#   * `page` is populated only in a frontend request; in CLI/BE the uid gate
+#     evaluates to false, which is the safe direction (no bubble, no error).
+[site("settings").get("meilisearch.rag.chatWidget.enabled") && ({$meilisearch.rag.chatWidget.restrictToPageUid} == 0 || page["uid"] == {$meilisearch.rag.chatWidget.restrictToPageUid}) && ({$meilisearch.rag.chatWidget.restrictToSubtreeUid} == 0 || {$meilisearch.rag.chatWidget.restrictToSubtreeUid} in tree.rootLineIds)]
     page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
     # Inline chat (no iframe): the widget injects the RAG shell into the host
     # DOM, so RagStream.js (driver) and RagEmbed.css (scoped look) must load on
@@ -67,27 +76,31 @@ plugin.tx_wsmeilisearch_search {
     page.includeJSFooter.wsMeilisearchRagStream = EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js
     page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
     page.includeCSS.wsMeilisearchRagEmbed = EXT:ws_meilisearch/Resources/Public/CSS/RagEmbed.css
-[END]
 
-# Render the bubble markup with a TypoLink-resolved URL when a pageUid
-# is configured. Two condition branches so we evaluate the URL source
-# exactly once per request.
-[site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") > 0]
-    page.footerData.1746000000 = TEXT
-    # "pageUid,typeNum" → speaking URL of the chat page in the bare embed type
-    # (renders only the RAG plugin, no site chrome), language overlay preserved.
-    page.footerData.1746000000.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid},{$meilisearch.rag.chatWidget.embedTypeNum}
-    page.footerData.1746000000.typolink.returnLast = url
-    page.footerData.1746000000.wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
-[END]
+    # Bubble markup. Target URL strategy, as two mutually exclusive branches
+    # of one COA (a second condition would end the block, see above):
+    #   1) chatWidget.pageUid > 0  -> TypoLink at render time, so the link
+    #      follows the active language overlay (DE -> /de/..., EN -> /en/...)
+    #      and survives slug renames.
+    #   2) chatWidget.pageUid == 0 -> legacy hardcoded chatWidget.url string,
+    #      kept for backwards compatibility.
+    page.footerData.1746000000 = COA
+    page.footerData.1746000000 {
+        # "pageUid,typeNum" -> speaking URL of the chat page in the bare embed
+        # type, which renders only the RAG plugin without the site chrome.
+        10 = TEXT
+        10.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid},{$meilisearch.rag.chatWidget.embedTypeNum}
+        10.typolink.returnLast = url
+        10.if.isTrue = {$meilisearch.rag.chatWidget.pageUid}
 
-[site("settings").get("meilisearch.rag.chatWidget.enabled") && site("settings").get("meilisearch.rag.chatWidget.pageUid") == 0]
-    page.footerData.1746000000 = TEXT
-    # Legacy hardcoded URL: append the bare-embed type. Assumes the URL has no
-    # query string of its own (prefer chatWidget.pageUid, which is robust).
-    page.footerData.1746000000.value (
-<div id="ws-meilisearch-chat-widget" data-url="{$meilisearch.rag.chatWidget.url}?type={$meilisearch.rag.chatWidget.embedTypeNum}" data-label="{$meilisearch.rag.chatWidget.label}"></div>
-    )
+        # Legacy URL: append the bare-embed type. Assumes the URL carries no
+        # query string of its own (prefer chatWidget.pageUid, which is robust).
+        20 = TEXT
+        20.value = {$meilisearch.rag.chatWidget.url}?type={$meilisearch.rag.chatWidget.embedTypeNum}
+        20.if.isFalse = {$meilisearch.rag.chatWidget.pageUid}
+
+        wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
+    }
 [END]
 
 # --- Bare RAG chat embed page type ---------------------------------------
