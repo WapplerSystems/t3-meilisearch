@@ -48,13 +48,27 @@ final class RagStreamMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if ($request->getUri()->getPath() !== self::PATH) {
+        // Answered both bare (/_ws_meilisearch/rag/stream) and under any of
+        // the site's language bases (/de/_ws_meilisearch/rag/stream). The
+        // prefixed form is what the rendered shell calls: this middleware runs
+        // after typo3/cms-frontend/site, so a language base in the path is all
+        // it takes for the core to hand us the resolved SiteLanguage — no
+        // client-supplied language parameter to validate. The bare form stays
+        // for backwards compatibility and simply retrieves unfiltered.
+        $path = $request->getUri()->getPath();
+        if (!str_ends_with($path, self::PATH)) {
             return $handler->handle($request);
         }
+        $prefix = substr($path, 0, -strlen(self::PATH));
 
         $site = $request->getAttribute('site');
         if (!$site instanceof Site) {
             return $this->jsonError('site not resolved', 404);
+        }
+        // An unknown prefix is somebody else's route, not a malformed call to
+        // ours — hand it back to the stack rather than answering with an error.
+        if ($prefix !== '' && !$this->languageForPrefix($site, $prefix) instanceof SiteLanguage) {
+            return $handler->handle($request);
         }
 
         $query = $request->getQueryParams();
@@ -69,6 +83,11 @@ final class RagStreamMiddleware implements MiddlewareInterface
         // multiple languages — matches the non-streaming controller.
         $askOptions = ['conversation' => $conversation];
         $language = $request->getAttribute('language');
+        // Belt and braces: if site resolution did not attach the language for
+        // this non-page path, derive it from the base prefix we just matched.
+        if (!$language instanceof SiteLanguage) {
+            $language = $this->languageForPrefix($site, $prefix);
+        }
         if ($language instanceof SiteLanguage) {
             $askOptions['language'] = $language->getLanguageId();
             $restrict = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', true);
@@ -89,6 +108,23 @@ final class RagStreamMiddleware implements MiddlewareInterface
         // Returning NullResponse tells TYPO3 not to emit any additional
         // payload on top of what we already sent.
         return new NullResponse();
+    }
+
+    /**
+     * Map a path prefix such as "/de" onto the SiteLanguage whose base carries
+     * it. Trailing slashes are normalised because a language base is stored as
+     * "/de/" while the prefix we cut off the request path has none.
+     */
+    private function languageForPrefix(Site $site, string $prefix): ?SiteLanguage
+    {
+        $needle = rtrim($prefix, '/');
+        foreach ($site->getLanguages() as $language) {
+            if (rtrim($language->getBase()->getPath(), '/') === $needle) {
+                return $language;
+            }
+        }
+
+        return null;
     }
 
     /**

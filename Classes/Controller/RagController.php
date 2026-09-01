@@ -75,6 +75,7 @@ final class RagController extends ActionController
             'fallback' => $this->resolveFallback($site),
             'showFallback' => $mode === 'always',
             'pageType' => $this->currentPageType(),
+            'streamEndpoint' => $this->streamEndpoint(),
         ]);
         return $this->htmlResponse();
     }
@@ -147,6 +148,7 @@ final class RagController extends ActionController
             'fallback' => $this->resolveFallback($site),
             'showFallback' => $this->shouldShowFallback($site, $answer->status, $answer->citedIds),
             'pageType' => $this->currentPageType(),
+            'streamEndpoint' => $this->streamEndpoint(),
         ]);
         return $this->htmlResponse();
     }
@@ -222,6 +224,22 @@ final class RagController extends ActionController
      * iframe reloads the full page. Read from the global request because
      * Extbase strips routing attributes off $this->request.
      */
+    /**
+     * Streaming endpoint for the rendered shell, prefixed with the active
+     * language base ("/de/_ws_meilisearch/rag/stream"). The path is what tells
+     * RagStreamMiddleware which language to retrieve in — without it the site
+     * resolver finds no SiteLanguage and the stream searches across every
+     * language, ignoring meilisearch.restrictToCurrentLanguage.
+     */
+    private function streamEndpoint(): string
+    {
+        $request = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $language = $request instanceof ServerRequestInterface ? $request->getAttribute('language') : null;
+        $prefix = $language instanceof SiteLanguage ? rtrim($language->getBase()->getPath(), '/') : '';
+
+        return $prefix . '/_ws_meilisearch/rag/stream';
+    }
+
     private function currentPageType(): int
     {
         $request = $GLOBALS['TYPO3_REQUEST'] ?? null;
