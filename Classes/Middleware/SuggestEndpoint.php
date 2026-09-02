@@ -168,6 +168,29 @@ final class SuggestEndpoint implements MiddlewareInterface
             if ($uid > 0) {
                 $seen[$key] = true;
             }
+            // Badges an AfterSearchEvent listener attached (release, product,
+            // edition …). They ride along so rows that would otherwise read
+            // alike stay distinguishable: a documentation set carrying one
+            // topic per product and release answers "Heizlast" with three
+            // different pages of that exact title, and a dropdown of five
+            // slots showing "Heizlast" three times helps nobody.
+            $badges = [];
+            foreach ((array)($hit['badges'] ?? []) as $badge) {
+                if (!is_array($badge)) {
+                    continue;
+                }
+                $label = trim((string)($badge['label'] ?? ''));
+                if ($label !== '') {
+                    $badges[] = $label;
+                }
+            }
+            // Same title and same badges: nothing tells these two apart on
+            // screen, so showing both is noise. Keep the better-ranked one.
+            $shown = mb_strtolower(trim((string)($hit['title'] ?? '')) . '|' . implode(',', $badges));
+            if ($shown !== '|' && isset($seen[$shown])) {
+                continue;
+            }
+            $seen[$shown] = true;
             // Files store their URL as `publicUrl`, pages/news/knowledge_resource
             // store it as `uri` — fall back to the alternate field so every
             // hit in the dropdown becomes clickable. Strip the fragment
@@ -205,6 +228,7 @@ final class SuggestEndpoint implements MiddlewareInterface
                 'language' => (int)($hit['language'] ?? 0),
                 'publicUrl' => $url !== '' ? $url : null,
                 'searchToken' => $searchToken !== '' ? $searchToken : null,
+                'badges' => $badges,
             ];
             // Grouped mode needs the full deduped set (bounded by the
             // over-fetch above) to fill every section; flat mode stops

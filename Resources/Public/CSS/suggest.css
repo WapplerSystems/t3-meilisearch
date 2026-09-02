@@ -113,3 +113,18 @@
     color: #6c757d;
     font-size: 0.9em;
 }
+
+/* Qualifier badges on a suggestion row (release, product, edition). Quiet and
+ * right of the title: they exist to tell otherwise identical rows apart, not
+ * to compete with the title for attention. */
+.ws-meilisearch-suggest__qualifier {
+    flex: 0 0 auto;
+    font-size: .8em;
+    opacity: .7;
+    white-space: nowrap;
+}
+
+.ws-meilisearch-suggest__qualifier + .ws-meilisearch-suggest__qualifier::before {
+    content: '·';
+    margin-right: .3em;
+}

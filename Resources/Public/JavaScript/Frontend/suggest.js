@@ -314,9 +314,22 @@
             '<a href="' + href + '"' + tokenAttr + ' class="d-flex align-items-center gap-2 text-decoration-none text-reset">',
             showBadge ? '<span class="' + badgeClass(hit.type) + '">' + escapeText(hit.typeLabel || hit.type || '?') + '</span>' : '',
             '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
+            // Badges an AfterSearchEvent listener set — release, product,
+            // edition. Without them a documentation set that carries one topic
+            // per product answers "Heizlast" with three rows of that exact
+            // title and the reader cannot tell which is which.
+            renderHitBadges(hit.badges),
             '</a>',
             '</li>',
         ].join('');
+    }
+
+    // The qualifier badges of one row, quiet and to the right of the title.
+    function renderHitBadges(badges) {
+        if (!Array.isArray(badges) || badges.length === 0) { return ''; }
+        return badges.map(function (label) {
+            return '<span class="ws-meilisearch-suggest__qualifier">' + escapeText(String(label)) + '</span>';
+        }).join('');
     }
 
     // Grouped dropdown: one labelled section per type. Item ids stay
