@@ -29,16 +29,11 @@
                             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant"/>
                         </small>
                         <p class="card-text mb-0" style="white-space: pre-wrap;"><f:format.raw>{turn.displayAnswerHtml}</f:format.raw></p>
-                        <f:if condition="{turn.citedIds}">
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources"/>:
-                                </small>
-                                <f:for each="{turn.citedIds}" as="id">
-                                    <span class="badge text-bg-light border ms-1">{id}</span>
-                                </f:for>
-                            </div>
-                        </f:if>
+                        <f:comment>
+                            No source list here: the answer text carries the
+                            citations as links, and a row of raw document ids
+                            told the visitor nothing while taking up space.
+                        </f:comment>
                     </div>
                 </div>
             </li>

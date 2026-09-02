@@ -10,8 +10,6 @@
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.heading"/>
         </h2>
 
-        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
-
         <f:comment>
             With conversation memory enabled, the controller has already
             appended the just-asked turn to {conversation}, so the thread
@@ -56,56 +54,11 @@
                             </f:if>
 
                             <f:comment>
-                                Sources fed into the LLM context window. Cited
-                                rows (those whose id appears in answer.citedIds)
-                                are highlighted; the parser only detects the
-                                `[id=…]` form, so a missing checkmark on a row
-                                doesn't mean the LLM didn't use it.
+                                No source list: getAnswerHtml() already turns
+                                every citation in the answer into a link to the
+                                document it came from, so listing the same
+                                documents again below only cost space.
                             </f:comment>
-                            <f:comment>
-                                {answer.publicSources} ist {answer.sources} ohne
-                                Treffer vom Typ knowledge_resource. Wissens-
-                                Resourcen grounden die Antwort (LLM bekommt sie
-                                im Prompt), aber wir machen sie hier nicht als
-                                Quelle sichtbar. Block bleibt komplett aus,
-                                wenn keine öffentliche Quelle übrig ist.
-                            </f:comment>
-                            <f:if condition="{answer.publicSources}">
-                                <section class="ws-meilisearch-rag-sources mb-4">
-                                    <h3 class="h6 text-uppercase text-muted small fw-semibold mb-2">
-                                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources"/>
-                                    </h3>
-                                    <ul class="list-group list-group-flush">
-                                        <f:for each="{answer.publicSources}" as="hit">
-                                            <f:variable name="cited" value="0"/>
-                                            <f:for each="{answer.citedIds}" as="cid">
-                                                <f:if condition="{cid} == {hit.id}"><f:variable name="cited" value="1"/></f:if>
-                                            </f:for>
-                                            <li class="list-group-item d-flex align-items-start gap-2 {f:if(condition: cited, then: 'list-group-item-success')}">
-                                                <span class="ws-meilisearch-rag-sources__marker" aria-hidden="true">
-                                                    <f:if condition="{cited}"><f:then>✓</f:then><f:else>·</f:else></f:if>
-                                                </span>
-                                                <span class="flex-grow-1">
-                                                    <f:if condition="{hit.uri}">
-                                                        <f:then>
-                                                            <a href="{hit.uri}" rel="noopener">{f:if(condition: hit.citationLabel, then: hit.citationLabel, else: hit.title) -> f:format.htmlspecialchars()}<f:if condition="{hit.citationQualifier}"> ({hit.citationQualifier -> f:format.htmlspecialchars()})</f:if></a>
-                                                        </f:then>
-                                                        <f:else>{f:if(condition: hit.citationLabel, then: hit.citationLabel, else: hit.title) -> f:format.htmlspecialchars()}<f:if condition="{hit.citationQualifier}"> ({hit.citationQualifier -> f:format.htmlspecialchars()})</f:if></f:else>
-                                                    </f:if>
-                                                    <f:comment>Rohe Dokument-ID bewusst nicht ausgegeben - fuer Besucher bedeutungslos.</f:comment>
-                                                </span>
-                                                <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.{hit.type}" default="{hit.type}"/></f:variable>
-                                                <f:switch expression="{hit.type}">
-                                                    <f:case value="page"><span class="badge text-bg-primary">{typeLabel -> f:format.trim()}</span></f:case>
-                                                    <f:case value="news"><span class="badge text-bg-info">{typeLabel -> f:format.trim()}</span></f:case>
-                                                    <f:case value="file"><span class="badge text-bg-warning">{typeLabel -> f:format.trim()}</span></f:case>
-                                                    <f:defaultCase><span class="badge text-bg-secondary">{typeLabel -> f:format.trim()}</span></f:defaultCase>
-                                                </f:switch>
-                                            </li>
-                                        </f:for>
-                                    </ul>
-                                </section>
-                            </f:if>
                         </f:case>
                         <f:case value="disabled">
                             <div class="alert alert-info" role="status">
@@ -151,6 +104,13 @@
             feature is enabled, so the partial produces no markup otherwise.
         </f:comment>
         <f:render partial="Rag/Suggestions" arguments="{suggestions: answer.suggestions, pageType: pageType}"/>
+
+        <f:comment>
+            Input below the answer, as in the streamed layout: the reader
+            scrolls down to read and types the next question where they
+            already are.
+        </f:comment>
+        <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
 
         <f:comment>
             Contact fallback — rendered below whatever the switch

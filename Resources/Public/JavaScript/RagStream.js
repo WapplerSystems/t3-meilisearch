@@ -45,7 +45,6 @@
         const labels = {
             you: root.dataset.labelYou || 'You',
             assistant: root.dataset.labelAssistant || 'Assistant',
-            sources: root.dataset.labelSources || 'Sources',
             suggestions: root.dataset.labelSuggestions || '',
             loading: root.dataset.labelLoading || 'Generating answer…'
         };
@@ -125,7 +124,6 @@
                 + '<span class="ws-meilisearch-rag-spinner__label">' + escapeText(labels.loading) + '</span>'
                 + '</div>'
                 + '</div>'
-                + '<div class="ws-meilisearch-rag-sources mt-2"></div>'
                 + '<div class="ws-meilisearch-rag-suggestions mt-2"></div>'
                 + '</div></div>';
             thread.appendChild(li);
@@ -133,7 +131,6 @@
             return {
                 answerEl: li.querySelector('.ws-meilisearch-rag-answer'),
                 spinnerEl: li.querySelector('.ws-meilisearch-rag-spinner'),
-                sourcesEl: li.querySelector('.ws-meilisearch-rag-sources'),
                 suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions')
             };
         }
@@ -167,8 +164,10 @@
             es.addEventListener('sources', function (ev) {
                 try {
                     const p = JSON.parse(ev.data);
+                    // Kept for the citation links in the answer text, no
+                    // longer rendered as a list: the answer names every source
+                    // it used, so a second list below it only cost space.
                     turn.sources = Array.isArray(p.sources) ? p.sources : [];
-                    turn.sourcesEl.innerHTML = renderSources(p.sources || [], labels.sources);
                 } catch (_) { /* ignore */ }
             });
 
@@ -192,9 +191,6 @@
                     const p = JSON.parse(ev.data);
                     const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : acc;
                     turn.answerEl.innerHTML = renderAnswerHtml(finalText, turn.sources);
-                    if (Array.isArray(p.citedIds) && p.citedIds.length > 0) {
-                        markCitedSources(turn.sourcesEl, p.citedIds);
-                    }
                 } catch (_) { /* ignore */ }
                 closeTimer = setTimeout(finish, 15000);
             });
@@ -286,43 +282,6 @@
             + '<div class="d-flex flex-wrap gap-2">' + buttons + '</div>';
     }
 
-    function renderSources(sources, label) {
-        if (sources.length === 0) return '';
-        const items = sources.map(function (s) {
-            const id = (s.id || '').toString();
-            // Label plus qualifier, so the list distinguishes the same topic
-            // in several releases just as the inline citations do.
-            const base = (s.citationLabel || s.title || '').toString();
-            const qualifier = (s.citationQualifier || '').toString().trim();
-            const title = qualifier !== '' ? base + ' (' + qualifier + ')' : base;
-            const type = (s.type || '').toString();
-            const url = (s.uri || s.publicUrl || '').toString();
-            // Help / knowledge-resource hits are the internal RAG grounding
-            // corpus — show the title but don't link it or expose the raw id.
-            if (type === 'knowledge_resource') {
-                return '<li data-source-id="' + escapeAttr(id) + '">' + escapeText(title) + '</li>';
-            }
-            const linked = url
-                ? '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">' + escapeText(title) + '</a>'
-                : escapeText(title);
-            // The raw document id stays in the data attribute for debugging
-            // but is not shown - it means nothing to a visitor.
-            return '<li data-source-id="' + escapeAttr(id) + '">' + linked + '</li>';
-        }).join('');
-        return '<small class="text-muted d-block mb-1">' + escapeText(label) + '</small><ul>' + items + '</ul>';
-    }
-
-    function markCitedSources(container, citedIds) {
-        if (!container) return;
-        const set = Object.create(null);
-        citedIds.forEach(function (id) { set[id] = true; });
-        container.querySelectorAll('[data-source-id]').forEach(function (el) {
-            if (set[el.dataset.sourceId]) {
-                el.classList.add('is-cited');
-            }
-        });
-    }
-
     function escapeText(s) {
         return String(s).replace(/[&<>]/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
@@ -381,62 +340,77 @@
             .replace(/\s*\[[^\[\]]*$/, '');
     }
 
-    // Final render: citation markers become links to the cited document.
-    // Mirrors RagAnswer::getAnswerHtml() so the streamed answer and the
-    // server-rendered one look the same, down to the markup and the tooltip.
+    // Final render: citation markers become numbered references and the
+    // numbers are explained in a legend after the text. Mirrors
+    // RagAnswer::getAnswerHtml() so the streamed answer and the
+    // server-rendered one look the same.
     function renderAnswerHtml(text, sources) {
+        const refs = Object.create(null);
+        const order = [];
         const linked = rewriteCitations(escapeText(text), sources, function (matched) {
-            // Group by citation label so three releases of one topic read
-            // "[Install packages (26 - Revit, 25 - AutoCAD)]" instead of
-            // repeating the title. Each document keeps its own link, carried
-            // by its qualifier. citationLabel/citationQualifier come from
-            // RagCitationLabelsEvent listeners; plain title otherwise.
-            const order = [];
-            const groups = Object.create(null);
+            // Numbers are handed out in order of first appearance and reused,
+            // so a document cited five times stays reference 1. Sources that
+            // would read identically — the same topic per discipline, say —
+            // collapse onto one number: two references a reader cannot tell
+            // apart are noise wherever they are shown.
+            const numbers = [];
             matched.forEach(function (hit) {
-                const label = (hit.src.citationLabel || hit.src.title || '').toString().trim() || hit.id;
-                if (!groups[label]) { groups[label] = []; order.push(label); }
-                groups[label].push({
-                    id: hit.id,
-                    qualifier: (hit.src.citationQualifier || '').toString().trim(),
-                    uri: (hit.src.uri || hit.src.publicUrl || '').toString(),
-                    type: (hit.src.type || '').toString().trim()
-                });
-            });
-
-            return order.map(function (label) {
-                const members = groups[label];
-                const qualified = members.filter(function (m) { return m.qualifier !== ''; });
-                // A single document, or several that brought no qualifier to
-                // tell them apart: link the label itself, once per document.
-                if (members.length === 1 || qualified.length === 0) {
-                    return members.map(function (m) {
-                        const text = m.qualifier !== '' ? label + ' (' + m.qualifier + ')' : label;
-                        return '[' + citationAnchor(m, text) + ']';
-                    }).join('');
+                const text = citationText(hit.src, hit.id);
+                if (!refs[text]) {
+                    refs[text] = {
+                        number: order.length + 1,
+                        text: text,
+                        uri: (hit.src.uri || hit.src.publicUrl || '').toString()
+                    };
+                    order.push(refs[text]);
                 }
-                // Several documents sharing a label: say it once as plain
-                // text and turn each qualifier into the link.
-                const links = members.map(function (m) {
-                    return citationAnchor(m, m.qualifier !== '' ? m.qualifier : label);
-                });
-                return '[' + escapeText(label) + ' (' + links.join(', ') + ')]';
+                if (numbers.indexOf(refs[text]) === -1) { numbers.push(refs[text]); }
+            });
+            numbers.sort(function (a, b) { return a.number - b.number; });
+            return numbers.map(function (ref) {
+                return '[' + citationAnchor(ref, String(ref.number)) + ']';
             }).join('');
         });
         // **bold** last, exactly as the server does: escaping left the
-        // asterisks alone and the citation titles must not be re-scanned.
-        return linked.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+        // asterisks alone and the citation texts must not be re-scanned.
+        const bold = linked.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+
+        return bold + citationLegend(order);
     }
 
-    // One citation link. Documents without a uri become an <abbr> so the
-    // tooltip still names what was cited.
-    function citationAnchor(member, text) {
-        const tooltip = member.type !== '' ? member.type + ' \u00b7 ' + member.id : member.id;
-        if (member.uri === '') {
-            return '<abbr title="' + escapeAttr(tooltip) + '">' + escapeText(text) + '</abbr>';
+    // What a citation is called: the label a RagCitationLabelsEvent listener
+    // set plus its qualifier, falling back to the title and then the id.
+    function citationText(src, id) {
+        const label = (src.citationLabel || src.title || '').toString().trim() || id;
+        const qualifier = (src.citationQualifier || '').toString().trim();
+
+        return qualifier === '' ? label : label + ' (' + qualifier + ')';
+    }
+
+    // One inline reference: the number, linking to the document, with the full
+    // citation text as its tooltip. Documents without a uri become an <abbr>,
+    // which still carries the tooltip.
+    function citationAnchor(ref, label) {
+        if (ref.uri === '') {
+            return '<abbr title="' + escapeAttr(ref.text) + '">' + escapeText(label) + '</abbr>';
         }
-        return '<a href="' + escapeAttr(member.uri) + '" title="' + escapeAttr(tooltip)
-            + '" rel="noopener" class="ws-meilisearch-rag-citation">' + escapeText(text) + '</a>';
+        return '<a href="' + escapeAttr(ref.uri) + '" title="' + escapeAttr(ref.text)
+            + '" rel="noopener" class="ws-meilisearch-rag-citation">' + escapeText(label) + '</a>';
+    }
+
+    // Explains the numbers, listing only what the answer actually cited. An
+    // <ol> so the browser numbers the rows — references were handed out in
+    // appearance order, so the two line up.
+    function citationLegend(order) {
+        if (order.length === 0) { return ''; }
+        const rows = order.map(function (ref) {
+            const text = escapeText(ref.text);
+            return ref.uri === ''
+                ? '<li>' + text + '</li>'
+                : '<li><a href="' + escapeAttr(ref.uri) + '" rel="noopener">' + text + '</a></li>';
+        }).join('');
+
+        return '<ol class="ws-meilisearch-rag-citations">' + rows + '</ol>';
     }
 
     function renderMarkdownLight(text) {

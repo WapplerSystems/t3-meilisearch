@@ -7,6 +7,34 @@
     position: relative;
 }
 
+/* Search field and its button, same height.
+ *
+ * Bootstrap 5 input groups are flex containers and stretch their children to
+ * equal height by themselves. Measured in this project the site theme renders
+ * .input-group as `inline-table` instead, so that never happened: the field
+ * came out 25px against the button's 35px — the theme's underline-style input
+ * pads 1px where the button pads 6px — and the table layout squeezed the field
+ * to 181px on top of that.
+ *
+ * Restoring flex inside the plugin's own form fixes it at the cause and
+ * survives the theme changing its paddings, which a fixed height would not.
+ * Scoped to this form, so the theme's own input groups stay untouched. The
+ * suggestion menu shares the container but is position:absolute, so it is not
+ * a flex item and keeps sitting under the field. */
+.ws-meilisearch-form .input-group {
+    display: flex;
+    align-items: stretch;
+}
+
+.ws-meilisearch-form .input-group > .form-control {
+    /* Take the remaining width; the button keeps its intrinsic size. */
+    flex: 1 1 auto;
+    width: 1%;
+    /* The theme's 25px comes from an explicit height on .form-control, which
+     * would win over stretching. */
+    height: auto;
+}
+
 .ws-meilisearch-suggest__menu {
     position: absolute;
     top: 100%;

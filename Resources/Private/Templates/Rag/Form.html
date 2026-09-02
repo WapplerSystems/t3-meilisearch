@@ -21,11 +21,17 @@
              data-endpoint="{streamEndpoint}"
              data-label-you="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you')}"
              data-label-assistant="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant')}"
-             data-label-sources="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources')}"
              data-label-suggestions="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}"
              data-label-loading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.loading')}">
-            <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
+            <f:comment>
+                Transcript first, input below it: the answer grows downwards
+                and the reader follows it, so the field they type the next
+                question into has to be where their eyes already are. Inside
+                the chat widget the field additionally sticks to the bottom of
+                the scrolling panel (Rag.css).
+            </f:comment>
             <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+            <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
         </div>
 
         <f:comment>

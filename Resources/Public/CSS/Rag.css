@@ -84,3 +84,84 @@
     white-space: nowrap;
     border: 0;
 }
+
+/* The input sits below the transcript, which in the widget means it scrolls
+ * away as the conversation grows. Inside the panel — the one place with a
+ * bounded scroll container — it stays put at the bottom instead. Scoped to the
+ * embed body on purpose: on a full page there is no such container, and a
+ * sticky field would hover over whatever follows the plugin. */
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-form {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding-top: .5rem;
+    /* sticky positions the margin box: any bottom margin would leave a
+     * transparent strip at the bottom edge of the panel with the transcript
+     * scrolling visibly through it. The form therefore carries no Bootstrap
+     * mb-* utility (those are !important and cannot be overridden here) and
+     * pads instead. */
+    padding-bottom: .5rem;
+    /* Opaque, so the transcript does not scroll through underneath it. The
+     * embed document and the panel body are both white (RagEmbed.css line 20,
+     * ChatWidget.css line 58); `inherit` would land on a transparent parent. */
+    background: #fff;
+    /* The panel body keeps its own bottom padding, and overflow is clipped at
+     * the padding box — so the strip below the sticky form would still have
+     * the transcript scrolling through it. Extending the background downwards
+     * with a shadow covers it without touching the layout. */
+    box-shadow: 0 1rem 0 #fff;
+}
+
+/* Inline reference: a number in brackets, deliberately unobtrusive. The
+ * citation used to be the document title, which on a knowledge base carrying
+ * one topic per product and release took 40 to 60 characters and dominated the
+ * sentence it belonged to. */
+.ws-meilisearch-rag-citation {
+    font-size: .85em;
+    text-decoration: none;
+}
+
+.ws-meilisearch-rag-citation:hover,
+.ws-meilisearch-rag-citation:focus-visible {
+    text-decoration: underline;
+}
+
+/* The legend explaining the numbers. Only the documents the answer actually
+ * cited, one line each, small and quiet — it is a reference, not content. */
+.ws-meilisearch-rag-citations {
+    margin: .75rem 0 0;
+    padding-left: 1.35rem;
+    font-size: .85em;
+    line-height: 1.45;
+    opacity: .8;
+}
+
+.ws-meilisearch-rag-citations li + li {
+    margin-top: .15rem;
+}
+
+/* Question field and its button, same height.
+ *
+ * Bootstrap 5 input groups are flex containers and stretch their children to
+ * equal height by themselves. Measured in this project the site theme renders
+ * .input-group as `inline-table` instead, so that never happened: the field
+ * came out 25px against the button's 35px, because the theme's underline-style
+ * input pads 1px where the button pads 6px.
+ *
+ * Restoring flex inside the plugin's own form fixes it at the cause and keeps
+ * working when the theme changes its paddings — an explicit height would have
+ * to be chased every time. Scoped to this form, so the theme's own input
+ * groups elsewhere are untouched. */
+.ws-meilisearch-rag-form .input-group {
+    display: flex;
+    align-items: stretch;
+}
+
+.ws-meilisearch-rag-form .input-group > .form-control {
+    /* Take the remaining width; the button keeps its intrinsic size. */
+    flex: 1 1 auto;
+    width: 1%;
+    /* The theme's 25px comes from an explicit height on .form-control, which
+     * would win over stretching. */
+    height: auto;
+}
