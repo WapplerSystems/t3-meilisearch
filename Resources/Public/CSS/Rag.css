@@ -14,20 +14,29 @@
 }
 
 /* While tokens are still arriving the answer is readable but visibly
- * unfinished, and gets a minimum height so the spinner has somewhere to sit
- * during the seconds before the first token lands. */
+ * unfinished. The reserved strip at the bottom is where the spinner sits: it
+ * marks the point the next chunk will appear at and travels down with the
+ * text, instead of floating in the middle of what is already written. The
+ * strip is also what gives the spinner somewhere to sit during the seconds
+ * before the first token lands, when the paragraph is still empty. */
 .ws-meilisearch-rag-answer[data-streaming="true"] {
     opacity: .4;
-    min-height: 3.5rem;
+    padding-bottom: 2.25rem;
+    min-height: 2.25rem;
     transition: opacity .2s ease-out;
 }
 
 .ws-meilisearch-rag-spinner {
     position: absolute;
-    inset: 0;
+    /* Pinned to the reserved strip below the text, at the start of the line
+     * the next chunk will be written on. */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2.25rem;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     /* Clicks belong to the text underneath, not to the overlay. */
     pointer-events: none;
 }
@@ -38,9 +47,9 @@
 
 .ws-meilisearch-rag-spinner::before {
     content: '';
-    width: 1.75rem;
-    height: 1.75rem;
-    border: .2rem solid currentColor;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: .15rem solid currentColor;
     border-top-color: transparent;
     border-radius: 50%;
     opacity: .55;

@@ -218,6 +218,20 @@
                 try { q = (JSON.parse(ev.data).question || '').toString(); } catch (_) { /* ignore */ }
                 turn.answerEl.innerHTML = renderMarkdownLight(stripCitations(q, turn.sources));
                 turn.answerEl.classList.add('ws-meilisearch-rag-answer--clarify');
+                // Offer the named alternatives as buttons. They reuse the
+                // suggestion markup, so the delegated click handler picks them
+                // up and asks with the chosen wording — no extra wiring, and
+                // the visitor does not have to retype a product name.
+                var optionen = [];
+                try { optionen = (JSON.parse(ev.data).options || []); } catch (_) { /* ignore */ }
+                if (Array.isArray(optionen) && optionen.length > 1) {
+                    // Server-composed pairs: the button reads just the choice,
+                    // clicking it asks the original question with the choice
+                    // appended, so the topic cannot get lost on the way.
+                    renderSuggestions(turn.suggestionsEl, optionen.map(function (o) {
+                        return { type: 'clarify', label: (o.label || '').toString(), value: (o.value || '').toString() };
+                    }), '');
+                }
                 finish();
             });
 

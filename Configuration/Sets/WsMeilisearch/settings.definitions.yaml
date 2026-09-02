@@ -546,6 +546,18 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.clarify.productTerms:
+    label: 'RAG: product names this site distinguishes'
+    description: 'Names of the products, editions or product lines the documentation covers, e.g. the CAD platforms a manual exists for. Used twice: the triage step skips the extra LLM call when the visitor already named one of them, and the choices offered as buttons under a clarifying question must occur in this list or in the retrieved titles — otherwise the model invents plausible-sounding product names that are not in the index at all, and the button leads to "no information found". Empty by default, which leaves both to the model.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.clarify.styleHint:
+    label: 'RAG: wording instruction for the clarifying question'
+    description: 'Appended verbatim to the triage prompt to govern how the clarifying question is worded — most usefully the form of address, which the model otherwise picks per request and which then clashes with the register of the answers themselves (documentation that says "Sie" getting a clarifying question that says "du"). Free text, in English or in the site language, e.g. "Address the reader with the polite German form Sie, never du." Empty by default, which leaves the wording entirely to the model.'
+    type: string
+    default: ''
+
   meilisearch.rag.suggestions.enabled:
     label: 'RAG: action suggestions under the answer'
     description: 'When true, after each answer one short extra LLM call proposes up to N actionable buttons: follow-up questions, narrower search queries, and pointers to retrieved sources. Optional + safe — when disabled or on any error no suggestions are shown and the answer is unaffected.'

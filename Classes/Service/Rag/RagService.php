@@ -370,7 +370,10 @@ final class RagService implements LoggerAwareInterface
             $llmOptions,
         );
         if ($clarification->needed) {
-            $answer = RagAnswer::clarification($clarification->question);
+            $answer = RagAnswer::clarification(
+                $clarification->question,
+                $this->clarifyChoices($clarification->options, $event->question),
+            );
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
             return $answer;
         }
@@ -509,10 +512,16 @@ final class RagService implements LoggerAwareInterface
             $llmOptions,
         );
         if ($clarification->needed) {
-            yield RagStreamChunk::clarify($clarification->question);
+            yield RagStreamChunk::clarify(
+                $clarification->question,
+                $this->clarifyChoices($clarification->options, $event->question),
+            );
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
                 $event->question,
-                RagAnswer::clarification($clarification->question),
+                RagAnswer::clarification(
+                    $clarification->question,
+                    $this->clarifyChoices($clarification->options, $event->question),
+                ),
                 $site,
                 $this->resolveLanguageId($options),
             ));
@@ -836,6 +845,35 @@ final class RagService implements LoggerAwareInterface
         $languageId = $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
+    /**
+     * Turn the choices of a clarifying question into label/value pairs for the
+     * client: the button reads just the choice, but asking it sends the
+     * original question along with it.
+     *
+     * Sending the bare choice would leave it to the conversational rewriter to
+     * reattach the topic, and that is not reliable enough to build a button
+     * on. Measured locally: "Wie starte ich die Rohrnetzberechnung?" followed
+     * by the choice "LINEAR 26 · Revit" came back with an answer about
+     * Heizlastberechnung — right product, wrong subject. Composing the value
+     * here removes the guesswork and makes the transcript readable on its own.
+     *
+     * @param list<string> $options
+     * @return list<array{label:string,value:string}>
+     */
+    private function clarifyChoices(array $options, string $question): array
+    {
+        $question = trim($question);
+        $choices = [];
+        foreach ($options as $option) {
+            $choices[] = [
+                'label' => $option,
+                'value' => $question === '' ? $option : sprintf('%s (%s)', $question, $option),
+            ];
+        }
+
+        return $choices;
     }
 
     private function resolveLanguageId(array $options): ?int

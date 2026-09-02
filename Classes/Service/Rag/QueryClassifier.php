@@ -40,10 +40,12 @@ Rules:
 - When clarification is genuinely needed, ask ONE short, specific question in the same language as the user's latest message. Prefer concrete options taken from the retrieved titles (e.g. product or edition names) over a generic "please be more specific".
 - Never ask the user merely to rephrase. Ask for the specific missing fact.
 
+- When your question offers the user a choice between named alternatives, list those alternatives in "options", each exactly as it should read on a button: short and without trailing punctuation. Take them VERBATIM from the retrieved titles or from the product names listed below — never invent a product, edition or module name, however plausible it sounds. An option that does not occur in that material is dropped, and a question whose options are all dropped ends up with no buttons at all. Two to five entries. Leave "options" out when the question asks for something that is not a choice between names — a version number, a file name, what the user actually wants to achieve.
+
 Output ONLY minified JSON, nothing else:
 {"answerable": true}
 or
-{"answerable": false, "question": "<your single clarifying question>"}
+{"answerable": false, "question": "<your single clarifying question>", "options": ["<choice>", "<choice>"]}
 PROMPT;
 
     /**
@@ -76,11 +78,12 @@ PROMPT;
 
         $historyTurns = max(1, (int)$settings->get('meilisearch.rag.rewriteHistoryTurns', 3));
         $messages = [
-            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+            ['role' => 'system', 'content' => $this->systemPrompt($settings)],
             ['role' => 'user', 'content' =>
                 "Conversation so far:\n" . $this->renderHistory($conversation, $historyTurns)
                 . "\n\nLatest question: " . $question
                 . "\n\nRetrieved document titles:\n" . $this->renderTitles($hits)
+                . $this->renderProductTerms($settings)
                 . "\n\nVerdict JSON:",
             ],
         ];
@@ -98,7 +101,7 @@ PROMPT;
             return Clarification::answerable();
         }
 
-        return $this->parse($raw);
+        return $this->parse($raw, $settings, $hits);
     }
 
     private function renderHistory(Conversation $conversation, int $maxTurns): string
@@ -134,12 +137,100 @@ PROMPT;
                 continue;
             }
             $type = trim((string)($hit['type'] ?? ''));
-            $lines[] = $type !== '' ? sprintf('- %s (%s)', $title, $type) : '- ' . $title;
+            // The citation qualifier names release and product as the site
+            // words them ("LINEAR 26 · Revit"), which is exactly the material
+            // a choice between products should be built from.
+            $qualifier = trim((string)($hit['citationQualifier'] ?? ''));
+            $meta = implode(', ', array_filter([$type, $qualifier]));
+            $lines[] = $meta !== '' ? sprintf('- %s (%s)', $title, $meta) : '- ' . $title;
         }
         return $lines === [] ? '(none)' : implode("\n", $lines);
     }
 
-    private function parse(string $raw): Clarification
+    /**
+     * The product names the site distinguishes, handed to the model so a
+     * choice between products can be built from the site's own vocabulary
+     * instead of the model's guesses.
+     */
+    /**
+     * The triage prompt plus the site's wording instruction, if it set one.
+     * Without it the model picks a form of address per request, which on a
+     * German site produces a clarifying question saying "du" while the answers
+     * say "Sie" — the assistant contradicting itself mid-conversation.
+     */
+    private function systemPrompt(object $settings): string
+    {
+        $hint = trim((string)$settings->get('meilisearch.rag.clarify.styleHint', ''));
+
+        return $hint === '' ? self::SYSTEM_PROMPT : self::SYSTEM_PROMPT . "\n\n" . $hint;
+    }
+
+    private function renderProductTerms(object $settings): string
+    {
+        $terms = $this->productTerms($settings);
+
+        return $terms === [] ? '' : "\n\nProduct names this site distinguishes:\n- " . implode("\n- ", $terms);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function productTerms(object $settings): array
+    {
+        $terms = $settings->get('meilisearch.rag.clarify.productTerms', []);
+        if (!is_array($terms)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn ($t): string => trim((string)$t),
+            $terms,
+        ), static fn (string $t): bool => $t !== ''));
+    }
+
+    /**
+     * Keep only options that actually occur in the material the model was
+     * shown — retrieved titles, their citation labels and qualifiers, or the
+     * site's product names.
+     *
+     * Without this the model offers plausible-sounding buttons for products
+     * that are not in the corpus at all: measured locally, a question about
+     * setting up a workstation produced "LINEAR Solutions Heizung",
+     * "… Trinkwasser" and "… Abwasser", none of which exist in the index. A
+     * button that reliably leads to "no information found" is worse than no
+     * button, because the visitor trusted it enough to click.
+     *
+     * @param list<string> $options
+     * @param list<array<string,mixed>> $hits
+     * @return list<string>
+     */
+    private function groundOptions(array $options, object $settings, array $hits): array
+    {
+        if ($options === []) {
+            return [];
+        }
+        $haystack = ' ' . mb_strtolower(implode(' ', $this->productTerms($settings)));
+        foreach ($hits as $hit) {
+            foreach (['title', 'citationLabel', 'citationQualifier'] as $field) {
+                $haystack .= ' ' . mb_strtolower((string)($hit[$field] ?? ''));
+            }
+        }
+        $grounded = [];
+        foreach ($options as $option) {
+            if (str_contains($haystack, mb_strtolower($option))) {
+                $grounded[] = $option;
+            }
+        }
+
+        // One surviving option is not a choice; none means the visitor types
+        // the answer, which is how this behaved before options existed.
+        return count($grounded) < 2 ? [] : $grounded;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $hits
+     */
+    private function parse(string $raw, object $settings, array $hits): Clarification
     {
         $raw = trim($raw);
         // Strip ```json fences some models wrap around the JSON.
@@ -164,7 +255,53 @@ PROMPT;
         if ($question === '' || mb_strlen($question) > 400) {
             return Clarification::answerable();
         }
-        return Clarification::needed($question);
+
+        return Clarification::needed(
+            $question,
+            $this->groundOptions($this->parseOptions($data['options'] ?? null), $settings, $hits),
+        );
+    }
+
+    /**
+     * Choices for the clarifying question, sanitised into button labels. The
+     * model is asked for them but nothing depends on getting them: an empty
+     * list simply means the visitor types the answer, which is how this
+     * worked before options existed.
+     *
+     * @return list<string>
+     */
+    private function parseOptions(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $options = [];
+        $seen = [];
+        foreach ($raw as $entry) {
+            if (!is_string($entry) && !is_numeric($entry)) {
+                continue;
+            }
+            // Models like to wrap choices in quotes or trail them with a
+            // comma from the sentence they were lifted out of.
+            $label = trim(trim((string)$entry), " \t\n\r\0\x0B\"'“”„,;.");
+            if ($label === '' || mb_strlen($label) > 60) {
+                continue;
+            }
+            $key = mb_strtolower($label);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $options[] = $label;
+            // More than a handful stops being a choice and becomes a list.
+            if (count($options) >= 6) {
+                break;
+            }
+        }
+
+        // A single option is not a choice — it would look like the assistant
+        // answering its own question.
+        return count($options) < 2 ? [] : $options;
     }
 
     /**

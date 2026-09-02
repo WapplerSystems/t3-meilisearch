@@ -102,8 +102,13 @@ final class RagStreamChunk
      * instead of answering. No `sources`/`token`/`end` follow — the client
      * renders the question and closes the stream.
      */
-    public static function clarify(string $question): self
+    /**
+     * @param list<array{label:string,value:string}> $options choices the
+     *              client offers as buttons: the label is the choice, the
+     *              value the question to ask when it is clicked
+     */
+    public static function clarify(string $question, array $options = []): self
     {
-        return new self(self::TYPE_CLARIFY, ['question' => $question]);
+        return new self(self::TYPE_CLARIFY, ['question' => $question, 'options' => $options]);
     }
 }

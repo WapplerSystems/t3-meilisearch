@@ -64,9 +64,26 @@ final class RagAnswer
      * clarifying question is carried in {@see $answer} so the template renders
      * it in the answer bubble; there are no sources or citations.
      */
-    public static function clarification(string $question): self
+    /**
+     * The choices ride along as suggestions of type `clarify`: the suggestion
+     * partial is rendered outside the status switch and already turns
+     * {type,label,value} rows into re-ask links, so the visitor answers the
+     * clarifying question with one click instead of retyping a product name.
+     *
+     * @param list<array{label:string,value:string}> $options
+     */
+    public static function clarification(string $question, array $options = []): self
     {
-        return new self(trim($question), [], [], 'clarify', null);
+        $suggestions = [];
+        foreach ($options as $option) {
+            $suggestions[] = [
+                'type' => 'clarify',
+                'label' => (string)($option['label'] ?? ''),
+                'value' => (string)($option['value'] ?? ''),
+            ];
+        }
+
+        return new self(trim($question), [], [], 'clarify', null, $suggestions);
     }
 
     /**

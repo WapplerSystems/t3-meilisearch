@@ -18,9 +18,16 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  */
 final class Clarification
 {
+    /**
+     * @param list<string> $options concrete choices the question offers, ready
+     *                              to be put on a button ("LINEAR Heizung").
+     *                              Empty when the question is not a choice
+     *                              between named alternatives.
+     */
     private function __construct(
         public readonly bool $needed,
         public readonly string $question,
+        public readonly array $options = [],
     ) {}
 
     public static function answerable(): self
@@ -28,8 +35,11 @@ final class Clarification
         return new self(false, '');
     }
 
-    public static function needed(string $question): self
+    /**
+     * @param list<string> $options
+     */
+    public static function needed(string $question, array $options = []): self
     {
-        return new self(true, trim($question));
+        return new self(true, trim($question), $options);
     }
 }
