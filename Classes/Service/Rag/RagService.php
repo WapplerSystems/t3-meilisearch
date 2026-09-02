@@ -11,6 +11,7 @@ use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
 use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
+use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
@@ -424,9 +425,12 @@ final class RagService implements LoggerAwareInterface
         // rendered as buttons under the answer. Generated from the final
         // answer + sources; returns [] when disabled or on any error, so it
         // never blocks the answer.
-        return $final->withSuggestions(
+        return $final->withSuggestions($this->withScopeOptions(
             $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
-        );
+            $site,
+            $event->question,
+            $hits,
+        ));
     }
 
     /**
@@ -562,7 +566,12 @@ final class RagService implements LoggerAwareInterface
                 citedIds: $citedIds,
                 status: 'ok',
             );
-            $cachedSuggestions = $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions);
+            $cachedSuggestions = $this->withScopeOptions(
+                $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
+                $site,
+                $event->question,
+                $hits,
+            );
             if ($cachedSuggestions !== []) {
                 yield RagStreamChunk::suggestions($cachedSuggestions);
             }
@@ -607,7 +616,12 @@ final class RagService implements LoggerAwareInterface
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
         // followup / refine / recommend buttons too.
-        $suggestions = $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions);
+        $suggestions = $this->withScopeOptions(
+            $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
+            $site,
+            $event->question,
+            $hits,
+        );
         if ($suggestions !== []) {
             yield RagStreamChunk::suggestions($suggestions);
         }
@@ -845,6 +859,47 @@ final class RagService implements LoggerAwareInterface
         $languageId = $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
+    /**
+     * Put the scopes the question could be re-asked in (see
+     * RagScopeOptionsEvent) in front of the generated suggestions: the reader
+     * gets the answer first and switches product, edition or release with one
+     * click instead of retyping the question.
+     *
+     * They lead the list because they are grounded in what was actually
+     * retrieved, while the generated followups are the model's idea of a next
+     * step. Both end up in the same suggestion frame, so client and template
+     * render them without knowing the difference.
+     *
+     * @param list<array<string,mixed>> $suggestions
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function withScopeOptions(array $suggestions, Site $site, string $question, array $hits): array
+    {
+        if ($hits === []) {
+            return $suggestions;
+        }
+        $event = new RagScopeOptionsEvent($site, $question, $hits);
+        $this->eventDispatcher->dispatch($event);
+        $options = $event->getOptions();
+        if ($options === []) {
+            return $suggestions;
+        }
+        $question = trim($question);
+        $scope = [];
+        foreach ($options as $option) {
+            $scope[] = [
+                'type' => 'scope',
+                'label' => $option['label'],
+                'value' => $question === ''
+                    ? $option['choice']
+                    : sprintf('%s (%s)', $question, $option['choice']),
+            ];
+        }
+
+        return array_merge($scope, $suggestions);
     }
 
     /**
