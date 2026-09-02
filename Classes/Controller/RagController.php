@@ -14,6 +14,7 @@ use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
+use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\Turn;
 
 /**
@@ -133,7 +134,15 @@ final class RagController extends ActionController
         // step avoid asking for clarification twice in a row.
         if (($answer->status === 'ok' || $answer->status === 'clarify') && $this->conversationEnabled($site)) {
             $kind = $answer->status === 'clarify' ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER;
-            $turn = new Turn($q, $answer->answer, $answer->citedIds, $kind);
+            $turn = new Turn(
+                $q,
+                $answer->answer,
+                $answer->citedIds,
+                $kind,
+                // Only the cited documents, so the transcript can render its
+                // references again after a reload.
+                CitationRenderer::citationsFor($answer->sources, $answer->citedIds),
+            );
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
             $conversation = $conversation->withTurn($turn, $maxTurns);
             $sessionKey = $this->sessionKey($site);

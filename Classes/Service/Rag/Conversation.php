@@ -76,6 +76,9 @@ final class Conversation
                 'answer' => $t->answer,
                 'citedIds' => $t->citedIds,
                 'kind' => $t->kind,
+                // The cited documents, so a reloaded page can render the
+                // references instead of an answer that lost them.
+                'citations' => $t->citations,
             ], $this->turns),
         ];
     }
@@ -111,6 +114,12 @@ final class Conversation
                 answer: (string)($row['answer'] ?? ''),
                 citedIds: array_values(array_map('strval', (array)($row['citedIds'] ?? []))),
                 kind: $kind === Turn::KIND_CLARIFICATION ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER,
+                // Absent in turns stored before citations were kept — those
+                // simply render without references.
+                citations: array_values(array_filter(
+                    (array)($row['citations'] ?? []),
+                    static fn ($c): bool => is_array($c),
+                )),
             );
         }
         return new self($turns);

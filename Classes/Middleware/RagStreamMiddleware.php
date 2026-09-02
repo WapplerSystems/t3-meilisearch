@@ -12,6 +12,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
+use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
 use WapplerSystems\Meilisearch\Service\Rag\RagStreamChunk;
@@ -151,8 +152,14 @@ final class RagStreamMiddleware implements MiddlewareInterface
         flush();
 
         $finalChunk = null;
+        // The sources frame passes by before the answer; keep it so the turn
+        // can store the documents the answer ends up citing.
+        $sources = [];
         foreach ($stream as $chunk) {
             $this->emitFrame($chunk);
+            if ($chunk->type === RagStreamChunk::TYPE_SOURCES) {
+                $sources = (array)($chunk->data['sources'] ?? []);
+            }
             // Both `done` (answered) and `clarify` (asked back) are terminal
             // states worth persisting as a turn.
             if ($chunk->type === RagStreamChunk::TYPE_DONE || $chunk->type === RagStreamChunk::TYPE_CLARIFY) {
@@ -179,10 +186,13 @@ final class RagStreamMiddleware implements MiddlewareInterface
                     Turn::KIND_CLARIFICATION,
                 );
             } else {
+                $citedIds = array_values(array_map('strval', (array)($finalChunk->data['citedIds'] ?? [])));
                 $turn = new Turn(
                     $question,
                     (string)($finalChunk->data['answer'] ?? ''),
-                    array_values(array_map('strval', (array)($finalChunk->data['citedIds'] ?? []))),
+                    $citedIds,
+                    Turn::KIND_ANSWER,
+                    CitationRenderer::citationsFor($sources, $citedIds),
                 );
             }
             $conversation = $conversation->withTurn($turn, $maxTurns);
