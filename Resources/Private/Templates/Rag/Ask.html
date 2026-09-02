@@ -88,11 +88,11 @@
                                                 <span class="flex-grow-1">
                                                     <f:if condition="{hit.uri}">
                                                         <f:then>
-                                                            <a href="{hit.uri}" rel="noopener">{hit.title -> f:format.htmlspecialchars()}</a>
+                                                            <a href="{hit.uri}" rel="noopener">{f:if(condition: hit.citationLabel, then: hit.citationLabel, else: hit.title) -> f:format.htmlspecialchars()}<f:if condition="{hit.citationQualifier}"> ({hit.citationQualifier -> f:format.htmlspecialchars()})</f:if></a>
                                                         </f:then>
-                                                        <f:else>{hit.title -> f:format.htmlspecialchars()}</f:else>
+                                                        <f:else>{f:if(condition: hit.citationLabel, then: hit.citationLabel, else: hit.title) -> f:format.htmlspecialchars()}<f:if condition="{hit.citationQualifier}"> ({hit.citationQualifier -> f:format.htmlspecialchars()})</f:if></f:else>
                                                     </f:if>
-                                                    <code class="text-muted small ms-1">{hit.id}</code>
+                                                    <f:comment>Rohe Dokument-ID bewusst nicht ausgegeben - fuer Besucher bedeutungslos.</f:comment>
                                                 </span>
                                                 <f:variable name="typeLabel"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:facet.value.type.{hit.type}" default="{hit.type}"/></f:variable>
                                                 <f:switch expression="{hit.type}">

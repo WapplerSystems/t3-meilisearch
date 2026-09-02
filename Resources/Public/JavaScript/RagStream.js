@@ -46,7 +46,8 @@
             you: root.dataset.labelYou || 'You',
             assistant: root.dataset.labelAssistant || 'Assistant',
             sources: root.dataset.labelSources || 'Sources',
-            suggestions: root.dataset.labelSuggestions || ''
+            suggestions: root.dataset.labelSuggestions || '',
+            loading: root.dataset.labelLoading || 'Generating answer…'
         };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
@@ -116,7 +117,14 @@
                 + '</div></div>'
                 + '<div class="card border-primary"><div class="card-body py-2">'
                 + '<small class="text-primary d-block mb-1">' + escapeText(labels.assistant) + '</small>'
-                + '<p class="card-text mb-0 ws-meilisearch-rag-answer" data-streaming="true" style="white-space: pre-wrap;"></p>'
+                // The answer is built faded in place with the spinner over it,
+                // so the field is never blank while the model is working.
+                + '<div class="ws-meilisearch-rag-answer-wrap">'
+                + '<p class="card-text mb-0 ws-meilisearch-rag-answer" data-streaming="true" aria-busy="true" style="white-space: pre-wrap;"></p>'
+                + '<div class="ws-meilisearch-rag-spinner" role="status">'
+                + '<span class="ws-meilisearch-rag-spinner__label">' + escapeText(labels.loading) + '</span>'
+                + '</div>'
+                + '</div>'
                 + '<div class="ws-meilisearch-rag-sources mt-2"></div>'
                 + '<div class="ws-meilisearch-rag-suggestions mt-2"></div>'
                 + '</div></div>';
@@ -124,9 +132,21 @@
             li.scrollIntoView({ block: 'nearest' });
             return {
                 answerEl: li.querySelector('.ws-meilisearch-rag-answer'),
+                spinnerEl: li.querySelector('.ws-meilisearch-rag-spinner'),
                 sourcesEl: li.querySelector('.ws-meilisearch-rag-sources'),
                 suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions')
             };
+        }
+
+        // One place to end the "still working" state: the fade, the spinner
+        // and aria-busy have to be cleared together on every path that
+        // finishes a turn — answer, clarification, error or dropped stream.
+        function stopStreaming(turn) {
+            turn.answerEl.dataset.streaming = 'false';
+            turn.answerEl.removeAttribute('aria-busy');
+            if (turn.spinnerEl) {
+                turn.spinnerEl.hidden = true;
+            }
         }
 
         function ask(q) {
@@ -166,7 +186,7 @@
                 // Finalize the answer now; keep the stream open for the trailing
                 // suggestions frame and close on `end` (safety timeout guards
                 // against a missing `end` triggering an auto-reconnect).
-                turn.answerEl.dataset.streaming = 'false';
+                stopStreaming(turn);
                 setBusy(false);
                 try {
                     const p = JSON.parse(ev.data);
@@ -192,7 +212,7 @@
             // a clarification) and close the stream — no sources/suggestions
             // follow. The user's next message answers it.
             es.addEventListener('clarify', function (ev) {
-                turn.answerEl.dataset.streaming = 'false';
+                stopStreaming(turn);
                 setBusy(false);
                 var q = '';
                 try { q = (JSON.parse(ev.data).question || '').toString(); } catch (_) { /* ignore */ }
@@ -207,7 +227,7 @@
 
             function terminate(prefix, fromEvent = true) {
                 finish();
-                turn.answerEl.dataset.streaming = 'false';
+                stopStreaming(turn);
                 setBusy(false);
                 let msg = prefix;
                 if (fromEvent && arguments.length > 2) {
@@ -223,7 +243,7 @@
                 const closed = es.readyState === EventSource.CLOSED;
                 finish();
                 if (closed) return;
-                turn.answerEl.dataset.streaming = 'false';
+                stopStreaming(turn);
                 setBusy(false);
                 if (turn.answerEl.textContent.trim() === '') {
                     turn.answerEl.textContent = 'Connection to the server was interrupted.';
@@ -256,7 +276,11 @@
         if (sources.length === 0) return '';
         const items = sources.map(function (s) {
             const id = (s.id || '').toString();
-            const title = (s.title || '').toString();
+            // Label plus qualifier, so the list distinguishes the same topic
+            // in several releases just as the inline citations do.
+            const base = (s.citationLabel || s.title || '').toString();
+            const qualifier = (s.citationQualifier || '').toString().trim();
+            const title = qualifier !== '' ? base + ' (' + qualifier + ')' : base;
             const type = (s.type || '').toString();
             const url = (s.uri || s.publicUrl || '').toString();
             // Help / knowledge-resource hits are the internal RAG grounding
@@ -267,7 +291,9 @@
             const linked = url
                 ? '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">' + escapeText(title) + '</a>'
                 : escapeText(title);
-            return '<li data-source-id="' + escapeAttr(id) + '"><code>' + escapeText(id) + '</code> ' + linked + '</li>';
+            // The raw document id stays in the data attribute for debugging
+            // but is not shown - it means nothing to a visitor.
+            return '<li data-source-id="' + escapeAttr(id) + '">' + linked + '</li>';
         }).join('');
         return '<small class="text-muted d-block mb-1">' + escapeText(label) + '</small><ul>' + items + '</ul>';
     }
@@ -327,7 +353,9 @@
             if (matched.length === 0) {
                 return knowledgeResourceMatches > 0 ? '' : whole;
             }
-            return leadingWs + matched.map(render).join('');
+            // The whole block goes to the renderer, not one token at a time,
+            // so it can group documents that share a citation label.
+            return leadingWs + render(matched);
         });
     }
 
@@ -343,20 +371,58 @@
     // Mirrors RagAnswer::getAnswerHtml() so the streamed answer and the
     // server-rendered one look the same, down to the markup and the tooltip.
     function renderAnswerHtml(text, sources) {
-        const linked = rewriteCitations(escapeText(text), sources, function (hit) {
-            const title = (hit.src.title || '').toString().trim() || hit.id;
-            const type = (hit.src.type || '').toString().trim();
-            const tooltip = type !== '' ? type + ' \u00b7 ' + hit.id : hit.id;
-            const uri = (hit.src.uri || hit.src.publicUrl || '').toString();
-            if (uri === '') {
-                return '[<abbr title="' + escapeAttr(tooltip) + '">' + escapeText(title) + '</abbr>]';
-            }
-            return '[<a href="' + escapeAttr(uri) + '" title="' + escapeAttr(tooltip)
-                + '" rel="noopener" class="ws-meilisearch-rag-citation">' + escapeText(title) + '</a>]';
+        const linked = rewriteCitations(escapeText(text), sources, function (matched) {
+            // Group by citation label so three releases of one topic read
+            // "[Install packages (26 - Revit, 25 - AutoCAD)]" instead of
+            // repeating the title. Each document keeps its own link, carried
+            // by its qualifier. citationLabel/citationQualifier come from
+            // RagCitationLabelsEvent listeners; plain title otherwise.
+            const order = [];
+            const groups = Object.create(null);
+            matched.forEach(function (hit) {
+                const label = (hit.src.citationLabel || hit.src.title || '').toString().trim() || hit.id;
+                if (!groups[label]) { groups[label] = []; order.push(label); }
+                groups[label].push({
+                    id: hit.id,
+                    qualifier: (hit.src.citationQualifier || '').toString().trim(),
+                    uri: (hit.src.uri || hit.src.publicUrl || '').toString(),
+                    type: (hit.src.type || '').toString().trim()
+                });
+            });
+
+            return order.map(function (label) {
+                const members = groups[label];
+                const qualified = members.filter(function (m) { return m.qualifier !== ''; });
+                // A single document, or several that brought no qualifier to
+                // tell them apart: link the label itself, once per document.
+                if (members.length === 1 || qualified.length === 0) {
+                    return members.map(function (m) {
+                        const text = m.qualifier !== '' ? label + ' (' + m.qualifier + ')' : label;
+                        return '[' + citationAnchor(m, text) + ']';
+                    }).join('');
+                }
+                // Several documents sharing a label: say it once as plain
+                // text and turn each qualifier into the link.
+                const links = members.map(function (m) {
+                    return citationAnchor(m, m.qualifier !== '' ? m.qualifier : label);
+                });
+                return '[' + escapeText(label) + ' (' + links.join(', ') + ')]';
+            }).join('');
         });
         // **bold** last, exactly as the server does: escaping left the
         // asterisks alone and the citation titles must not be re-scanned.
         return linked.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    // One citation link. Documents without a uri become an <abbr> so the
+    // tooltip still names what was cited.
+    function citationAnchor(member, text) {
+        const tooltip = member.type !== '' ? member.type + ' \u00b7 ' + member.id : member.id;
+        if (member.uri === '') {
+            return '<abbr title="' + escapeAttr(tooltip) + '">' + escapeText(text) + '</abbr>';
+        }
+        return '<a href="' + escapeAttr(member.uri) + '" title="' + escapeAttr(tooltip)
+            + '" rel="noopener" class="ws-meilisearch-rag-citation">' + escapeText(text) + '</a>';
     }
 
     function renderMarkdownLight(text) {

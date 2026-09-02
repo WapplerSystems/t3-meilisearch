@@ -123,6 +123,32 @@ final class RagAnswer
      * so what the parser counts as "cited" is exactly what this
      * method linkifies.
      */
+    /**
+     * One citation link. Documents without a uri (the RAG corpus keeps some
+     * that have no public page) become an <abbr> so the tooltip still names
+     * what was cited.
+     *
+     * @param array{id:string,qualifier:string,uri:string,type:string} $member
+     */
+    private static function citationAnchor(array $member, string $text): string
+    {
+        $tooltip = $member['type'] !== ''
+            ? sprintf('%s · %s', $member['type'], $member['id'])
+            : $member['id'];
+        $textAttr = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $tooltipAttr = htmlspecialchars($tooltip, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($member['uri'] === '') {
+            return sprintf('<abbr title="%s">%s</abbr>', $tooltipAttr, $textAttr);
+        }
+
+        return sprintf(
+            '<a href="%s" title="%s" rel="noopener" class="ws-meilisearch-rag-citation">%s</a>',
+            htmlspecialchars($member['uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            $tooltipAttr,
+            $textAttr,
+        );
+    }
+
     public function getAnswerHtml(): string
     {
         $escaped = htmlspecialchars($this->answer, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -171,27 +197,57 @@ final class RagAnswer
                 if ($matched === []) {
                     return $block[0]; // nothing recognised — leave alone (prose like [NOTE])
                 }
-                $out = $leadingWs;
+                // Group by citation text so three releases of one topic
+                // read "[Install packages (26 · Revit, 25 · AutoCAD)]" instead
+                // of repeating the same title three times over. Every document
+                // keeps its own link — the qualifier carries it.
+                $groups = [];
                 foreach ($matched as $id => $src) {
-                    $title = trim((string)($src['title'] ?? '')) !== ''
-                        ? trim((string)$src['title'])
-                        : $id;
-                    $type = trim((string)($src['type'] ?? ''));
-                    $tooltip = $type !== ''
-                        ? sprintf('%s · %s', $type, $id)
-                        : $id;
-                    $titleAttr = htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    $tooltipAttr = htmlspecialchars($tooltip, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    $uri = (string)($src['uri'] ?? '');
-                    if ($uri === '') {
-                        $out .= sprintf('[<abbr title="%s">%s</abbr>]', $tooltipAttr, $titleAttr);
+                    // citationLabel/citationQualifier are what
+                    // RagCitationLabelsEvent listeners set; plain title when
+                    // nobody had anything to add.
+                    $label = trim((string)($src['citationLabel'] ?? '')) ?: (
+                        trim((string)($src['title'] ?? '')) ?: $id
+                    );
+                    $groups[$label][] = [
+                        'id' => $id,
+                        'qualifier' => trim((string)($src['citationQualifier'] ?? '')),
+                        'uri' => (string)($src['uri'] ?? ''),
+                        'type' => trim((string)($src['type'] ?? '')),
+                    ];
+                }
+
+                $out = $leadingWs;
+                foreach ($groups as $label => $members) {
+                    $qualified = array_values(array_filter(
+                        $members,
+                        static fn (array $member): bool => $member['qualifier'] !== '',
+                    ));
+                    // A single document, or several that brought no qualifier
+                    // to tell them apart: link the label itself, once per
+                    // document, exactly as before.
+                    if (count($members) === 1 || $qualified === []) {
+                        foreach ($members as $member) {
+                            $text = $member['qualifier'] !== ''
+                                ? sprintf('%s (%s)', $label, $member['qualifier'])
+                                : $label;
+                            $out .= '[' . self::citationAnchor($member, $text) . ']';
+                        }
                         continue;
                     }
+                    // Several documents sharing a label: the label is said
+                    // once as plain text and each qualifier becomes the link.
+                    $links = [];
+                    foreach ($members as $member) {
+                        $links[] = self::citationAnchor(
+                            $member,
+                            $member['qualifier'] !== '' ? $member['qualifier'] : $label,
+                        );
+                    }
                     $out .= sprintf(
-                        '[<a href="%s" title="%s" rel="noopener" class="ws-meilisearch-rag-citation">%s</a>]',
-                        htmlspecialchars($uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                        $tooltipAttr,
-                        $titleAttr,
+                        '[%s (%s)]',
+                        htmlspecialchars($label, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                        implode(', ', $links),
                     );
                 }
                 return $out;

@@ -63,6 +63,10 @@
                 <source>Sources</source>
                 <target>Quellen</target>
             </trans-unit>
+            <trans-unit id="rag.answer.loading">
+                <source>Generating answer…</source>
+                <target>Antwort wird erstellt …</target>
+            </trans-unit>
             <trans-unit id="rag.suggestions.heading">
                 <source>Suggestions</source>
                 <target>Vorschläge</target>

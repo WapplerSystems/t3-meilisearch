@@ -48,6 +48,9 @@
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
             </trans-unit>
+            <trans-unit id="rag.answer.loading">
+                <source>Generating answer…</source>
+            </trans-unit>
             <trans-unit id="rag.suggestions.heading">
                 <source>Suggestions</source>
             </trans-unit>

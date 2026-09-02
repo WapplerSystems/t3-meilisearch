@@ -10,6 +10,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
 use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
+use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
@@ -123,6 +124,39 @@ final class RagService implements LoggerAwareInterface
                 $maxHits,
             ));
         }
+
+        return $this->labelCitations($site, $hits);
+    }
+
+    /**
+     * Let listeners give each context document a citation label (see
+     * RagCitationLabelsEvent). The label rides along on the document as
+     * `citationLabel`, so the streamed sources frame and RagAnswer both expose
+     * it to their renderers without either of them knowing where it came from
+     * — one hook covers the streamed and the server-rendered answer.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function labelCitations(Site $site, array $hits): array
+    {
+        if ($hits === []) {
+            return $hits;
+        }
+        $event = new RagCitationLabelsEvent($site, $hits);
+        $this->eventDispatcher->dispatch($event);
+        $labels = $event->getLabels();
+        if ($labels === []) {
+            return $hits;
+        }
+        foreach ($hits as $index => $hit) {
+            $id = (string)($hit['id'] ?? '');
+            if ($id !== '' && isset($labels[$id])) {
+                $hits[$index]['citationLabel'] = $labels[$id]['label'];
+                $hits[$index]['citationQualifier'] = $labels[$id]['qualifier'];
+            }
+        }
+
         return $hits;
     }
 

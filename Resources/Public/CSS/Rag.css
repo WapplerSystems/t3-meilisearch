@@ -1,0 +1,77 @@
+/*
+ * Component styles for the RAG answer.
+ *
+ * Loaded by the plugin itself, so it applies on a normal page as well as
+ * inside the chat widget — where the panel injects the shell into the host
+ * DOM and the embed document's own assets never travel along, which is why
+ * the widget block in setup.typoscript includes this file too. Layout of the
+ * bare embed document stays in RagEmbed.css.
+ */
+
+/* Positioning context for the spinner that sits over the answer. */
+.ws-meilisearch-rag-answer-wrap {
+    position: relative;
+}
+
+/* While tokens are still arriving the answer is readable but visibly
+ * unfinished, and gets a minimum height so the spinner has somewhere to sit
+ * during the seconds before the first token lands. */
+.ws-meilisearch-rag-answer[data-streaming="true"] {
+    opacity: .4;
+    min-height: 3.5rem;
+    transition: opacity .2s ease-out;
+}
+
+.ws-meilisearch-rag-spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Clicks belong to the text underneath, not to the overlay. */
+    pointer-events: none;
+}
+
+.ws-meilisearch-rag-spinner[hidden] {
+    display: none;
+}
+
+.ws-meilisearch-rag-spinner::before {
+    content: '';
+    width: 1.75rem;
+    height: 1.75rem;
+    border: .2rem solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    opacity: .55;
+    animation: ws-meilisearch-rag-spin .8s linear infinite;
+}
+
+@keyframes ws-meilisearch-rag-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Visitors who asked for less motion get a static ring: the faded answer and
+ * the status label already say that something is running. */
+@media (prefers-reduced-motion: reduce) {
+    .ws-meilisearch-rag-spinner::before {
+        animation: none;
+    }
+    .ws-meilisearch-rag-answer[data-streaming="true"] {
+        transition: none;
+    }
+}
+
+/* Screen-reader label for the spinner. Own implementation rather than
+ * Bootstrap's .visually-hidden, which is not available in the bare embed. */
+.ws-meilisearch-rag-spinner__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

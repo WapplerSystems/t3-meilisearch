@@ -76,6 +76,9 @@ plugin.tx_wsmeilisearch_search {
     page.includeJSFooter.wsMeilisearchRagStream = EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js
     page.includeCSS.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/CSS/ChatWidget.css
     page.includeCSS.wsMeilisearchRagEmbed = EXT:ws_meilisearch/Resources/Public/CSS/RagEmbed.css
+    # Answer component styles: the panel injects the shell into the host DOM,
+    # so the embed document's own <f:asset.css> never travels along.
+    page.includeCSS.wsMeilisearchRag = EXT:ws_meilisearch/Resources/Public/CSS/Rag.css
 
     # Bubble markup. Target URL strategy, as two mutually exclusive branches
     # of one COA (a second condition would end the block, see above):

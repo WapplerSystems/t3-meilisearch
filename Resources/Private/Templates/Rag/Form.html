@@ -22,11 +22,18 @@
              data-label-you="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you')}"
              data-label-assistant="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant')}"
              data-label-sources="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.sources')}"
-             data-label-suggestions="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}">
+             data-label-suggestions="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}"
+             data-label-loading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.loading')}">
             <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
             <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
         </div>
 
+        <f:comment>
+            Component styles for the streamed answer (faded while building,
+            spinner on top). Separate from RagEmbed.css, which only dresses
+            the bare embed document.
+        </f:comment>
+        <f:asset.css identifier="wsMeilisearchRag" href="EXT:ws_meilisearch/Resources/Public/CSS/Rag.css"/>
         <f:asset.script identifier="wsMeilisearchRagStream" src="EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js"/>
 
         <f:if condition="{showFallback}">
