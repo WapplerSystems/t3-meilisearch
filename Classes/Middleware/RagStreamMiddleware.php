@@ -160,10 +160,16 @@ final class RagStreamMiddleware implements MiddlewareInterface
         // The sources frame passes by before the answer; keep it so the turn
         // can store the documents the answer ends up citing.
         $sources = [];
+        $suggestions = [];
         foreach ($stream as $chunk) {
             $this->emitFrame($chunk);
             if ($chunk->type === RagStreamChunk::TYPE_SOURCES) {
                 $sources = (array)($chunk->data['sources'] ?? []);
+            }
+            // The suggestion frame trails the answer; keep it so the turn can
+            // offer the same buttons again after a reload.
+            if ($chunk->type === RagStreamChunk::TYPE_SUGGESTIONS) {
+                $suggestions = (array)($chunk->data['suggestions'] ?? []);
             }
             // Both `done` (answered) and `clarify` (asked back) are terminal
             // states worth persisting as a turn.
@@ -184,11 +190,27 @@ final class RagStreamMiddleware implements MiddlewareInterface
         if ($finalChunk !== null && $this->conversationEnabled($site)) {
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
             if ($finalChunk->type === RagStreamChunk::TYPE_CLARIFY) {
+                // The choices of the clarifying question ride along as
+                // suggestions of type `clarify`, the same rows the client
+                // renders live, so a reload offers them again.
+                $optionen = [];
+                foreach ((array)($finalChunk->data['options'] ?? []) as $option) {
+                    if (!is_array($option)) {
+                        continue;
+                    }
+                    $optionen[] = [
+                        'type' => 'clarify',
+                        'label' => (string)($option['label'] ?? ''),
+                        'value' => (string)($option['value'] ?? ''),
+                    ];
+                }
                 $turn = new Turn(
                     $question,
                     (string)($finalChunk->data['question'] ?? ''),
                     [],
                     Turn::KIND_CLARIFICATION,
+                    [],
+                    $optionen,
                 );
             } else {
                 $citedIds = array_values(array_map('strval', (array)($finalChunk->data['citedIds'] ?? [])));
@@ -198,6 +220,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
                     $citedIds,
                     Turn::KIND_ANSWER,
                     CitationRenderer::citationsFor($sources, $citedIds),
+                    $suggestions,
                 );
             }
             $conversation = $conversation->withTurn($turn, $maxTurns);

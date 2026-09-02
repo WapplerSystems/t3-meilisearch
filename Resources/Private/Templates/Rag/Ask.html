@@ -19,7 +19,7 @@
         </f:comment>
         <f:if condition="{conversationEnabled} && {conversation}">
             <f:then>
-                <f:render partial="Rag/Thread" arguments="{conversation: conversation}"/>
+                <f:render partial="Rag/Thread" arguments="{conversation: conversation, pageType: pageType}"/>
             </f:then>
             <f:else>
                 <f:if condition="{answer}">

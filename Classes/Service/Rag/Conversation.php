@@ -79,6 +79,8 @@ final class Conversation
                 // The cited documents, so a reloaded page can render the
                 // references instead of an answer that lost them.
                 'citations' => $t->citations,
+                // The buttons offered under the answer, so a reload keeps them.
+                'suggestions' => $t->suggestions,
             ], $this->turns),
         ];
     }
@@ -118,6 +120,10 @@ final class Conversation
                 // simply render without references.
                 citations: array_values(array_filter(
                     (array)($row['citations'] ?? []),
+                    static fn ($c): bool => is_array($c),
+                )),
+                suggestions: array_values(array_filter(
+                    (array)($row['suggestions'] ?? []),
                     static fn ($c): bool => is_array($c),
                 )),
             );

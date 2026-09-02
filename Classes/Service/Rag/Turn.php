@@ -30,6 +30,11 @@ final class Turn
      * @param self::KIND_* $kind
      * @param list<array<string,string>> $citations the cited documents, as
      *        {@see CitationRenderer::citationsFor()} trims them down
+     * @param list<array<string,mixed>> $suggestions the buttons offered under
+     *        this answer — {type, label, value} rows. Kept so a reloaded
+     *        transcript still offers them: they were generated for this
+     *        answer, and a reader who scrolls back to it wants the same
+     *        choices, not an answer that lost its options.
      */
     public function __construct(
         public readonly string $question,
@@ -37,6 +42,7 @@ final class Turn
         public readonly array $citedIds = [],
         public readonly string $kind = self::KIND_ANSWER,
         public readonly array $citations = [],
+        public readonly array $suggestions = [],
     ) {}
 
     public function isClarification(): bool

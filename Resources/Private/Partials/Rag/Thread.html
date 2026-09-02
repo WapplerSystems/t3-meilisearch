@@ -34,6 +34,13 @@
                             citations as links, and a row of raw document ids
                             told the visitor nothing while taking up space.
                         </f:comment>
+                        <f:comment>
+                            The buttons this answer offered, rendered again from
+                            the stored turn — a reloaded transcript that dropped
+                            its options made the reader retype what had been one
+                            click before.
+                        </f:comment>
+                        <f:render partial="Rag/Suggestions" arguments="{suggestions: turn.suggestions, pageType: pageType}"/>
                     </div>
                 </div>
             </li>

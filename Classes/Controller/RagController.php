@@ -142,6 +142,8 @@ final class RagController extends ActionController
                 // Only the cited documents, so the transcript can render its
                 // references again after a reload.
                 CitationRenderer::citationsFor($answer->sources, $answer->citedIds),
+                // Same for the buttons under the answer.
+                $answer->suggestions,
             );
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
             $conversation = $conversation->withTurn($turn, $maxTurns);
