@@ -412,9 +412,9 @@
                 return '[' + citationAnchor(ref, String(ref.number)) + ']';
             }).join('');
         });
-        // **bold** last, exactly as the server does: escaping left the
-        // asterisks alone and the citation texts must not be re-scanned.
-        const bold = linked.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+        // Markdown last, exactly as the server does: escaping left the
+        // markers alone and the citation texts must not be re-scanned.
+        const bold = markdownLight(linked);
 
         return bold + citationLegend(order);
     }
@@ -455,7 +455,31 @@
     }
 
     function renderMarkdownLight(text) {
-        return escapeText(text).replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+        return markdownLight(escapeText(text));
+    }
+
+    // Markdown-light on already-escaped text. The model writes markdown
+    // whether asked to or not, and anything not translated here reaches the
+    // reader as literal syntax — "### Voraussetzungen" with the hashes,
+    // "*Hinweis:*" with the asterisks, a row of dashes where a rule was meant.
+    // Mirrors CitationRenderer::markdownLight().
+    //
+    // Inline-only on purpose: the answer sits in a <p> with white-space:
+    // pre-wrap, so a heading becomes bold rather than an <h3> and the line
+    // structure the model produced survives.
+    function markdownLight(html) {
+        return html
+            // "### Heading" and its trailing hashes, at the start of a line.
+            .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm, '<strong>$1</strong>')
+            // A horizontal rule has no place inside a paragraph; drop the line.
+            .replace(/^[ \t]{0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*\n?/gm, '')
+            // **bold** before *italic*, so the double asterisks are consumed
+            // first and leave no stray <em> behind.
+            .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+            // *italic* — one asterisk pair on a line. A bullet ("* item") has
+            // no closing partner and stays as it is.
+            .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
+            .replace(/`([^`\n]+?)`/g, '<code>$1</code>');
     }
 
     function escapeAttr(s) {

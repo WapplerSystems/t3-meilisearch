@@ -37,7 +37,7 @@ final class CitationRenderer
     {
         $escaped = htmlspecialchars($answer, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if ($escaped === '' || $sources === []) {
-            return self::bold($escaped);
+            return self::markdownLight($escaped);
         }
         $byId = [];
         foreach ($sources as $src) {
@@ -47,7 +47,7 @@ final class CitationRenderer
             }
         }
         if ($byId === []) {
-            return self::bold($escaped);
+            return self::markdownLight($escaped);
         }
 
         /** @var array<string,array{number:int,text:string,uri:string}> $refs keyed by display text */
@@ -98,7 +98,7 @@ final class CitationRenderer
             $escaped,
         );
 
-        return self::bold($rewritten) . self::legend($refs);
+        return self::markdownLight($rewritten) . self::legend($refs);
     }
 
     /**
@@ -141,7 +141,7 @@ final class CitationRenderer
             $answer,
         );
 
-        return self::bold(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        return self::markdownLight(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     /**
@@ -241,12 +241,34 @@ final class CitationRenderer
     }
 
     /**
-     * Markdown-light: **bold** as <strong>. LLMs reach for emphasis often, and
-     * literal asterisks in the frontend look like uninterpreted markup. Runs
-     * after the citation rewrite because htmlspecialchars leaves `**` alone.
+     * Markdown-light. The model writes markdown whether asked to or not, and
+     * anything not translated here reaches the reader as literal syntax —
+     * "### Voraussetzungen" with the hashes, "*Hinweis:*" with the asterisks,
+     * a row of dashes where a rule was meant.
+     *
+     * Deliberately inline-only: the answer is rendered inside a <p> with
+     * white-space: pre-wrap, so a heading becomes bold text rather than an
+     * <h3>, and the line structure the model produced is left alone. Runs
+     * after the citation rewrite and after escaping, which leaves `#`, `*` and
+     * backticks untouched — so nothing here can inject markup.
      */
-    private static function bold(string $html): string
+    private static function markdownLight(string $html): string
     {
-        return (string)preg_replace('/\*\*([^*\n]+?)\*\*/u', '<strong>$1</strong>', $html);
+        $rules = [
+            // "### Heading" and its trailing hashes, at the start of a line.
+            '/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/mu' => '<strong>$1</strong>',
+            // A horizontal rule has no place inside a paragraph; drop the line.
+            '/^[ \t]{0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*\R?/mu' => '',
+            // **bold** before *italic*, so the double asterisks are consumed
+            // first and do not leave a stray <em> behind.
+            '/\*\*([^*\n]+?)\*\*/u' => '<strong>$1</strong>',
+            // *italic* — a single asterisk pair on one line. A bullet ("* item")
+            // has no closing partner and stays as it is.
+            '/(?<!\*)\*([^*\n]+?)\*(?!\*)/u' => '<em>$1</em>',
+            // `code`
+            '/`([^`\n]+?)`/u' => '<code>$1</code>',
+        ];
+
+        return (string)preg_replace(array_keys($rules), array_values($rules), $html);
     }
 }
