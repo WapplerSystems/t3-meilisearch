@@ -38,6 +38,31 @@ final class ConversationStore
         $user->setAndSaveSessionData($sessionKey, $conversation->toArray());
     }
 
+    /**
+     * Like {@see save()}, but also fixates an anonymous session so it can be
+     * announced to the client.
+     *
+     * setAndSaveSessionData() writes the row and nothing else. Fixating a new
+     * anonymous session — and with it the core's decision to send a session
+     * cookie — happens in FrontendUserAuthentication::storeSessionData(),
+     * which the frontend normally reaches at the end of a request. The
+     * streaming endpoint flushes its own headers long before that, so it needs
+     * a session that is persisted *and* marked to be announced before the
+     * first frame goes out.
+     *
+     * On a visitor who already has a session this simply updates it; the core
+     * then has no new cookie to send, which is correct.
+     */
+    public function establish(ServerRequestInterface $request, string $sessionKey, Conversation $conversation): void
+    {
+        $user = $this->frontendUser($request);
+        if ($user === null) {
+            return;
+        }
+        $user->setSessionData($sessionKey, $conversation->toArray());
+        $user->storeSessionData();
+    }
+
     public function clear(ServerRequestInterface $request, string $sessionKey): void
     {
         $user = $this->frontendUser($request);

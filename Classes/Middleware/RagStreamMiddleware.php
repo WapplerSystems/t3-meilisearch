@@ -7,7 +7,10 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
+use TYPO3\CMS\Core\Http\NormalizedParams;
 use TYPO3\CMS\Core\Http\NullResponse;
+use TYPO3\CMS\Core\Http\Response;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use WapplerSystems\Meilisearch\Service\AccessControlFilter;
@@ -144,6 +147,8 @@ final class RagStreamMiddleware implements MiddlewareInterface
             ob_end_clean();
         }
 
+        $this->sendSessionCookie($request, $site, $conversation);
+
         header('Content-Type: text/event-stream; charset=UTF-8');
         header('Cache-Control: no-cache, no-store, must-revalidate');
         header('X-Accel-Buffering: no');
@@ -210,6 +215,47 @@ final class RagStreamMiddleware implements MiddlewareInterface
         echo 'event: ' . $chunk->type . "\n";
         echo 'data: ' . $payload . "\n\n";
         flush();
+    }
+
+    /**
+     * Hand the frontend session cookie to the client before the stream starts.
+     *
+     * The conversation lives in the frontend user session. This middleware
+     * flushes its own headers and answers with a NullResponse, which tells
+     * TYPO3 the response is already sent — so the authentication middleware
+     * can no longer append the Set-Cookie it would normally add. Measured
+     * consequence before this: the session was written on the server and never
+     * claimed by the browser, so every question opened a fresh anonymous
+     * session (98 rows in fe_sessions on the local install), multi-turn memory
+     * never worked on the streamed path, and the reset link — which renders
+     * only when a stored conversation exists — could not appear at all.
+     *
+     * ConversationStore::establish() is what brings the session into being and
+     * marks it to be announced; appendCookieToResponse then produces exactly
+     * the cookie the core would have sent — name, path, domain, secure,
+     * httponly and samesite all from the install's own configuration rather
+     * than a hand-rolled guess. It is @internal, which is the price for
+     * emitting a cookie outside the normal response cycle.
+     *
+     * A visitor who already has a session gets no new cookie, which is right.
+     */
+    private function sendSessionCookie(
+        ServerRequestInterface $request,
+        Site $site,
+        Conversation $conversation,
+    ): void {
+        if (headers_sent() || !$this->conversationEnabled($site)) {
+            return;
+        }
+        $user = $request->getAttribute('frontend.user');
+        $normalizedParams = $request->getAttribute('normalizedParams');
+        if (!$user instanceof FrontendUserAuthentication || !$normalizedParams instanceof NormalizedParams) {
+            return;
+        }
+        $this->conversationStore->establish($request, $this->sessionKey($site), $conversation);
+        foreach ($user->appendCookieToResponse(new Response(), $normalizedParams)->getHeader('Set-Cookie') as $cookie) {
+            header('Set-Cookie: ' . $cookie, false);
+        }
     }
 
     private function loadConversation(Site $site, ServerRequestInterface $request): Conversation
