@@ -1,40 +1,49 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
-<form action="{f:uri.page()}" method="get" role="search" class="ws-meilisearch-rag-form" data-ws-meilisearch-rag-form="1" data-rag-form="1">
-    <input type="hidden" name="tx_wsmeilisearch_rag[action]" value="ask"/>
-    <input type="hidden" name="tx_wsmeilisearch_rag[controller]" value="Rag"/>
-    <f:comment><!-- Keep the bare chat-widget embed (dedicated typeNum) sticky across this GET submit. --></f:comment>
-    <f:if condition="{pageType}">
-        <input type="hidden" name="type" value="{pageType}"/>
+<f:comment>
+    Eingabefeld und "Neu beginnen" bilden eine Einheit: im Chat-Fenster
+    klebt dieser Container am unteren Rand des scrollenden Panels
+    (Rag.css). Klebte nur das Formular, lag der Link darunter im
+    Innenabstand des Panels und wurde vom weissen Schatten des
+    Formulars ueberdeckt, der genau diesen Innenabstand abdeckt.
+</f:comment>
+<div class="ws-meilisearch-rag-ask">
+    <form action="{f:uri.page()}" method="get" role="search" class="ws-meilisearch-rag-form" data-ws-meilisearch-rag-form="1" data-rag-form="1">
+        <input type="hidden" name="tx_wsmeilisearch_rag[action]" value="ask"/>
+        <input type="hidden" name="tx_wsmeilisearch_rag[controller]" value="Rag"/>
+        <f:comment><!-- Keep the bare chat-widget embed (dedicated typeNum) sticky across this GET submit. --></f:comment>
+        <f:if condition="{pageType}">
+            <input type="hidden" name="type" value="{pageType}"/>
+        </f:if>
+
+        <label for="ws-meilisearch-rag-q" class="visually-hidden">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.placeholder"/>
+        </label>
+        <div class="input-group input-group-lg">
+            <input type="text"
+                id="ws-meilisearch-rag-q"
+                class="form-control"
+                name="tx_wsmeilisearch_rag[q]"
+                value="{question}"
+                placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.placeholder')}"
+                autocomplete="off"
+                required="required"/>
+            <button type="submit"
+                    class="btn btn-success"
+                    data-ws-meilisearch-rag-submit="1"
+                    data-loading-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.loading', default: 'Antwort wird generiert…')}">
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.submit"/>
+            </button>
+        </div>
+    </form>
+
+    <f:asset.script identifier="wsMeilisearchRagFormLoading" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/rag-form-loading.js"/>
+
+    <f:if condition="{conversationEnabled} && {conversation}">
+        <p class="ws-meilisearch-rag-reset text-end small">
+            <f:link.action action="reset" pageType="{pageType}" class="link-secondary" additionalAttributes="{data-rag-reset: '1'}">
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.reset"/>
+            </f:link.action>
+        </p>
     </f:if>
-
-    <label for="ws-meilisearch-rag-q" class="visually-hidden">
-        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.placeholder"/>
-    </label>
-    <div class="input-group input-group-lg">
-        <input type="text"
-            id="ws-meilisearch-rag-q"
-            class="form-control"
-            name="tx_wsmeilisearch_rag[q]"
-            value="{question}"
-            placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.placeholder')}"
-            autocomplete="off"
-            required="required"/>
-        <button type="submit"
-                class="btn btn-success"
-                data-ws-meilisearch-rag-submit="1"
-                data-loading-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.loading', default: 'Antwort wird generiert…')}">
-            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.submit"/>
-        </button>
-    </div>
-</form>
-
-<f:asset.script identifier="wsMeilisearchRagFormLoading" src="EXT:ws_meilisearch/Resources/Public/JavaScript/Frontend/rag-form-loading.js"/>
-
-<f:if condition="{conversationEnabled} && {conversation}">
-    <p class="ws-meilisearch-rag-reset text-end small">
-        <f:link.action action="reset" pageType="{pageType}" class="link-secondary" additionalAttributes="{data-rag-reset: '1'}">
-            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.form.reset"/>
-        </f:link.action>
-    </p>
-</f:if>
+</div>
 </html>

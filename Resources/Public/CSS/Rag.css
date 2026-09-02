@@ -89,8 +89,13 @@
  * away as the conversation grows. Inside the panel — the one place with a
  * bounded scroll container — it stays put at the bottom instead. Scoped to the
  * embed body on purpose: on a full page there is no such container, and a
- * sticky field would hover over whatever follows the plugin. */
-.ws-meilisearch-rag-embed .ws-meilisearch-rag-form {
+ * sticky field would hover over whatever follows the plugin.
+ *
+ * The sticky element is the container around the field AND the "start over"
+ * link, not the form alone: with only the form pinned, that link sat below it
+ * in the panel's padding, and the white shadow under the form — which exists
+ * to cover exactly that padding — painted straight over it. */
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-ask {
     position: sticky;
     bottom: 0;
     z-index: 1;
