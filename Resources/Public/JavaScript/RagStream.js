@@ -22,11 +22,23 @@
  * (with a safety timeout), so the suggestions frame — generated after the
  * answer — still arrives without EventSource auto-reconnecting.
  *
- * Conversation memory works because the chat page sets the fe_typo_user
- * session cookie on load; the SSE request carries it (withCredentials).
+ * The SSE request carries cookies (withCredentials), so an existing
+ * fe_typo_user session reaches the server and its conversation is used.
+ * Measured caveat: the streaming endpoint flushes its own headers and answers
+ * with a NullResponse, so TYPO3 can no longer append a Set-Cookie — a session
+ * created by a streamed question is written on the server and never claimed by
+ * the browser. Multi-turn memory therefore only works when the session came
+ * from somewhere else (a normal page request).
  */
 (function () {
     'use strict';
+
+    // Attempts per question, the first one included. Two retries cover a
+    // worker recycling or a pool restart without keeping a visitor waiting on
+    // a server that is genuinely down.
+    const MAX_STREAM_ATTEMPTS = 3;
+    // Grows with the attempt: 0.8s, then 1.6s.
+    const STREAM_RETRY_DELAY = 800;
 
     function init(root) {
         // Idempotency: boot() runs on DOMContentLoaded and the chat widget
@@ -46,7 +58,8 @@
             you: root.dataset.labelYou || 'You',
             assistant: root.dataset.labelAssistant || 'Assistant',
             suggestions: root.dataset.labelSuggestions || '',
-            loading: root.dataset.labelLoading || 'Generating answer…'
+            loading: root.dataset.labelLoading || 'Generating answer…',
+            interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.'
         };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
@@ -150,11 +163,20 @@
             const turn = appendTurn(q);
             if (inputEl) inputEl.value = '';
             setBusy(true);
+            openStream(q, turn, 1);
+        }
 
+        // One attempt at the streamed answer. Split out of ask() so a retry
+        // reuses the same turn instead of appending the question again.
+        function openStream(q, turn, attempt) {
             const es = new EventSource(endpoint + '?q=' + encodeURIComponent(q), { withCredentials: true });
             currentStream = es;
             let closeTimer = null;
             let acc = '';
+            // Whether anything at all arrived on this attempt. Decides between
+            // retrying quietly and reporting: a stream that died mid-answer
+            // must not be restarted, or the visitor reads the beginning twice.
+            let received = false;
             function finish() {
                 if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
                 es.close();
@@ -167,12 +189,14 @@
                     // Kept for the citation links in the answer text, no
                     // longer rendered as a list: the answer names every source
                     // it used, so a second list below it only cost space.
+                    received = true;
                     turn.sources = Array.isArray(p.sources) ? p.sources : [];
                 } catch (_) { /* ignore */ }
             });
 
             es.addEventListener('token', function (ev) {
                 try {
+                    received = true;
                     acc += JSON.parse(ev.data).text || '';
                     // Hide inline [id=…] citation markers — the sources are
                     // listed separately under the answer.
@@ -182,6 +206,7 @@
             });
 
             es.addEventListener('done', function (ev) {
+                received = true;
                 // Finalize the answer now; keep the stream open for the trailing
                 // suggestions frame and close on `end` (safety timeout guards
                 // against a missing `end` triggering an auto-reconnect).
@@ -208,6 +233,7 @@
             // a clarification) and close the stream — no sources/suggestions
             // follow. The user's next message answers it.
             es.addEventListener('clarify', function (ev) {
+                received = true;
                 stopStreaming(turn);
                 setBusy(false);
                 var q = '';
@@ -250,13 +276,28 @@
             }
 
             es.onerror = function () {
-                const closed = es.readyState === EventSource.CLOSED;
                 finish();
-                if (closed) return;
+                // Nothing arrived: the request never got off the ground. A
+                // recycled php-fpm worker, a deploy restarting the pool, a
+                // dropped mobile connection all look like this, and all of
+                // them succeed on a second attempt. Retry quietly with the
+                // spinner still running, instead of handing the visitor an
+                // error whose only cure is pressing the button again.
+                //
+                // The previous handling had this backwards: on a permanent
+                // close it returned without even clearing the spinner, and on
+                // a transient one it showed the error AND closed the stream,
+                // cutting off the browser's own reconnect.
+                if (!received && attempt < MAX_STREAM_ATTEMPTS) {
+                    setTimeout(function () {
+                        openStream(q, turn, attempt + 1);
+                    }, STREAM_RETRY_DELAY * attempt);
+                    return;
+                }
                 stopStreaming(turn);
                 setBusy(false);
                 if (turn.answerEl.textContent.trim() === '') {
-                    turn.answerEl.textContent = 'Connection to the server was interrupted.';
+                    turn.answerEl.textContent = labels.interrupted;
                 }
             };
         }
