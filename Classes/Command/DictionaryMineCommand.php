@@ -77,6 +77,43 @@ final class DictionaryMineCommand extends Command
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print the proposals, write nothing.');
     }
 
+    /**
+     * Terme, ueber die schon entschieden ist — in BEIDE Quellen geschaut:
+     *
+     *  • indexSettings()->synonyms deckt die kuratierte YAML-Basis UND die
+     *    aktiven DB-Zeilen ab. Ohne diesen Blick schlaegt der Miner vor,
+     *    was in der settings.yaml langst steht (der DB-Check allein sieht
+     *    die YAML-Haelfte des Woerterbuchs nicht).
+     *  • exists() deckt zusaetzlich Kandidaten und *abgelehnte* Zeilen ab.
+     *    Eine Ablehnung muss halten: sonst schlaegt jeder Lauf erneut vor,
+     *    was ein Mensch schon verworfen hat, und die Liste konvergiert nie.
+     *
+     * @param array<string,mixed> $knownFromSettings
+     */
+    private function isDecided(Site $site, string $term, array $knownFromSettings): bool
+    {
+        $needle = mb_strtolower(trim($term));
+        if ($needle === '') {
+            return true;
+        }
+        if (isset($knownFromSettings[$needle])) {
+            return true;
+        }
+        return $this->dictionary->exists($site->getIdentifier(), DictionaryRepository::KIND_SYNONYM, $needle);
+    }
+
+    /**
+     * @return array<string,mixed> lowercased synonym keys of the merged dictionary
+     */
+    private function knownSynonyms(Site $site): array
+    {
+        $out = [];
+        foreach (array_keys($this->configProvider->indexSettings($site)->synonyms) as $key) {
+            $out[mb_strtolower((string)$key)] = true;
+        }
+        return $out;
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
@@ -97,15 +134,16 @@ final class DictionaryMineCommand extends Command
                 continue;
             }
             $io->section($site->getIdentifier());
+            $known = $this->knownSynonyms($site);
 
             if (in_array('recovery', $miners, true)) {
-                $written += $this->mineRecovery($io, $site, $cutoff, $limit, $storagePid, $dry);
+                $written += $this->mineRecovery($io, $site, $cutoff, $limit, $storagePid, $dry, $known);
             }
             if (in_array('reformulation', $miners, true)) {
-                $written += $this->mineReformulations($io, $site, $cutoff, $limit, $storagePid, $dry);
+                $written += $this->mineReformulations($io, $site, $cutoff, $limit, $storagePid, $dry, $known);
             }
             if (in_array('translation', $miners, true)) {
-                $written += $this->mineTranslations($io, $site, $limit, $storagePid, $dry);
+                $written += $this->mineTranslations($io, $site, $limit, $storagePid, $dry, $known);
             }
         }
 
@@ -123,7 +161,7 @@ final class DictionaryMineCommand extends Command
     /**
      * Miner 1: what the runtime recovery ladder already knows.
      */
-    private function mineRecovery(SymfonyStyle $io, Site $site, int $cutoff, int $limit, int $storagePid, bool $dry): int
+    private function mineRecovery(SymfonyStyle $io, Site $site, int $cutoff, int $limit, int $storagePid, bool $dry, array $known): int
     {
         $rows = $this->zeroResultQueries($site->getIdentifier(), $cutoff, $limit);
         if ($rows === []) {
@@ -157,6 +195,12 @@ final class DictionaryMineCommand extends Command
                     $alternative->totalHits,
                     $alternative->kind,
                 );
+                // Ein echter Lauf wuerde bekannte Terme ueberspringen — der
+                // Trockenlauf muss dasselbe zeigen, sonst schlaegt er bei
+                // jedem Aufruf erneut vor, was langst entschieden ist.
+                if ($this->isDecided($site, $query, $known)) {
+                    continue;
+                }
                 $io->writeln(sprintf(
                     '  recovery: <info>%s</info> → %s (%d hits, %s)',
                     $query,
@@ -188,7 +232,7 @@ final class DictionaryMineCommand extends Command
     /**
      * Miner 2: zero-result query followed by a similar query that worked.
      */
-    private function mineReformulations(SymfonyStyle $io, Site $site, int $cutoff, int $limit, int $storagePid, bool $dry): int
+    private function mineReformulations(SymfonyStyle $io, Site $site, int $cutoff, int $limit, int $storagePid, bool $dry, array $known): int
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('tx_wsmeilisearch_search_log');
         $rows = $qb->select('query', 'language_id', 'result_count', 'crdate')
@@ -226,6 +270,9 @@ final class DictionaryMineCommand extends Command
                     break;
                 }
                 $seen[$key] = true;
+                if ($this->isDecided($site, $failed, $known)) {
+                    break;
+                }
                 $io->writeln(sprintf(
                     '  reformulation: <info>%s</info> → %s (%d hits, %ds later)',
                     $failed,
@@ -266,7 +313,7 @@ final class DictionaryMineCommand extends Command
     /**
      * Miner 3: single-word title pairs across the site's languages.
      */
-    private function mineTranslations(SymfonyStyle $io, Site $site, int $limit, int $storagePid, bool $dry): int
+    private function mineTranslations(SymfonyStyle $io, Site $site, int $limit, int $storagePid, bool $dry, array $known): int
     {
         $default = $this->singleWordTitles(0);
         $written = 0;
@@ -306,6 +353,9 @@ final class DictionaryMineCommand extends Command
                 // are already handled by Meilisearch's typo tolerance; a
                 // synonym for them is dead weight in the review list.
                 if (levenshtein($source, $target) <= 2) {
+                    continue;
+                }
+                if ($this->isDecided($site, $source, $known) && $this->isDecided($site, $target, $known)) {
                     continue;
                 }
                 $pairs++;
