@@ -58,14 +58,21 @@ final class QueryRecoveryService implements LoggerAwareInterface
     private const MIN_SPLIT_PART = 4;
 
     /**
-     * …and has to occur in more than a handful of documents. Text
+     * Default for how many documents a split half has to appear in. Text
      * extraction from PDFs leaves line-break debris in the index
-     * ("Inform ation" → the token "ation" exists in four documents), so
+     * ("inform ation" → the token "ation" exists in four documents), so
      * "does this string occur at all?" is not the same question as "is
-     * this a word?". Five is comfortably above the debris and far below
-     * any real vocabulary item.
+     * this a word?".
+     *
+     * The number is a genuine trade-off and therefore configurable via
+     * meilisearch.search.recovery.minPartHits: raise it and debris stops
+     * being proposed, lower it and rare-but-real terms come back. "5"
+     * keeps "install ation" (2625 junk hits) out but also drops
+     * "vorhangfassade planung", because that term exists in exactly one
+     * document — such one-offs belong in the editorial dictionary, which
+     * is why that half of the feature exists.
      */
-    private const MIN_PART_HITS = 5;
+    private const DEFAULT_MIN_PART_HITS = 5;
 
     /**
      * Guard against pathological input: a 20-word query would otherwise
@@ -100,6 +107,10 @@ final class QueryRecoveryService implements LoggerAwareInterface
         array $highlightAttributes,
         int $limit = 4,
     ): array {
+        $minPartHits = max(1, (int)$site->getSettings()->get(
+            'meilisearch.search.recovery.minPartHits',
+            self::DEFAULT_MIN_PART_HITS,
+        ));
         $query = trim($query);
         if ($query === '') {
             return [];
@@ -170,7 +181,7 @@ final class QueryRecoveryService implements LoggerAwareInterface
         // contains. Without this gate the ladder happily proposes
         // "fußbode nauslegen" (53 hits, pure prefix noise).
         foreach ($splits as $splitQuery) {
-            if (!$this->partsAreWords($splitQuery, $results)) {
+            if (!$this->partsAreWords($splitQuery, $results, $minPartHits)) {
                 continue;
             }
             $second['split:' . $splitQuery] = $this->probe($indexUid, $splitQuery, $filter, $hybridParams, 'all');
@@ -288,7 +299,7 @@ final class QueryRecoveryService implements LoggerAwareInterface
     /**
      * @param array<string,array<string,mixed>> $results
      */
-    private function partsAreWords(string $splitQuery, array $results): bool
+    private function partsAreWords(string $splitQuery, array $results, int $minPartHits): bool
     {
         foreach (preg_split('/\s+/u', $splitQuery) ?: [] as $part) {
             if ($part === '' || mb_strlen($part) < self::MIN_SPLIT_PART) {
@@ -299,7 +310,7 @@ final class QueryRecoveryService implements LoggerAwareInterface
                 // unverified rather than valid.
                 return false;
             }
-            if ($this->totalHits($results['part:' . $part]) < self::MIN_PART_HITS) {
+            if ($this->totalHits($results['part:' . $part]) < $minPartHits) {
                 return false;
             }
         }

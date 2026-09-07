@@ -135,6 +135,10 @@
                 <source>Search relaxed: not every word has to match</source>
                 <target>Ricerca allargata: non tutte le parole devono corrispondere</target>
             </trans-unit>
+            <trans-unit id="search.recovery.chip.relaxed">
+                <source>Search without every word</source>
+                <target>Cercare senza tutte le parole</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

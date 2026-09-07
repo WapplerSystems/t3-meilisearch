@@ -51,7 +51,15 @@
                 href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: alternative.query, page: 1, hybrid: hybrid, sort: sort, scope: scope}')}"
                 data-ws-meilisearch-alternative="{alternative.query}"
                 title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.recovery.kind.{alternative.kind}')}">
-                {alternative.query}
+                <f:comment>
+                    Bei "relaxed" ist die Schreibweise unveraendert — dort den
+                    Suchtext zu wiederholen sieht wie derselbe Vorschlag zweimal
+                    aus. Stattdessen sagen, WAS passiert.
+                </f:comment>
+                <f:if condition="{alternative.kind} == 'relaxed'">
+                    <f:then><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.recovery.chip.relaxed"/></f:then>
+                    <f:else>{alternative.query}</f:else>
+                </f:if>
                 <span class="text-muted">({alternative.totalHits})</span>
             </a>
         </f:for>

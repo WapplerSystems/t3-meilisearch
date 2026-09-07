@@ -135,6 +135,10 @@
                 <source>Search relaxed: not every word has to match</source>
                 <target>Zoekopdracht verruimd: niet elk woord hoeft te matchen</target>
             </trans-unit>
+            <trans-unit id="search.recovery.chip.relaxed">
+                <source>Search without every word</source>
+                <target>Zoeken zonder elk woord</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

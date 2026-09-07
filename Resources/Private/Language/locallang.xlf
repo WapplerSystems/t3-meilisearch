@@ -192,6 +192,9 @@
                 <trans-unit id="search.recovery.kind.relaxed" resname="search.recovery.kind.relaxed">
                     <source>Search relaxed: not every word has to match</source>
                 </trans-unit>
+                <trans-unit id="search.recovery.chip.relaxed" resname="search.recovery.chip.relaxed">
+                    <source>Search without every word</source>
+                </trans-unit>
         </body>
     </file>
 </xliff>

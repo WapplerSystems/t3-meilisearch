@@ -1,7 +1,14 @@
 /**
- * On page load after a search submit, scroll the result list into view
+ * On page load after a search submit, scroll the search area into view
  * so the visitor sees their hits without having to manually scroll
- * past the form + hero.
+ * past the hero.
+ *
+ * Scrolls to the FORM, not to the result list: landing on the results
+ * pushes the search box off the top of the viewport, and the first thing
+ * someone does after reading a result count is correct their query. The
+ * box has to stay reachable. A sticky site header would still cover it,
+ * hence scroll-margin-top on the form (search-ajax.css) — integrators set
+ * --ws-meilisearch-scroll-offset to their actual header height.
  *
  * Why this exists as a JS file rather than a CSS scroll-anchor or a
  * <form action="…#results">: HTML5 strips the fragment from a form's
@@ -30,7 +37,10 @@
     }
 
     function jump() {
-        const target = document.getElementById('ws-meilisearch-results');
+        // Form first, result anchor as the fallback for site packages
+        // that render their own markup around the plugin.
+        const target = document.querySelector('.ws-meilisearch-form')
+            || document.getElementById('ws-meilisearch-results');
         if (target) {
             target.scrollIntoView({ block: 'start', behavior: 'auto' });
         }

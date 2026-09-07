@@ -255,6 +255,10 @@
                 <source>Search relaxed: not every word has to match</source>
                 <target>Suche gelockert: es müssen nicht alle Wörter zutreffen</target>
             </trans-unit>
+            <trans-unit id="search.recovery.chip.relaxed">
+                <source>Search without every word</source>
+                <target>Ohne jedes Wort suchen</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

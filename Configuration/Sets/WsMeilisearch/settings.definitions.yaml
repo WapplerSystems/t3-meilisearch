@@ -429,6 +429,12 @@ settings:
     type: int
     default: 4
 
+  meilisearch.search.recovery.minPartHits:
+    label: 'Minimum frequency of a split half'
+    description: 'When the recovery pass splits a compound ("fussbodenauslegen" -> "fussboden auslegen"), each half has to occur in at least this many documents. Text extraction from PDFs leaves line-break debris in the index (the token "ation" from "inform ation"), and without this floor the search proposes "install ation" with thousands of junk hits. Lower it to also recover rare terms that exist in only one or two documents — at the price of the occasional nonsense suggestion.'
+    type: int
+    default: 5
+
   meilisearch.defaults.dictionary:
     label: 'Single-token words (dictionary)'
     description: 'Character sequences Meilisearch must keep as ONE token even though its tokenizer would split them: product type keys ("LZS 50"), parameter names ("lin_ww_flowrate"), brand spellings ("SCHAKonnect"). Without this such a token is chopped up and — under matchingStrategy "all" — the query needs every fragment to match separately.'

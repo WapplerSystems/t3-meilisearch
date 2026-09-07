@@ -1,3 +1,17 @@
+/* Anything we scroll to sits under the site's sticky header unless we
+   reserve room for it. The extension cannot know that header's height,
+   so it reads a custom property the theme can set:
+
+     :root { --ws-meilisearch-scroll-offset: 8rem; }
+
+   The default is deliberately generous — a bit of air above the search
+   box is harmless, a search box hidden behind the header is not. */
+.ws-meilisearch-form,
+#ws-meilisearch-results,
+.ws-meilisearch-result-region {
+    scroll-margin-top: var(--ws-meilisearch-scroll-offset, 7rem);
+}
+
 /* Visual cue while the Ajax fragment is loading. Pointer-events: none
    blocks accidental double-clicks on facets/pagination during the
    roundtrip. */
