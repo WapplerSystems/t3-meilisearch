@@ -271,6 +271,12 @@ final class DictionaryMineCommand extends Command
         $default = $this->singleWordTitles(0);
         $written = 0;
         $pairs = 0;
+        // Dieselbe Titelpaarung entsteht so oft, wie es Seiten mit diesem
+        // Titel gibt — in einer Knowledge-Base sind "Einstellungen" /
+        // "Settings" Dutzende Seiten. Ohne Dedupe frisst ein einziges
+        // Wortpaar das komplette --limit und die Vorschlagsliste besteht
+        // aus Wiederholungen.
+        $seenPairs = [];
         foreach ($site->getAllLanguages() as $language) {
             $languageId = $language->getLanguageId();
             if ($languageId === 0) {
@@ -291,6 +297,11 @@ final class DictionaryMineCommand extends Command
                 if (mb_strlen($source) < 6 || mb_strlen($target) < 6) {
                     continue;
                 }
+                $pairKey = $source . '|' . $target;
+                if (isset($seenPairs[$pairKey])) {
+                    continue;
+                }
+                $seenPairs[$pairKey] = true;
                 // Pairs this close together (profil/profile, autor/author)
                 // are already handled by Meilisearch's typo tolerance; a
                 // synonym for them is dead weight in the review list.
