@@ -227,6 +227,34 @@
                 <source>Loading…</source>
                 <target>Wird geladen…</target>
             </trans-unit>
+            <trans-unit id="search.recovery.applied">
+                <source>No exact match for "%1$s" — showing results for "%2$s".</source>
+                <target>Keine exakten Treffer für „%1$s" — angezeigt werden Ergebnisse für „%2$s".</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.suggestions">
+                <source>Did you mean:</source>
+                <target>Meinten Sie:</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.corrected">
+                <source>Spelling corrected to the word used in the content</source>
+                <target>Schreibweise an das im Inhalt verwendete Wort angepasst</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.split">
+                <source>Compound split into separate words</source>
+                <target>Kompositum in einzelne Wörter getrennt</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.join">
+                <source>Words joined into one compound</source>
+                <target>Wörter zu einem Kompositum zusammengezogen</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.dropped">
+                <source>Terms that appear nowhere were left out</source>
+                <target>Begriffe, die nirgends vorkommen, wurden weggelassen</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.relaxed">
+                <source>Search relaxed: not every word has to match</source>
+                <target>Suche gelockert: es müssen nicht alle Wörter zutreffen</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

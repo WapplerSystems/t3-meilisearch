@@ -107,6 +107,34 @@
                 <source>Content element</source>
                 <target>Élément de contenu</target>
             </trans-unit>
+            <trans-unit id="search.recovery.applied">
+                <source>No exact match for "%1$s" — showing results for "%2$s".</source>
+                <target>Aucun résultat exact pour « %1$s » — affichage des résultats pour « %2$s ».</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.suggestions">
+                <source>Did you mean:</source>
+                <target>Vouliez-vous dire :</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.corrected">
+                <source>Spelling corrected to the word used in the content</source>
+                <target>Orthographe alignée sur le mot utilisé dans le contenu</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.split">
+                <source>Compound split into separate words</source>
+                <target>Mot composé séparé en plusieurs mots</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.join">
+                <source>Words joined into one compound</source>
+                <target>Mots réunis en un seul mot composé</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.dropped">
+                <source>Terms that appear nowhere were left out</source>
+                <target>Les termes absents du contenu ont été ignorés</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.relaxed">
+                <source>Search relaxed: not every word has to match</source>
+                <target>Recherche assouplie : tous les mots ne doivent pas correspondre</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

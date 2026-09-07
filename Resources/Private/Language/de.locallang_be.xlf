@@ -115,6 +115,106 @@
                 <source>Very high (2×)</source>
                 <target>Sehr hoch (2×)</target>
             </trans-unit>
+            <trans-unit id="dictionary.title">
+                <source>Search dictionary</source>
+                <target>Suchwörterbuch</target>
+            </trans-unit>
+            <trans-unit id="dictionary.kind">
+                <source>Type</source>
+                <target>Art</target>
+            </trans-unit>
+            <trans-unit id="dictionary.kind.description">
+                <source>Synonym = the term expands to the words on the right. Single token = never split this character sequence (product keys, parameter names). Stop word = ignore the word while indexing and searching.</source>
+                <target>Synonym = der Begriff wird um die Wörter rechts erweitert. Ein Token = diese Zeichenfolge nie zerlegen (Typenschlüssel, Parameternamen). Stoppwort = Wort beim Indexieren und Suchen ignorieren.</target>
+            </trans-unit>
+            <trans-unit id="dictionary.kind.synonym">
+                <source>Synonym</source>
+                <target>Synonym</target>
+            </trans-unit>
+            <trans-unit id="dictionary.kind.word">
+                <source>Single token</source>
+                <target>Ein Token</target>
+            </trans-unit>
+            <trans-unit id="dictionary.kind.stopword">
+                <source>Stop word</source>
+                <target>Stoppwort</target>
+            </trans-unit>
+            <trans-unit id="dictionary.term">
+                <source>Term</source>
+                <target>Begriff</target>
+            </trans-unit>
+            <trans-unit id="dictionary.term.description">
+                <source>What visitors type. Lowercase; matching is case-insensitive.</source>
+                <target>Was Besucher eintippen. Kleinschreibung, die Zuordnung erfolgt unabhängig von Groß- und Kleinschreibung.</target>
+            </trans-unit>
+            <trans-unit id="dictionary.replacements">
+                <source>Expands to</source>
+                <target>Erweitert um</target>
+            </trans-unit>
+            <trans-unit id="dictionary.replacements.description">
+                <source>One word or phrase per line. A search for the term above also matches documents containing these. Add the reverse direction as its own record if it should work both ways.</source>
+                <target>Ein Wort oder eine Wortgruppe pro Zeile. Eine Suche nach dem Begriff oben findet dann auch Dokumente, die diese enthalten. Soll es in beide Richtungen gelten, dafür einen eigenen Datensatz anlegen.</target>
+            </trans-unit>
+            <trans-unit id="dictionary.state">
+                <source>Status</source>
+                <target>Status</target>
+            </trans-unit>
+            <trans-unit id="dictionary.state.description">
+                <source>Only "active" records are pushed to the search engine. "Candidate" is a machine proposal waiting for review, "rejected" keeps it from being proposed again.</source>
+                <target>Nur „aktiv" wird an die Suchmaschine übertragen. „Kandidat" ist ein maschineller Vorschlag zur Prüfung, „abgelehnt" verhindert, dass er erneut vorgeschlagen wird.</target>
+            </trans-unit>
+            <trans-unit id="dictionary.state.candidate">
+                <source>Candidate (not in use)</source>
+                <target>Kandidat (nicht in Benutzung)</target>
+            </trans-unit>
+            <trans-unit id="dictionary.state.active">
+                <source>Active</source>
+                <target>Aktiv</target>
+            </trans-unit>
+            <trans-unit id="dictionary.state.rejected">
+                <source>Rejected</source>
+                <target>Abgelehnt</target>
+            </trans-unit>
+            <trans-unit id="dictionary.site">
+                <source>Site</source>
+                <target>Site</target>
+            </trans-unit>
+            <trans-unit id="dictionary.site.description">
+                <source>Leave empty to apply to every site of this installation.</source>
+                <target>Leer lassen, damit der Eintrag für alle Sites dieser Installation gilt.</target>
+            </trans-unit>
+            <trans-unit id="dictionary.source">
+                <source>Origin</source>
+                <target>Herkunft</target>
+            </trans-unit>
+            <trans-unit id="dictionary.source.manual">
+                <source>Entered manually</source>
+                <target>Manuell eingetragen</target>
+            </trans-unit>
+            <trans-unit id="dictionary.source.log">
+                <source>Mined from the search log</source>
+                <target>Aus dem Suchprotokoll gewonnen</target>
+            </trans-unit>
+            <trans-unit id="dictionary.source.translation">
+                <source>Mined from translated titles</source>
+                <target>Aus übersetzten Titeln gewonnen</target>
+            </trans-unit>
+            <trans-unit id="dictionary.source.vocabulary">
+                <source>Mined from the index vocabulary</source>
+                <target>Aus dem Index-Vokabular gewonnen</target>
+            </trans-unit>
+            <trans-unit id="dictionary.evidence">
+                <source>Evidence</source>
+                <target>Belege</target>
+            </trans-unit>
+            <trans-unit id="dictionary.hits">
+                <source>Hits of the proposal</source>
+                <target>Treffer des Vorschlags</target>
+            </trans-unit>
+            <trans-unit id="dictionary.tab.origin">
+                <source>Origin</source>
+                <target>Herkunft</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

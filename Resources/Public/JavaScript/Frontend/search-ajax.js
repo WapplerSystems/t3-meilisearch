@@ -32,6 +32,7 @@
     const HYBRID_SELECTOR = '[data-ws-meilisearch-hybrid]';
     const PAGE_LINK_SELECTOR = '[data-ws-meilisearch-page]';
     const SCOPE_CLEAR_SELECTOR = '[data-ws-meilisearch-scope-clear]';
+    const ALTERNATIVE_SELECTOR = '[data-ws-meilisearch-alternative]';
     const FRAGMENT_ENDPOINT = '/_ws_meilisearch/search-fragment';
     const EXTBASE_PREFIX = 'tx_wsmeilisearch_search[';
 
@@ -226,6 +227,30 @@
                 'tx_wsmeilisearch_search[page]': 1,
             });
             window.location.assign(url.toString());
+            return;
+        }
+
+        // "Did you mean" chip: adopt the suggested spelling. Treated like a
+        // fresh search — the input field has to show what is now being
+        // searched, and old facet selections are meaningless for a
+        // different query (same reasoning as the submit handler).
+        const alternative = event.target instanceof Element ? event.target.closest(ALTERNATIVE_SELECTOR) : null;
+        if (alternative) {
+            event.preventDefault();
+            const suggestion = alternative.getAttribute('data-ws-meilisearch-alternative') || '';
+            if (suggestion === '') return;
+            const input = form.querySelector(QUERY_INPUT_SELECTOR);
+            if (input) input.value = suggestion;
+            const url = buildUrl({
+                'tx_wsmeilisearch_search[q]': suggestion,
+                'tx_wsmeilisearch_search[page]': 1,
+            });
+            for (const key of [...url.searchParams.keys()]) {
+                if (key.startsWith('tx_wsmeilisearch_search[filters]')) {
+                    url.searchParams.delete(key);
+                }
+            }
+            refresh(url);
             return;
         }
 

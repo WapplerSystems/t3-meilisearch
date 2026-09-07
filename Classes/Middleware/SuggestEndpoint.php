@@ -143,6 +143,11 @@ final class SuggestEndpoint implements MiddlewareInterface
             // search-result-page hits. Underscore-prefixed → never
             // passed to Meilisearch.
             '__analyticsSource' => 'suggest',
+            // The dropdown fires per keystroke and a half-typed word has
+            // no hits by definition. Running the recovery ladder here
+            // would add a multi-search per character for a suggestion
+            // nobody asked for.
+            'recover' => false,
         ]);
 
         // Build the LanguageService once for the active site language so

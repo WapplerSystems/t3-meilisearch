@@ -133,6 +133,24 @@ CREATE TABLE tx_wsmeilisearch_search_log (
     status          VARCHAR(16) DEFAULT '' NOT NULL,
     cited_count     INT(11) UNSIGNED DEFAULT 0 NOT NULL,
 
+    -- Query CONTEXT. Without it a zero-result row is unreadable: the same
+    -- query yields 138 hits unscoped and 0 inside a KB subtree, and the
+    -- analytics panel only ever showed the 0. `filters` holds the visitor's
+    -- facet selection as compact JSON ({"type":["file"]}), `scope_uid` the
+    -- page-subtree restriction, `matching_strategy` which token rule ran.
+    filters         VARCHAR(1024) DEFAULT '' NOT NULL,
+    scope_uid       INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    matching_strategy VARCHAR(16) DEFAULT '' NOT NULL,
+    -- Which recovery step produced the row's result_count:
+    -- '' = the query matched as typed; corrected|split|join|dropped|relaxed
+    -- = an alternative was applied; 'none' = nothing was found either.
+    -- Turns "how often does the ladder save a search?" into one GROUP BY.
+    recovery        VARCHAR(16) DEFAULT '' NOT NULL,
+    -- Alternatives that were offered as chips but not auto-applied, so the
+    -- editorial view can see which suggestion editors should turn into a
+    -- synonym.
+    alternatives    VARCHAR(512) DEFAULT '' NOT NULL,
+
     PRIMARY KEY (uid),
     KEY site_lang_crdate (site_identifier, language_id, crdate),
     KEY query_idx (query),
@@ -159,4 +177,42 @@ CREATE TABLE tx_wsmeilisearch_ragtest_run (
 
     PRIMARY KEY (uid),
     KEY test_recent (test_uid, crdate)
+);
+-- Editorial half of the search dictionary. The curated base list stays in
+-- the site's settings.yaml (versioned, code-reviewed); rows here are the
+-- additions redaction may make without a deploy, plus the machine-mined
+-- candidates from DictionaryMineCommand. SearchConfigurationProvider merges
+-- both into the index settings, DB rows winning over YAML for the same term.
+CREATE TABLE tx_wsmeilisearch_dictionary (
+    uid             INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    pid             INT(11) DEFAULT 0 NOT NULL,
+    tstamp          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    crdate          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    deleted         SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+    hidden          SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+
+    -- Empty = applies to every site of the installation.
+    site_identifier VARCHAR(64) DEFAULT '' NOT NULL,
+    -- synonym  = term expands to `replacements` (Meilisearch `synonyms`)
+    -- word     = keep as ONE token, never split (Meilisearch `dictionary`)
+    -- stopword = ignore while indexing and querying (`stopWords`)
+    kind            VARCHAR(16) DEFAULT 'synonym' NOT NULL,
+    term            VARCHAR(190) DEFAULT '' NOT NULL,
+    -- Newline- or comma-separated for `synonym`, unused otherwise.
+    replacements    TEXT,
+    -- candidate = mined, waiting for a human; active = pushed to the index;
+    -- rejected = mined and dismissed (kept so mining doesn't re-propose it).
+    state           VARCHAR(16) DEFAULT 'candidate' NOT NULL,
+    -- manual | log | translation | vocabulary — where the row came from.
+    source          VARCHAR(24) DEFAULT 'manual' NOT NULL,
+    -- Free-text justification shown in the BE list ("0 Treffer am 07.09.,
+    -- 42 s später 'fassadensysteme' mit 187 Treffern").
+    evidence        VARCHAR(255) DEFAULT '' NOT NULL,
+    -- Hits the proposed replacement had when mined — ranks the candidate list.
+    hits            INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+
+    PRIMARY KEY (uid),
+    KEY parent (pid),
+    KEY lookup (site_identifier, kind, state),
+    KEY term_idx (term)
 );

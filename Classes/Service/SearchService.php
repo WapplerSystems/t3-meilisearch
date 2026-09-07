@@ -43,6 +43,7 @@ final class SearchService implements LoggerAwareInterface
         private readonly SearchEngineFactory $engineFactory,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly SearchConfigurationProvider $configProvider,
+        private readonly QueryRecoveryService $queryRecovery,
     ) {}
 
     /**
@@ -72,10 +73,16 @@ final class SearchService implements LoggerAwareInterface
         $useHybrid = (bool)($before->options['hybrid'] ?? false)
             && trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
 
+        // Resolve the strategy here instead of inside directSearch so both
+        // the recovery pass and the analytics row see the value that was
+        // actually in force.
+        $before->options['matchingStrategy'] = $this->resolveMatchingStrategy($site, $before->options);
+
         try {
             $result = $useHybrid
                 ? $this->hybridSearch($site, $before->query, $before->options, $page, $perPage)
                 : $this->keywordSearch($site, $before->query, $before->options, $page, $perPage);
+            $result = $this->recoverIfEmpty($site, $before->query, $before->options, $page, $perPage, $useHybrid, $result);
         } catch (\Throwable $e) {
             $this->logger?->error('Meilisearch search failed: {message}', [
                 'message' => $e->getMessage(),
@@ -84,9 +91,144 @@ final class SearchService implements LoggerAwareInterface
             $result = SearchResult::empty();
         }
 
+        // Hand the recovery outcome to the analytics listener: a row saying
+        // "0 hits" reads very differently once it also says whether an
+        // alternative was found, offered or applied.
+        $before->options['__recovery'] = $result->recovery !== ''
+            ? $result->recovery
+            : ($result->alternatives !== [] ? 'offered' : ($result->totalHits === 0 ? 'none' : ''));
+        $before->options['__alternatives'] = array_map(
+            static fn (QueryAlternative $a): string => $a->kind . ':' . $a->query,
+            $result->alternatives,
+        );
+
         $after = new AfterSearchEvent($before->query, $before->options, $result, $site);
         $this->eventDispatcher->dispatch($after);
         return $after->result;
+    }
+
+    /**
+     * Zero-result rescue. Asks QueryRecoveryService for near spellings that
+     * do have hits, then decides how much to do with them:
+     *
+     *   • a single high-confidence alternative (typo fixed, compound split,
+     *     tokens joined) is run for the visitor right away — landing on an
+     *     empty page when one character was wrong is the worst outcome of
+     *     the three;
+     *   • anything else is handed to the template as "did you mean" chips,
+     *     so relaxing the query stays the visitor's decision.
+     *
+     * Opt out per call with `['recover' => false]` — RAG retrieval does,
+     * because it has its own fallback ladder and must not pay for a second.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function recoverIfEmpty(
+        Site $site,
+        string $query,
+        array $options,
+        int $page,
+        int $perPage,
+        bool $useHybrid,
+        SearchResult $result,
+    ): SearchResult {
+        if ($result->totalHits > 0 || trim($query) === '') {
+            return $result;
+        }
+        if (($options['recover'] ?? true) === false) {
+            return $result;
+        }
+        if (!(bool)$site->getSettings()->get('meilisearch.search.recovery.enabled', true)) {
+            return $result;
+        }
+
+        $filter = $this->withKnowledgeResourceExclusion(
+            $this->buildMeilisearchFilter((array)($options['filters'] ?? [])),
+            $options,
+        );
+        $alternatives = $this->queryRecovery->recover(
+            $site,
+            $query,
+            $filter,
+            $useHybrid ? $this->hybridParams($site, $options) : null,
+            $this->highlightFields($site),
+            max(1, (int)$site->getSettings()->get('meilisearch.search.recovery.maxAlternatives', 4)),
+        );
+        if ($alternatives === []) {
+            return $result;
+        }
+
+        $best = $alternatives[0];
+        $autoApply = (bool)$site->getSettings()->get('meilisearch.search.recovery.autoApply', true);
+        if (!$autoApply || !$best->getIsAutoApplicable()) {
+            return $result->withRecovery($alternatives, originalQuery: $query);
+        }
+
+        // Re-run the real search with the better spelling. Deliberately
+        // bypasses search() so no second recovery pass and no duplicate
+        // Before/AfterSearchEvent can fire.
+        $recoveredOptions = $options;
+        $recoveredOptions['page'] = 1;
+        try {
+            $recovered = $useHybrid
+                ? $this->hybridSearch($site, $best->query, $recoveredOptions, 1, $perPage)
+                : $this->keywordSearch($site, $best->query, $recoveredOptions, 1, $perPage);
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Recovered query "{query}" failed: {message}', [
+                'query' => $best->query,
+                'message' => $e->getMessage(),
+            ]);
+            return $result->withRecovery($alternatives, originalQuery: $query);
+        }
+        if ($recovered->totalHits < 1) {
+            return $result->withRecovery($alternatives, originalQuery: $query);
+        }
+
+        return $recovered->withRecovery(
+            alternatives: array_values(array_slice($alternatives, 1)),
+            effectiveQuery: $best->query,
+            originalQuery: $query,
+            recovery: $best->kind,
+        );
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     */
+    private function resolveMatchingStrategy(Site $site, array $options): string
+    {
+        $strategy = trim((string)($options['matchingStrategy'] ?? ''));
+        if ($strategy !== '') {
+            return $strategy;
+        }
+        return trim((string)$site->getSettings()->get('meilisearch.search.matchingStrategy', 'all'));
+    }
+
+    /**
+     * Highlightable text fields — also the fields QueryRecoveryService
+     * reads the correctly spelled word out of.
+     *
+     * @return list<string>
+     */
+    private function highlightFields(Site $site): array
+    {
+        $fields = $this->configProvider->highlightAttributes($site) ?: self::FALLBACK_HIGHLIGHT_FIELDS;
+        if (!in_array('content', $fields, true)) {
+            $fields[] = 'content';
+        }
+        return array_values($fields);
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function hybridParams(Site $site, array $options): array
+    {
+        return (new HybridSearchOptions())
+            ->setEmbedder(EmbedderConfigurator::EMBEDDER_NAME)
+            ->setSemanticRatio($this->resolveSemanticRatio($site, $options))
+            ->toArray();
     }
 
     /**
@@ -102,12 +244,7 @@ final class SearchService implements LoggerAwareInterface
      */
     private function hybridSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
     {
-        $ratio = $this->resolveSemanticRatio($site, $options);
-        $hybridParams = (new HybridSearchOptions())
-            ->setEmbedder(EmbedderConfigurator::EMBEDDER_NAME)
-            ->setSemanticRatio($ratio)
-            ->toArray();
-        return $this->directSearch($site, $query, $options, $page, $perPage, $hybridParams);
+        return $this->directSearch($site, $query, $options, $page, $perPage, $this->hybridParams($site, $options));
     }
 
     /**
@@ -174,10 +311,7 @@ final class SearchService implements LoggerAwareInterface
         //                Used by RAG retrieval for verb-led questions.
         // Callers explicitly opt in via the option; otherwise the
         // SearchConfigurationProvider site-setting controls the default.
-        $strategy = (string)($options['matchingStrategy'] ?? '');
-        if ($strategy === '') {
-            $strategy = trim((string)$site->getSettings()->get('meilisearch.search.matchingStrategy', 'all'));
-        }
+        $strategy = $this->resolveMatchingStrategy($site, $options);
         if ($strategy !== '') {
             $params['matchingStrategy'] = $strategy;
         }

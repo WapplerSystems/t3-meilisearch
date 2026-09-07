@@ -22,6 +22,9 @@ final readonly class IndexSettings
      * @param list<string>                 $displayedAttributes
      * @param list<string>                 $typoDisableOnAttributes
      * @param list<string>                 $typoDisableOnWords
+     * @param list<string>                 $dictionary
+     * @param list<string>                 $separatorTokens
+     * @param list<string>                 $nonSeparatorTokens
      */
     public function __construct(
         public array  $rankingRules,
@@ -39,6 +42,9 @@ final readonly class IndexSettings
         public int    $facetingMaxValuesPerFacet,
         public string $facetingSortFacetValuesBy,
         public int    $searchCutoffMs,
+        public array  $dictionary = [],
+        public array  $separatorTokens = [],
+        public array  $nonSeparatorTokens = [],
     ) {}
 
     /**
@@ -88,6 +94,26 @@ final readonly class IndexSettings
                 'sortFacetValuesBy' => ['*' => $this->facetingSortFacetValuesBy],
             ],
         ];
+
+        // Tokenizer vocabulary. `dictionary` tells the engine which
+        // character sequences are ONE token even though its own rules would
+        // split them — product type keys ("LZS 50"), parameter names
+        // ("lin_ww_flowrate"), brand spellings ("SCHAKonnect"). Without it
+        // such a token is chopped up and, under matchingStrategy=all, the
+        // query needs every fragment to match separately.
+        if ($this->dictionary !== []) {
+            $payload['dictionary'] = $this->dictionary;
+        }
+        // separatorTokens / nonSeparatorTokens move single characters
+        // between "splits a word" and "belongs to the word". `_` and `+`
+        // living in the wrong group is what turns "lin_ww_flowrate" into
+        // three tokens and "drufi+" into two.
+        if ($this->separatorTokens !== []) {
+            $payload['separatorTokens'] = $this->separatorTokens;
+        }
+        if ($this->nonSeparatorTokens !== []) {
+            $payload['nonSeparatorTokens'] = $this->nonSeparatorTokens;
+        }
 
         if ($this->distinctAttribute !== null && $this->distinctAttribute !== '') {
             $payload['distinctAttribute'] = $this->distinctAttribute;

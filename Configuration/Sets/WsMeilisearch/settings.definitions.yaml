@@ -411,6 +411,42 @@ settings:
     type: string
     default: 'all'
 
+  meilisearch.search.recovery.enabled:
+    label: 'Zero-result recovery'
+    description: 'When a query returns nothing, probe near spellings that DO have hits — a typo corrected to the word actually in the index, a German compound split into its parts, two words joined, terms that appear nowhere dropped, or the matching strategy relaxed. Costs one extra multi-search, and only on queries that found nothing. Turn off to keep the strict empty result.'
+    type: bool
+    default: true
+
+  meilisearch.search.recovery.autoApply:
+    label: 'Apply the best alternative automatically'
+    description: 'When the recovery pass finds exactly one high-confidence spelling (corrected typo, split compound, joined words), run it for the visitor and label the result "no exact match for X — showing results for Y". Off: the alternatives are only offered as "did you mean" chips. A relaxed query is never applied automatically, regardless of this setting.'
+    type: bool
+    default: true
+
+  meilisearch.search.recovery.maxAlternatives:
+    label: 'Maximum alternatives offered'
+    description: 'How many "did you mean" suggestions to show at most. Each one carries its hit count, so more than a handful is noise.'
+    type: int
+    default: 4
+
+  meilisearch.defaults.dictionary:
+    label: 'Single-token words (dictionary)'
+    description: 'Character sequences Meilisearch must keep as ONE token even though its tokenizer would split them: product type keys ("LZS 50"), parameter names ("lin_ww_flowrate"), brand spellings ("SCHAKonnect"). Without this such a token is chopped up and — under matchingStrategy "all" — the query needs every fragment to match separately.'
+    type: stringlist
+    default: []
+
+  meilisearch.defaults.separatorTokens:
+    label: 'Additional separator characters'
+    description: 'Characters that should split words even though Meilisearch treats them as part of one. Rarely needed.'
+    type: stringlist
+    default: []
+
+  meilisearch.defaults.nonSeparatorTokens:
+    label: 'Characters that belong to the word'
+    description: 'Characters Meilisearch must NOT split on. "_" keeps parameter names like lin_ww_flowrate searchable as one term instead of three; "+" keeps product names like "Drufi+" intact.'
+    type: stringlist
+    default: []
+
   meilisearch.tika.allowedMimeTypes:
     label: 'Tika allowed mime types'
     description: 'Whitelist of mime types eligible for text extraction. Everything else is skipped.'

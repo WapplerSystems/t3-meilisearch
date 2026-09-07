@@ -115,6 +115,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             'facets' => $facetList,
             'hybrid' => $useHybrid,
             'sort' => $sort,
+            '__scopeUid' => $scope,
         ]);
 
         $hits = [];
@@ -127,13 +128,7 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
             $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }
-        $result = new SearchResult(
-            hits: $hits,
-            totalHits: $result->totalHits,
-            facets: $result->facets,
-            page: $result->page,
-            perPage: $result->perPage,
-        );
+        $result = $result->withHits($hits);
 
         $languageLabels = [];
         foreach ($site->getAllLanguages() as $language) {
@@ -142,7 +137,10 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
 
         $view = $this->createView($request);
         $view->assignMultiple([
-            'query' => $q,
+            // Same split as the full-page action: links follow the spelling
+            // that produced the hits, the notice names what was typed.
+            'query' => $result->effectiveQuery !== '' ? $result->effectiveQuery : $q,
+            'typedQuery' => $q,
             'page' => $page,
             'result' => $result,
             // Clean facet selections only (server-injected raw filters stay

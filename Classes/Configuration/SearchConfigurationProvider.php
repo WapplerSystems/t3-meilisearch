@@ -7,6 +7,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Configuration\Dto\DisplayConfig;
 use WapplerSystems\Meilisearch\Configuration\Dto\FacetConfig;
 use WapplerSystems\Meilisearch\Configuration\Dto\IndexSettings;
+use WapplerSystems\Meilisearch\Domain\Repository\DictionaryRepository;
 
 /**
  * Single point of read access for the search/relevance/display configuration.
@@ -21,12 +22,23 @@ use WapplerSystems\Meilisearch\Configuration\Dto\IndexSettings;
  * Callers: ApplyMeilisearchSettingsCommand (pushes IndexSettings to
  * Meilisearch), and — eventually — SearchController / SearchService
  * (consume FacetConfig and DisplayConfig at render time).
+ *
+ * Synonyms, dictionary words and stop words have a SECOND source: the
+ * tx_wsmeilisearch_dictionary rows an editor maintains in the backend.
+ * The YAML list is the curated, code-reviewed base; DB rows are the
+ * additions redaction can make without a deploy. On a term collision the
+ * DB row wins — otherwise a fix could never be applied without a release.
  */
 final class SearchConfigurationProvider
 {
+    public function __construct(
+        private readonly DictionaryRepository $dictionary,
+    ) {}
+
     public function indexSettings(Site $site): IndexSettings
     {
         $s = $site->getSettings();
+        $siteId = $site->getIdentifier();
         return new IndexSettings(
             rankingRules: $this->stringList($this->getNested($site, 'meilisearch.defaults.rankingRules')),
             typoToleranceEnabled:        (bool)($s->get('meilisearch.defaults.typoTolerance.enabled', true)),
@@ -35,14 +47,26 @@ final class SearchConfigurationProvider
             typoDisableOnAttributes:     $this->stringList($this->getNested($site, 'meilisearch.defaults.typoTolerance.disableOnAttributes')),
             typoDisableOnWords:           $this->stringList($this->getNested($site, 'meilisearch.defaults.typoTolerance.disableOnWords')),
             typoDisableOnNumbers:        (bool)$s->get('meilisearch.defaults.typoTolerance.disableOnNumbers', false),
-            stopWords:                   $this->stringList($this->getNested($site, 'meilisearch.defaults.stopWords')),
-            synonyms:                    $this->synonymsMap($this->getNested($site, 'meilisearch.defaults.synonyms')),
+            stopWords:                   array_values(array_unique(array_merge(
+                $this->stringList($this->getNested($site, 'meilisearch.defaults.stopWords')),
+                $this->dictionary->activeStopWords($siteId),
+            ))),
+            synonyms:                    array_merge(
+                $this->synonymsMap($this->getNested($site, 'meilisearch.defaults.synonyms')),
+                $this->dictionary->activeSynonyms($siteId),
+            ),
             distinctAttribute:           $this->nullableString($s->get('meilisearch.defaults.distinctAttribute')),
             displayedAttributes:         $this->stringList($this->getNested($site, 'meilisearch.defaults.displayedAttributes')) ?: ['*'],
             paginationMaxTotalHits:      (int)$s->get('meilisearch.defaults.pagination.maxTotalHits', 1000),
             facetingMaxValuesPerFacet:   (int)$s->get('meilisearch.defaults.faceting.maxValuesPerFacet', 100),
             facetingSortFacetValuesBy:   (string)$s->get('meilisearch.defaults.faceting.sortFacetValuesBy', 'count'),
             searchCutoffMs:              (int)$s->get('meilisearch.defaults.searchCutoffMs', 0),
+            dictionary:                  array_values(array_unique(array_merge(
+                $this->stringList($this->getNested($site, 'meilisearch.defaults.dictionary')),
+                $this->dictionary->activeWords($siteId),
+            ))),
+            separatorTokens:             $this->stringList($this->getNested($site, 'meilisearch.defaults.separatorTokens')),
+            nonSeparatorTokens:          $this->stringList($this->getNested($site, 'meilisearch.defaults.nonSeparatorTokens')),
         );
     }
 

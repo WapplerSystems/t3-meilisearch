@@ -232,6 +232,11 @@ final class SearchController extends ActionController
             'facets' => $facetList,
             'hybrid' => $useHybrid,
             'sort' => $sortOption,
+            // Analytics context only — the scope itself is already inside
+            // $filters as a rootline expression. Logged separately so the
+            // zero-result panel can tell "nothing in this subtree" apart
+            // from "nothing on the whole site".
+            '__scopeUid' => $scopeUid,
         ]);
 
         // Resolve the numeric language id of each hit to the site-
@@ -254,15 +259,16 @@ final class SearchController extends ActionController
             $hit['displayPartial'] = $this->configProvider->resolveDisplayPartial($site, (string)($hit['type'] ?? ''));
             $hits[] = $hit;
         }
-        // Rebuild SearchResult with the enriched hits — DTO is readonly,
-        // so a new instance with the same paging metadata is the way.
-        $result = new \WapplerSystems\Meilisearch\Service\SearchResult(
-            hits: $hits,
-            totalHits: $result->totalHits,
-            facets: $result->facets,
-            page: $result->page,
-            perPage: $result->perPage,
-        );
+        // DTO is readonly, so the enriched hits go into a copy. withHits()
+        // carries paging AND the zero-result recovery metadata along —
+        // listing the fields by hand is how that metadata gets lost.
+        $result = $result->withHits($hits);
+
+        // The search box keeps showing what the visitor typed, but the
+        // result heading and every facet/pagination link must use the
+        // spelling the hits actually belong to — otherwise clicking page 2
+        // would drop back to the query that found nothing.
+        $effectiveQuery = $result->effectiveQuery !== '' ? $result->effectiveQuery : $q;
 
         // Map of language-id → title so the language facet shows
         // "Deutsch" / "English" instead of the raw numeric id. Built once
@@ -282,7 +288,8 @@ final class SearchController extends ActionController
         $currentPageUid = $pageInfo !== null ? $pageInfo->getId() : (int)($GLOBALS['TSFE']->id ?? 0);
 
         $this->view->assignMultiple([
-            'query' => $q,
+            'query' => $effectiveQuery,
+            'typedQuery' => $q,
             'page' => max(1, $page),
             'result' => $result,
             // Clean facet selections only — server-injected raw filters stay

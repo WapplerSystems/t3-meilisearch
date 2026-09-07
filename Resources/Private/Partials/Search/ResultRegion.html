@@ -26,6 +26,37 @@
         </span>
     </div>
 </f:if>
+<f:comment>
+    Zero-result recovery (QueryRecoveryService). Two shapes:
+      • {result.isRecovered} — one high-confidence spelling was applied for
+        the visitor; say so, and name what was typed. `query` already holds
+        the applied spelling so every facet/pagination link below stays on it.
+      • {result.hasAlternatives} — near spellings that DO have hits, offered
+        as chips. Rendered in both branches: alongside a recovered result set
+        (as further options) and above the empty state.
+</f:comment>
+<f:if condition="{result.isRecovered}">
+    <div class="alert alert-info ws-meilisearch-recovery" role="status">
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.recovery.applied"
+            arguments="{0: typedQuery, 1: result.effectiveQuery}"/>
+    </div>
+</f:if>
+<f:if condition="{result.hasAlternatives}">
+    <div class="ws-meilisearch-alternatives mb-3">
+        <span class="text-muted small me-2">
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.recovery.suggestions"/>
+        </span>
+        <f:for each="{result.alternatives}" as="alternative">
+            <a class="ws-meilisearch-alternatives__chip badge rounded-pill text-bg-light border text-decoration-none me-1"
+                href="{f:uri.action(action: 'results', extensionName: 'WsMeilisearch', pluginName: 'Search', controller: 'Search', pageUid: currentPageUid, arguments: '{q: alternative.query, page: 1, hybrid: hybrid, sort: sort, scope: scope}')}"
+                data-ws-meilisearch-alternative="{alternative.query}"
+                title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.recovery.kind.{alternative.kind}')}">
+                {alternative.query}
+                <span class="text-muted">({alternative.totalHits})</span>
+            </a>
+        </f:for>
+    </div>
+</f:if>
 <f:if condition="{result.totalHits} > 0">
     <f:then>
         <div class="ws-meilisearch-controls d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
@@ -153,7 +184,7 @@
     <f:else>
         <div class="alert alert-info ws-meilisearch-empty" role="status">
             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:search.results.empty"
-                arguments="{0: query}"/>
+                arguments="{0: '{f:if(condition: typedQuery, then: typedQuery, else: query)}'}"/>
         </div>
     </f:else>
 </f:if>

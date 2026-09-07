@@ -99,6 +99,81 @@
       <trans-unit id="ragtest.context_requirement.description">
         <source>How much of the retrieved context must come from the right subject area, as "&lt;min&gt;:&lt;pattern&gt;", comma-separated for several rules (e.g. "4:daVo" or "3:schema"). The pattern is matched case-insensitively against a document\'s id, title and helpSourcePath, so a DITA chapter code works as well as a word. Catches a context where the one expected document ranks first but the remaining slots are filled with unrelated topics. Leave empty to skip.</source>
       </trans-unit>
+                <trans-unit id="dictionary.title" resname="dictionary.title">
+                    <source>Search dictionary</source>
+                </trans-unit>
+                <trans-unit id="dictionary.kind" resname="dictionary.kind">
+                    <source>Type</source>
+                </trans-unit>
+                <trans-unit id="dictionary.kind.description" resname="dictionary.kind.description">
+                    <source>Synonym = the term expands to the words on the right. Single token = never split this character sequence (product keys, parameter names). Stop word = ignore the word while indexing and searching.</source>
+                </trans-unit>
+                <trans-unit id="dictionary.kind.synonym" resname="dictionary.kind.synonym">
+                    <source>Synonym</source>
+                </trans-unit>
+                <trans-unit id="dictionary.kind.word" resname="dictionary.kind.word">
+                    <source>Single token</source>
+                </trans-unit>
+                <trans-unit id="dictionary.kind.stopword" resname="dictionary.kind.stopword">
+                    <source>Stop word</source>
+                </trans-unit>
+                <trans-unit id="dictionary.term" resname="dictionary.term">
+                    <source>Term</source>
+                </trans-unit>
+                <trans-unit id="dictionary.term.description" resname="dictionary.term.description">
+                    <source>What visitors type. Lowercase; matching is case-insensitive.</source>
+                </trans-unit>
+                <trans-unit id="dictionary.replacements" resname="dictionary.replacements">
+                    <source>Expands to</source>
+                </trans-unit>
+                <trans-unit id="dictionary.replacements.description" resname="dictionary.replacements.description">
+                    <source>One word or phrase per line. A search for the term above also matches documents containing these. Add the reverse direction as its own record if it should work both ways.</source>
+                </trans-unit>
+                <trans-unit id="dictionary.state" resname="dictionary.state">
+                    <source>Status</source>
+                </trans-unit>
+                <trans-unit id="dictionary.state.description" resname="dictionary.state.description">
+                    <source>Only "active" records are pushed to the search engine. "Candidate" is a machine proposal waiting for review, "rejected" keeps it from being proposed again.</source>
+                </trans-unit>
+                <trans-unit id="dictionary.state.candidate" resname="dictionary.state.candidate">
+                    <source>Candidate (not in use)</source>
+                </trans-unit>
+                <trans-unit id="dictionary.state.active" resname="dictionary.state.active">
+                    <source>Active</source>
+                </trans-unit>
+                <trans-unit id="dictionary.state.rejected" resname="dictionary.state.rejected">
+                    <source>Rejected</source>
+                </trans-unit>
+                <trans-unit id="dictionary.site" resname="dictionary.site">
+                    <source>Site</source>
+                </trans-unit>
+                <trans-unit id="dictionary.site.description" resname="dictionary.site.description">
+                    <source>Leave empty to apply to every site of this installation.</source>
+                </trans-unit>
+                <trans-unit id="dictionary.source" resname="dictionary.source">
+                    <source>Origin</source>
+                </trans-unit>
+                <trans-unit id="dictionary.source.manual" resname="dictionary.source.manual">
+                    <source>Entered manually</source>
+                </trans-unit>
+                <trans-unit id="dictionary.source.log" resname="dictionary.source.log">
+                    <source>Mined from the search log</source>
+                </trans-unit>
+                <trans-unit id="dictionary.source.translation" resname="dictionary.source.translation">
+                    <source>Mined from translated titles</source>
+                </trans-unit>
+                <trans-unit id="dictionary.source.vocabulary" resname="dictionary.source.vocabulary">
+                    <source>Mined from the index vocabulary</source>
+                </trans-unit>
+                <trans-unit id="dictionary.evidence" resname="dictionary.evidence">
+                    <source>Evidence</source>
+                </trans-unit>
+                <trans-unit id="dictionary.hits" resname="dictionary.hits">
+                    <source>Hits of the proposal</source>
+                </trans-unit>
+                <trans-unit id="dictionary.tab.origin" resname="dictionary.tab.origin">
+                    <source>Origin</source>
+                </trans-unit>
     </body>
     </file>
 </xliff>

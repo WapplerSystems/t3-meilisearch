@@ -17,10 +17,16 @@ use WapplerSystems\Meilisearch\Event\AfterSearchEvent;
  * and hybrid-vs-keyword usage over time.
  *
  * Privacy posture: stores ONLY {site, language, query, count, source,
- * hybrid, timestamp}. No IPs, no session ids, no user agents — the
- * data is aggregable but contains no PII, so the table is safe to
- * keep around indefinitely (a retention sweep is offered as
- * scheduler task but not required for compliance).
+ * hybrid, timestamp} plus the QUERY CONTEXT {facet filters, subtree
+ * scope, matching strategy, recovery outcome}. No IPs, no session ids,
+ * no user agents — the data is aggregable but contains no PII, so the
+ * table is safe to keep around indefinitely (a retention sweep is
+ * offered as scheduler task but not required for compliance).
+ *
+ * The context columns exist because without them the zero-result panel
+ * lies: the same query returns 138 hits site-wide and 0 inside a KB
+ * subtree, and both were logged as a bare "0 results". Filters and
+ * scope are server-built values, not user text, so they add no PII.
  *
  * Gating: opt-in per site via meilisearch.analytics.enabled = true.
  * Silent no-op for sites that haven't opted in.
@@ -95,6 +101,11 @@ final class SearchAnalyticsLogger implements LoggerAwareInterface
                 'result_count' => (int)$event->result->totalHits,
                 'source' => substr($source, 0, 32),
                 'hybrid' => $hybrid ? 1 : 0,
+                'filters' => $this->encodeFilters($event->options['filters'] ?? []),
+                'scope_uid' => max(0, (int)($event->options['__scopeUid'] ?? 0)),
+                'matching_strategy' => substr((string)($event->options['matchingStrategy'] ?? ''), 0, 16),
+                'recovery' => substr((string)($event->options['__recovery'] ?? ''), 0, 16),
+                'alternatives' => $this->encodeAlternatives($event->options['__alternatives'] ?? []),
             ]);
         } catch (\Throwable $e) {
             // Never break a search just because analytics couldn't
@@ -105,6 +116,46 @@ final class SearchAnalyticsLogger implements LoggerAwareInterface
                 ['msg' => $e->getMessage()],
             );
         }
+    }
+
+    /**
+     * The visitor's facet selection as compact JSON. Server-built entries
+     * are dropped: `__rawFilters` holds access-control and scope
+     * expressions (recorded separately, and noise in an aggregation), and
+     * `language` duplicates the language_id column.
+     */
+    private function encodeFilters(mixed $filters): string
+    {
+        if (!is_array($filters) || $filters === []) {
+            return '';
+        }
+        $clean = [];
+        foreach ($filters as $key => $value) {
+            $name = (string)$key;
+            if (str_starts_with($name, '__') || $name === 'language' || $name === 'contentLanguage') {
+                continue;
+            }
+            $clean[$name] = is_array($value) ? array_values(array_map('strval', $value)) : (string)$value;
+        }
+        if ($clean === []) {
+            return '';
+        }
+        ksort($clean);
+        return substr((string)json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 1024);
+    }
+
+    /**
+     * Offered-but-not-applied alternatives as "kind:query" pairs. These are
+     * the editorial gold: a query that only worked after a compound split
+     * or a typo fix is a synonym waiting to be written down.
+     */
+    private function encodeAlternatives(mixed $alternatives): string
+    {
+        if (!is_array($alternatives) || $alternatives === []) {
+            return '';
+        }
+        $flat = implode(' | ', array_map('strval', array_slice($alternatives, 0, 5)));
+        return mb_substr($flat, 0, 500);
     }
 
     private function normalizeQuery(string $query): string

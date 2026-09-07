@@ -11,6 +11,9 @@ services:
       - '../Classes/Domain/RecordSource/PluginRecordSourceInterface.php'
       - '../Classes/Event/*'
       - '../Classes/Service/SearchResult.php'
+      # Readonly DTO built by QueryRecoveryService; scalar-only constructor,
+      # so autowiring it would break container compilation.
+      - '../Classes/Service/QueryAlternative.php'
       - '../Classes/Service/Llm/LlmProviderInterface.php'
       - '../Classes/Service/Llm/LlmException.php'
       - '../Classes/Service/Rag/RagAnswer.php'
