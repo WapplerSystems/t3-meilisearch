@@ -449,7 +449,7 @@ settings:
 
   meilisearch.defaults.nonSeparatorTokens:
     label: 'Characters that belong to the word'
-    description: 'Characters Meilisearch must NOT split on. "_" keeps parameter names like lin_ww_flowrate searchable as one term instead of three; "+" keeps product names like "Drufi+" intact.'
+    description: 'Characters Meilisearch must NOT split on — "+" keeps product names like "Drufi+" intact. Handle "_" with care: it makes parameter names like lin_ww_flowrate findable, but every underscore inside a file or field name then belongs to one long token, so a search for a single part of it stops matching. Measured on a corpus with 35k indexed files: adding "_" made one parameter name findable (0 -> 2 hits) and cost an everyday term 23% of its hits (309 -> 239). Change it only with a before/after count on your own index, and note that any change here re-tokenises the whole index.'
     type: stringlist
     default: []
 
