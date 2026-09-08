@@ -22,6 +22,12 @@
              data-label-you="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you')}"
              data-label-assistant="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant')}"
              data-label-suggestions="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}"
+             data-label-fallback-heading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.heading')}"
+             data-label-fallback-intro="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.intro')}"
+             data-label-fallback-email="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.email')}"
+             data-label-fallback-phone="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.phone')}"
+             data-label-fallback-ticket="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.ticket')}"
+             data-label-fallback-subject="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.fallback.email.subject')}"
              data-label-loading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.loading')}"
              data-label-interrupted="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.interrupted')}">
             <f:comment>
@@ -43,6 +49,14 @@
         <f:asset.css identifier="wsMeilisearchRag" href="EXT:ws_meilisearch/Resources/Public/CSS/Rag.css"/>
         <f:asset.script identifier="wsMeilisearchRagStream" src="EXT:ws_meilisearch/Resources/Public/JavaScript/RagStream.js"/>
 
+        <f:comment>
+            Static contact card — only in fallback.show=always, where it is
+            permanently visible and needs no answer to anchor it. In the
+            default onlyEmpty mode the streamed answer decides per turn and
+            the card arrives as a `fallback` frame (RagStream.js), because
+            this shell is rendered before any answer exists and could never
+            make that call itself.
+        </f:comment>
         <f:if condition="{showFallback}">
             <f:render partial="Rag/FallbackContact" arguments="{fallback: fallback, question: question}"/>
         </f:if>

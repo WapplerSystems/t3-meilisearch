@@ -612,6 +612,24 @@ settings:
     type: int
     default: 4
 
+  meilisearch.rag.suggestions.validate:
+    label: 'RAG: probe suggestions against retrieval before showing them'
+    description: 'When true, every followup / refine button is run through the real retrieval (query rewrite + search, no answer call) before it reaches the visitor, and dropped when it would land on "I have no information about that". Two rules: the probe must retrieve something at all, and — governed by the novelty depth below — it must surface at least one document that was not already in the current answer''s context. Reason it is on by default: the suggestion generator writes its buttons from the answer text and the source titles without ever touching the index, so it cannot tell a retrievable question from an unretrievable one; measured on a live help corpus, three of four followup buttons led to a dead end. Costs one short rewrite completion plus one search per followup / refine suggestion. "recommend" buttons are never probed — they already resolve to a real source URL.'
+    type: bool
+    default: true
+
+  meilisearch.rag.suggestions.noveltyDepth:
+    label: 'RAG: novelty depth for the suggestion probe'
+    description: 'How many top ranks of the probe are inspected for a document that is not already in the current answer''s context. A suggestion that only retrieves the excerpts the model just answered from gets a second "not in there" answer, which a pure zero-hit check does not catch — this is what removes it. 3 is a good default: deeper ranks are retrieval tail rather than a new topic, and a larger value keeps more buttons at the price of more dead ends. Set to 0 to keep only the zero-hit rule, e.g. when follow-ups are supposed to drill deeper into a document that was already cited. Ignored when the probe is switched off.'
+    type: int
+    default: 3
+
+  meilisearch.rag.suggestions.related:
+    label: 'RAG: grounded related-topic buttons'
+    description: 'How many suggestion buttons are taken from the index instead of from the model: the sibling documents of the ones this answer was built on, each offered under its own title. They exist because the retrieval probe can only remove generated suggestions, and an answer whose followups were all unretrievable would end up with no buttons at all. A title retrieves its own document first, so these cannot fail the way a paraphrased question can. They only fill slots the generated suggestions left free — the total never exceeds the maximum above, so raising this does not make the row longer, only fuller. Costs one filtered search per answer. Set to 0 to switch it off.'
+    type: int
+    default: 2
+
   meilisearch.rag.useHybrid:
     label: 'Use hybrid search for retrieval'
     description: 'When true, RAG retrieval uses hybrid (keyword + semantic) search instead of keyword-only. Requires a configured embedder. Ignored when no embedder is configured.'

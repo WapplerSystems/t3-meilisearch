@@ -13,6 +13,7 @@ use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
+use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
@@ -72,6 +73,8 @@ final class RagService implements LoggerAwareInterface
         private readonly QueryRewriter $queryRewriter,
         private readonly SuggestionGenerator $suggestionGenerator,
         private readonly QueryClassifier $queryClassifier,
+        private readonly FallbackContact $fallbackContact,
+        private readonly NeighbourSuggestions $neighbourSuggestions,
     ) {}
 
     /**
@@ -426,7 +429,24 @@ final class RagService implements LoggerAwareInterface
         // answer + sources; returns [] when disabled or on any error, so it
         // never blocks the answer.
         return $final->withSuggestions($this->withScopeOptions(
-            $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
+            $this->withRelatedTopics(
+                $this->groundSuggestions(
+                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
+                    $site,
+                    $provider,
+                    $settings,
+                    $event->options,
+                    $maxHits,
+                    $llmOptions,
+                    $this->resolveLanguageLabel($site, $options),
+                    $hits,
+                ),
+                $site,
+                $settings,
+                $event->options,
+                $hits,
+                $final->citedIds,
+            ),
             $site,
             $event->question,
             $hits,
@@ -449,6 +469,9 @@ final class RagService implements LoggerAwareInterface
     {
         $question = trim($question);
         if ($question === '') {
+            if ($chunk = $this->fallbackChunk($site, 'no_context', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::noContext();
             return;
         }
@@ -456,11 +479,17 @@ final class RagService implements LoggerAwareInterface
         $settings = $site->getSettings();
         $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
         if ($providerName === '') {
+            if ($chunk = $this->fallbackChunk($site, 'disabled', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::disabled();
             return;
         }
         $provider = $this->providerRegistry->get($providerName);
         if ($provider === null) {
+            if ($chunk = $this->fallbackChunk($site, 'failed', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::failed('provider "' . $providerName . '" not registered');
             return;
         }
@@ -493,6 +522,9 @@ final class RagService implements LoggerAwareInterface
         // streaming path cannot degrade differently on identical questions.
         $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
         if ($hits === []) {
+            if ($chunk = $this->fallbackChunk($site, 'no_context', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
                 $event->question,
@@ -516,6 +548,9 @@ final class RagService implements LoggerAwareInterface
             $llmOptions,
         );
         if ($clarification->needed) {
+            if ($chunk = $this->fallbackChunk($site, 'clarify', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::clarify(
                 $clarification->question,
                 $this->clarifyChoices($clarification->options, $event->question),
@@ -559,6 +594,9 @@ final class RagService implements LoggerAwareInterface
         if ($before->response !== null) {
             yield RagStreamChunk::token($before->response);
             $citedIds = $this->extractCitations($before->response, $hits);
+            if ($chunk = $this->fallbackChunk($site, 'ok', $citedIds)) {
+                yield $chunk;
+            }
             yield RagStreamChunk::done($before->response, $citedIds);
             $cachedAnswer = new RagAnswer(
                 answer: trim($before->response),
@@ -567,7 +605,24 @@ final class RagService implements LoggerAwareInterface
                 status: 'ok',
             );
             $cachedSuggestions = $this->withScopeOptions(
-                $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
+                $this->withRelatedTopics(
+                    $this->groundSuggestions(
+                        $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
+                        $site,
+                        $provider,
+                        $settings,
+                        $event->options,
+                        $maxHits,
+                        $llmOptions,
+                        $this->resolveLanguageLabel($site, $options),
+                        $hits,
+                    ),
+                    $site,
+                    $settings,
+                    $event->options,
+                    $hits,
+                    $citedIds,
+                ),
                 $site,
                 $event->question,
                 $hits,
@@ -594,6 +649,9 @@ final class RagService implements LoggerAwareInterface
                 'message' => $e->getMessage(),
                 'exception' => $e,
             ]);
+            if ($chunk = $this->fallbackChunk($site, 'failed', [])) {
+                yield $chunk;
+            }
             yield RagStreamChunk::failed($e->getMessage());
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
                 $event->question,
@@ -605,6 +663,12 @@ final class RagService implements LoggerAwareInterface
         }
 
         $citedIds = $this->extractCitations($accumulated, $hits);
+        // Before `done`, because `done` is the terminal frame the client may
+        // close on — see RagStreamChunk. An answer that cited nothing is the
+        // "ok but ungrounded" case the contact card exists for.
+        if ($chunk = $this->fallbackChunk($site, 'ok', $citedIds)) {
+            yield $chunk;
+        }
         yield RagStreamChunk::done(trim($accumulated), $citedIds);
 
         $answer = new RagAnswer(
@@ -617,7 +681,24 @@ final class RagService implements LoggerAwareInterface
         // ask(); emitted as a trailing frame so the streaming chat shows the
         // followup / refine / recommend buttons too.
         $suggestions = $this->withScopeOptions(
-            $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
+            $this->withRelatedTopics(
+                $this->groundSuggestions(
+                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
+                    $site,
+                    $provider,
+                    $settings,
+                    $event->options,
+                    $maxHits,
+                    $llmOptions,
+                    $this->resolveLanguageLabel($site, $options),
+                    $hits,
+                ),
+                $site,
+                $settings,
+                $event->options,
+                $hits,
+                $citedIds,
+            ),
             $site,
             $event->question,
             $hits,
@@ -859,6 +940,223 @@ final class RagService implements LoggerAwareInterface
         $languageId = $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
+    /**
+     * The contact-card frame for a streamed turn, or null when it does not
+     * apply. See FallbackContact for the rule and for why the streamed path
+     * needed its own entry point at all.
+     *
+     * @param list<string> $citedIds
+     */
+    private function fallbackChunk(Site $site, string $status, array $citedIds): ?RagStreamChunk
+    {
+        if (!$this->fallbackContact->shouldStream($site, $status, $citedIds)) {
+            return null;
+        }
+        $fallback = $this->fallbackContact->resolve($site);
+        if (!$this->fallbackContact->hasContact($fallback)) {
+            return null;
+        }
+
+        return RagStreamChunk::fallback($fallback);
+    }
+
+    /**
+     * Drop the followup / refine suggestions that would land on "I have no
+     * information about that".
+     *
+     * Why this is needed at all: SuggestionGenerator writes its buttons from
+     * the answer text plus the source titles. It never touches the index, so
+     * it cannot know whether the question it just invented is retrievable —
+     * and clicking a button starts a completely fresh retrieval round.
+     * Measured on the live corpus (2026-09-08, three questions, four
+     * followup/refine buttons): two clicks answered "the context excerpts
+     * contain no information about that", a third "no detailed step-by-step
+     * instructions". One of four was usable.
+     *
+     * Two rejection rules, because the failures come in two shapes:
+     *
+     *  1. NOTHING is retrieved. The suggestion paraphrased a title out of
+     *     matchability — "Lizenzlaufzeiten überprüfen" ranks the right
+     *     document first, "Wie prüfe ich die Laufzeiten meiner LINEAR-
+     *     Lizenzen?" does not retrieve it at all.
+     *  2. The SAME documents are retrieved. The suggestion asked something
+     *     adjacent that the corpus does not cover ("… without the Admin
+     *     Control Center", "what if Disconnect does not work"), so retrieval
+     *     hands the model the very excerpts it just answered from — and it
+     *     answers "not in there" a second time. A zero-hit check alone does
+     *     not catch this one, which is why novelty is checked as well: the
+     *     probe has to surface at least one document that was not already in
+     *     this turn's context, within the top `noveltyDepth` ranks. Anything
+     *     deeper is retrieval tail, not a new topic.
+     *
+     * `recommend` suggestions are passed through untouched — they already
+     * resolve to a real source URL and cannot fail this way.
+     *
+     * Cost: one short rewrite completion plus one search per followup/refine
+     * suggestion, no answer call. Fails OPEN — a probe that throws keeps its
+     * suggestion, so a flaky search never strips the whole button row.
+     *
+     * @param list<array{type:string,label:string,value:string}> $suggestions
+     * @param array<string,mixed> $searchOptions the retrieval options of this
+     *        turn, so the probe is filtered exactly like the click would be
+     * @param array<string,mixed> $llmOptions
+     * @param list<array<string,mixed>> $contextHits this turn's context
+     * @return list<array{type:string,label:string,value:string}>
+     */
+    private function groundSuggestions(
+        array $suggestions,
+        Site $site,
+        LlmProviderInterface $provider,
+        object $settings,
+        array $searchOptions,
+        int $maxHits,
+        array $llmOptions,
+        ?string $languageLabel,
+        array $contextHits,
+    ): array {
+        if ($suggestions === [] || !(bool)$settings->get('meilisearch.rag.suggestions.validate', true)) {
+            return $suggestions;
+        }
+
+        $noveltyDepth = max(0, (int)$settings->get('meilisearch.rag.suggestions.noveltyDepth', 3));
+        // Only as deep as the novelty rule looks — a probe that fetches the
+        // full context size would pay for ranks nobody reads. Without the
+        // novelty rule one hit is enough to answer "is anything there?".
+        $probeHits = max(1, $noveltyDepth > 0 ? min($maxHits, $noveltyDepth) : 1);
+
+        $contextIds = [];
+        foreach ($contextHits as $hit) {
+            $id = (string)($hit['id'] ?? '');
+            if ($id !== '') {
+                $contextIds[$id] = true;
+            }
+        }
+
+        $kept = [];
+        foreach ($suggestions as $suggestion) {
+            $type = (string)($suggestion['type'] ?? '');
+            $value = trim((string)($suggestion['value'] ?? ''));
+            if ($type === 'recommend' || $value === '') {
+                $kept[] = $suggestion;
+                continue;
+            }
+
+            try {
+                // The rewrite belongs in the probe: it is what a click runs,
+                // and it is the single biggest influence on what gets
+                // retrieved. An empty conversation is the friendliest case
+                // (the keyword condensation only fires on a first turn), so
+                // what fails here fails on a click too.
+                $query = $this->queryRewriter->rewrite(
+                    $provider,
+                    $settings,
+                    Conversation::empty(),
+                    $value,
+                    $llmOptions,
+                    $languageLabel,
+                );
+                $probe = $this->searchForContext(
+                    $site,
+                    $query,
+                    $searchOptions,
+                    $probeHits,
+                    $this->collapsesIdentical($settings),
+                );
+            } catch (\Throwable $e) {
+                $this->logger?->info('RAG suggestion probe failed, keeping suggestion: {message}', [
+                    'message' => $e->getMessage(),
+                    'suggestion' => $value,
+                ]);
+                $kept[] = $suggestion;
+                continue;
+            }
+
+            if ($probe === []) {
+                $this->logger?->info('RAG suggestion dropped, retrieves nothing: {suggestion}', [
+                    'suggestion' => $value,
+                    'query' => $query,
+                ]);
+                continue;
+            }
+            if ($noveltyDepth > 0 && !$this->hasNewSource($probe, $contextIds, $noveltyDepth)) {
+                $this->logger?->info('RAG suggestion dropped, retrieves only the current context: {suggestion}', [
+                    'suggestion' => $value,
+                    'query' => $query,
+                ]);
+                continue;
+            }
+            $kept[] = $suggestion;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * Top up the button row with grounded related-topic suggestions.
+     *
+     * The probe in groundSuggestions() can only remove, and a question whose
+     * generated followups were all unretrievable ends up with an empty row —
+     * which is a worse answer page than one with two buttons that work. These
+     * come out of the index instead of out of the model (see
+     * NeighbourSuggestions), so they cannot fail retrieval.
+     *
+     * They only fill what is free: the total never exceeds
+     * meilisearch.rag.suggestions.max, so enabling this does not make the row
+     * longer, only fuller. Set meilisearch.rag.suggestions.related to 0 to
+     * switch it off.
+     *
+     * @param list<array{type:string,label:string,value:string}> $suggestions
+     * @param array<string,mixed> $searchOptions
+     * @param list<array<string,mixed>> $hits
+     * @param list<string> $citedIds
+     * @return list<array{type:string,label:string,value:string}>
+     */
+    private function withRelatedTopics(
+        array $suggestions,
+        Site $site,
+        object $settings,
+        array $searchOptions,
+        array $hits,
+        array $citedIds,
+    ): array {
+        $related = max(0, (int)$settings->get('meilisearch.rag.suggestions.related', 2));
+        if ($related === 0) {
+            return $suggestions;
+        }
+        $max = max(1, min(8, (int)$settings->get('meilisearch.rag.suggestions.max', 4)));
+        $room = min($related, $max - count($suggestions));
+        if ($room < 1) {
+            return $suggestions;
+        }
+
+        return array_merge($suggestions, $this->neighbourSuggestions->forContext(
+            $site,
+            $hits,
+            $citedIds,
+            $searchOptions,
+            $room,
+        ));
+    }
+
+    /**
+     * Whether a probe surfaced a document that was not already in this turn's
+     * context, looking no deeper than $depth ranks.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,true> $contextIds
+     */
+    private function hasNewSource(array $hits, array $contextIds, int $depth): bool
+    {
+        foreach (\array_slice($hits, 0, $depth) as $hit) {
+            $id = (string)($hit['id'] ?? '');
+            if ($id !== '' && !isset($contextIds[$id])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

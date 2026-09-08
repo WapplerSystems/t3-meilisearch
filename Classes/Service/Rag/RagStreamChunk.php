@@ -22,6 +22,13 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  *   clarify → terminal alternative when the triage step decided the
  *             question is too ambiguous / underspecified to answer. Carries
  *             one clarifying question; no sources or tokens are emitted.
+ *   fallback → optional, ALWAYS immediately before the terminal frame:
+ *             carries the "ask a human" contact fields when the answer did
+ *             not ground in any source. Emitted ahead of the terminal frame
+ *             on purpose — the client closes the stream on `clarify`,
+ *             `failed`, `no_context` and `disabled`, so a frame sent after
+ *             one of those would never be read. The client stashes it and
+ *             renders it when the turn finishes.
  */
 final class RagStreamChunk
 {
@@ -34,6 +41,7 @@ final class RagStreamChunk
     public const TYPE_SUGGESTIONS = 'suggestions';
     public const TYPE_END = 'end';
     public const TYPE_CLARIFY = 'clarify';
+    public const TYPE_FALLBACK = 'fallback';
 
     /**
      * @param array<string,mixed> $data
@@ -80,6 +88,17 @@ final class RagStreamChunk
     public static function end(): self
     {
         return new self(self::TYPE_END, []);
+    }
+
+    /**
+     * The contact card for an answer the model could not ground. See the
+     * class docblock for why this precedes the terminal frame.
+     *
+     * @param array{contactName:string,email:string,phone:string,telHref:string,ticketUrl:string} $fallback
+     */
+    public static function fallback(array $fallback): self
+    {
+        return new self(self::TYPE_FALLBACK, ['fallback' => $fallback]);
     }
 
     public static function failed(string $error): self

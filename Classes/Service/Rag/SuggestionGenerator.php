@@ -23,6 +23,22 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
  *
  * Optional + safe: returns [] when disabled, on a non-ok answer, or on any
  * parse/LLM error, so it never blocks or corrupts the answer.
+ *
+ * The `value` of a followup/refine is a RETRIEVAL query, not prose: clicking
+ * re-asks it and the retriever has to find the topic again. Measured on the
+ * LINEAR corpus, a paraphrase of a title is enough to lose it — "Lizenz-
+ * laufzeiten überprüfen" puts the right document at rank 1, while "Wie prüfe
+ * ich die Laufzeiten meiner LINEAR-Lizenzen?" does not reach the top five,
+ * because German compounds are not decompounded on either side. Hence the
+ * wording rules in the prompt: domain terms character-for-character from the
+ * Sources list, compounds never split, refine phrased like a title. The
+ * `label` carries the readable phrasing, so nothing is lost for the user.
+ *
+ * Grounding is enforced twice: the prompt asks for topics the Sources list
+ * shows are actually documented, and RagService probes every surviving
+ * followup/refine against the real retrieval before it reaches the client
+ * (see RagService::groundSuggestions()). The prompt alone cannot do it — the
+ * model does not know the corpus.
  */
 final class SuggestionGenerator implements LoggerAwareInterface
 {
@@ -30,7 +46,9 @@ final class SuggestionGenerator implements LoggerAwareInterface
 
     private const TYPES = ['followup', 'refine', 'recommend'];
 
-    private const SYSTEM_PROMPT = 'You generate short, actionable next-step suggestions for the user after a help-chat answer. Return ONLY a JSON array (no prose, no code fences). Each element is an object with: "type" = "followup" (a natural follow-up question), "refine" (a narrower search query) or "recommend" (point to one of the provided sources); "label" = the button text shown to the user (max ~8 words), in the same language as the user question; "value" = for followup/refine the question/query text to run, for recommend the EXACT source id from the Sources list. Only use "recommend" with an id that appears in the Sources list. Propose at most %d suggestions, most useful first. If nothing useful applies, return [].';
+    private const SYSTEM_PROMPT = 'You generate short, actionable next-step suggestions for the user after a help-chat answer. Return ONLY a JSON array (no prose, no code fences). Each element is an object with: "type" = "followup" (a natural follow-up question), "refine" (a narrower search query) or "recommend" (point to one of the provided sources); "label" = the button text shown to the user (max ~8 words), in the same language as the user question; "value" = for followup/refine the question/query text to run, for recommend the EXACT source id from the Sources list. Only use "recommend" with an id that appears in the Sources list. Propose at most %d suggestions, most useful first. If nothing useful applies, return [].'
+        . ' The "value" of a followup or refine is fed to a keyword document search, not read by a human — the "label" is the only text the user sees, so keep the label readable and make the value searchable. Reuse the domain and product terms of the Sources list character for character: never paraphrase a term, never split a compound word into its parts, never translate one. A "refine" value is written like a documentation title — compound noun plus the verb in the infinitive, no question words, no articles, two to five words. A "followup" value stays a natural question but must carry the source terms unchanged.'
+        . ' Only suggest topics the Sources list shows the documentation actually covers. Do not invent adjacent topics, alternative procedures, troubleshooting cases or "what if it does not work" questions that are not visible there: they lead to a button that finds nothing. When the sources support fewer than %d useful suggestions, return fewer.';
 
     /**
      * @param array<string,mixed> $baseLlmOptions provider connection options
@@ -70,7 +88,7 @@ final class SuggestionGenerator implements LoggerAwareInterface
         }
 
         $messages = [
-            ['role' => 'system', 'content' => sprintf(self::SYSTEM_PROMPT, $max)],
+            ['role' => 'system', 'content' => sprintf(self::SYSTEM_PROMPT, $max, $max)],
             ['role' => 'user', 'content' =>
                 "User question:\n" . $question
                 . "\n\nAnswer given:\n" . mb_substr(trim($answer->answer), 0, 1200)

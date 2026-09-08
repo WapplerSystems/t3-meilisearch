@@ -17,7 +17,11 @@
  *     <ol data-rag-thread> … server history … </ol>
  *   </div>
  *
- * Frame order from the server: sources → token* → done → suggestions? → end.
+ * Frame order from the server: sources → token* → fallback? → done →
+ * suggestions? → end. The optional `fallback` frame carries the "ask a human"
+ * contact card and always precedes the terminal frame, because the terminal
+ * frames that are not `done` close the stream — so it is stashed on the turn
+ * and rendered by stopStreaming(), which every finishing path runs through.
  * We finalize the answer on `done` but only close the stream on `end`
  * (with a safety timeout), so the suggestions frame — generated after the
  * answer — still arrives without EventSource auto-reconnecting.
@@ -58,6 +62,12 @@
             you: root.dataset.labelYou || 'You',
             assistant: root.dataset.labelAssistant || 'Assistant',
             suggestions: root.dataset.labelSuggestions || '',
+            fallbackHeading: root.dataset.labelFallbackHeading || '',
+            fallbackIntro: root.dataset.labelFallbackIntro || '',
+            fallbackEmail: root.dataset.labelFallbackEmail || '',
+            fallbackPhone: root.dataset.labelFallbackPhone || '',
+            fallbackTicket: root.dataset.labelFallbackTicket || '',
+            fallbackSubject: root.dataset.labelFallbackSubject || '',
             loading: root.dataset.labelLoading || 'Generating answer…',
             interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.'
         };
@@ -138,13 +148,18 @@
                 + '</div>'
                 + '</div>'
                 + '<div class="ws-meilisearch-rag-suggestions mt-2"></div>'
+                + '<div class="ws-meilisearch-rag-fallback-slot"></div>'
                 + '</div></div>';
             thread.appendChild(li);
             li.scrollIntoView({ block: 'nearest' });
             return {
                 answerEl: li.querySelector('.ws-meilisearch-rag-answer'),
                 spinnerEl: li.querySelector('.ws-meilisearch-rag-spinner'),
-                suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions')
+                suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions'),
+                fallbackEl: li.querySelector('.ws-meilisearch-rag-fallback-slot'),
+                // Set by the `fallback` frame, rendered by stopStreaming().
+                fallback: null,
+                question: question
             };
         }
 
@@ -157,6 +172,10 @@
             if (turn.spinnerEl) {
                 turn.spinnerEl.hidden = true;
             }
+            // The contact card belongs to a finished turn, and every path that
+            // finishes one — answered, clarified, failed, dropped — comes
+            // through here. Rendering it anywhere else would miss a path.
+            renderFallback(turn, labels);
         }
 
         function ask(q) {
@@ -223,6 +242,17 @@
             es.addEventListener('suggestions', function (ev) {
                 try {
                     renderSuggestions(turn.suggestionsEl, JSON.parse(ev.data).suggestions || [], labels.suggestions);
+                } catch (_) { /* ignore */ }
+            });
+
+            // Arrives before the terminal frame; the card is rendered once the
+            // turn is finished, so it never appears above a still-growing answer.
+            es.addEventListener('fallback', function (ev) {
+                try {
+                    const p = JSON.parse(ev.data);
+                    if (p.fallback && typeof p.fallback === 'object') {
+                        turn.fallback = p.fallback;
+                    }
                 } catch (_) { /* ignore */ }
             });
 
@@ -301,6 +331,45 @@
                 }
             };
         }
+    }
+
+    // Contact card under a turn the assistant could not ground. Mirrors
+    // Partials/Rag/FallbackContact.html — same classes, same order, same
+    // "stay invisible when nothing is configured" rule — because the streamed
+    // and the server-rendered answer have to look identical to the visitor.
+    // `labels` is passed in rather than closed over: this function lives at
+    // module scope, the label map inside init() — same reason
+    // renderSuggestions() takes its heading as an argument.
+    function renderFallback(turn, labels) {
+        if (!turn.fallbackEl) return;
+        const f = turn.fallback;
+        if (!f || (!f.email && !f.phone && !f.ticketUrl)) {
+            turn.fallbackEl.innerHTML = '';
+            return;
+        }
+        const items = [];
+        if (f.email) {
+            const subject = (labels.fallbackSubject ? labels.fallbackSubject + ': ' : '') + (turn.question || '');
+            items.push('<li><strong>' + escapeText(labels.fallbackEmail) + ':</strong> '
+                + '<a class="ws-meilisearch-rag-fallback__email" href="mailto:' + escapeAttr(f.email)
+                + '?subject=' + escapeAttr(encodeURIComponent(subject)) + '">' + escapeText(f.email) + '</a></li>');
+        }
+        if (f.phone) {
+            items.push('<li><strong>' + escapeText(labels.fallbackPhone) + ':</strong> '
+                + '<a class="ws-meilisearch-rag-fallback__phone" href="tel:' + escapeAttr(f.telHref || f.phone) + '">'
+                + escapeText(f.phone) + '</a></li>');
+        }
+        if (f.ticketUrl) {
+            items.push('<li><a class="btn btn-sm btn-outline-primary ws-meilisearch-rag-fallback__ticket" '
+                + 'href="' + escapeAttr(f.ticketUrl) + '" target="_blank" rel="noopener">'
+                + escapeText(labels.fallbackTicket) + '</a></li>');
+        }
+        turn.fallbackEl.innerHTML =
+            '<aside class="ws-meilisearch-rag-fallback alert alert-light border mt-3" role="complementary">'
+            + '<h3 class="h6 mb-2">' + escapeText(f.contactName || labels.fallbackHeading) + '</h3>'
+            + (labels.fallbackIntro ? '<p class="small text-muted mb-2">' + escapeText(labels.fallbackIntro) + '</p>' : '')
+            + '<ul class="list-unstyled mb-0 d-flex flex-wrap gap-3">' + items.join('') + '</ul>'
+            + '</aside>';
     }
 
     function renderSuggestions(container, items, heading) {
