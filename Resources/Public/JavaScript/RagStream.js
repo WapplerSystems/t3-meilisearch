@@ -69,7 +69,14 @@
             fallbackTicket: root.dataset.labelFallbackTicket || '',
             fallbackSubject: root.dataset.labelFallbackSubject || '',
             loading: root.dataset.labelLoading || 'Generating answer…',
-            interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.'
+            interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.',
+            // Terminal-state wording, same rag.status.* labels the synchronous
+            // template uses. The English defaults are not decoration: HTML
+            // cached before this shell grew the attributes carries none of
+            // them, and an empty label would leave the turn blank.
+            statusNoContext: root.dataset.labelStatusNoContext || 'No matching documents found.',
+            statusDisabled: root.dataset.labelStatusDisabled || 'RAG is not configured for this site.',
+            statusFailed: root.dataset.labelStatusFailed || 'Sorry, something went wrong: %s'
         };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
@@ -287,22 +294,27 @@
                 finish();
             });
 
-            es.addEventListener('failed', terminate.bind(null, 'Sorry, something went wrong: '));
-            es.addEventListener('no_context', terminate.bind(null, 'No matching documents found.', false));
-            es.addEventListener('disabled', terminate.bind(null, 'RAG is not configured for this site.', false));
+            // Only `failed` carries an error message; the other two frames
+            // have no payload, so the event is not passed on.
+            es.addEventListener('failed', function (ev) { terminate(labels.statusFailed, ev); });
+            es.addEventListener('no_context', function () { terminate(labels.statusNoContext, null); });
+            es.addEventListener('disabled', function () { terminate(labels.statusDisabled, null); });
 
-            function terminate(prefix, fromEvent = true) {
+            function terminate(template, ev) {
                 finish();
                 stopStreaming(turn);
                 setBusy(false);
-                let msg = prefix;
-                if (fromEvent && arguments.length > 2) {
-                    try {
-                        const p = JSON.parse(arguments[2].data);
-                        if (p.error) msg += p.error;
-                    } catch (_) { /* ignore */ }
+                let error = '';
+                if (ev) {
+                    try { error = (JSON.parse(ev.data).error || '').toString(); } catch (_) { /* ignore */ }
                 }
-                turn.answerEl.textContent = msg;
+                // rag.status.failed carries a %s placeholder for the provider
+                // error, the other two carry none. An unfilled placeholder must
+                // never reach the reader, and neither must the colon in front of
+                // it when the frame arrived without a message.
+                turn.answerEl.textContent = template.indexOf('%s') === -1
+                    ? template
+                    : template.replace('%s', error).replace(/\s*:\s*$/, '').trim();
             }
 
             es.onerror = function () {
