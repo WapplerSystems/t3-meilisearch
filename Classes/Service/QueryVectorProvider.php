@@ -44,6 +44,25 @@ use WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientRegistry;
  * Degrades to keyword search: every failure path returns null, and
  * SearchService then drops the hybrid block rather than sending a search whose
  * semantic half is dead weight.
+ *
+ * ## Why the query is not embedded verbatim
+ *
+ * Retrieval embedders are asymmetric. The document side gets the passage as
+ * it stands — that is what EmbeddingPrecomputer sends, rendered from
+ * meilisearch.embedder.documentTemplate — while the query side is trained
+ * with an instruction wrapped around the question. Embedding a bare query
+ * therefore lands it in a different region than the passages it should match.
+ *
+ * Measured against the live index (2026-09-08, 12 paraphrase → expected-document
+ * pairs, pure vector search, filtered to the same corpus the answer uses):
+ *
+ *   bare query                                          2 of 12
+ *   BGE instruction wrapper (see below)                 8 of 12
+ *   "Represent this sentence for searching …" prefix    8 of 12
+ *
+ * Four times the recall from the wording around the query alone — and 8 of 12
+ * is what the entire keyword pipeline with its LLM rewrite reaches, so the two
+ * halves finally have something to add to each other.
  */
 final class QueryVectorProvider implements LoggerAwareInterface
 {
@@ -51,6 +70,15 @@ final class QueryVectorProvider implements LoggerAwareInterface
 
     /** Longest query we embed. Beyond this it is not a query any more, and providers charge by token. */
     private const MAX_QUERY_LENGTH = 512;
+
+    /**
+     * The instruction BGE retrieval models are trained to see on the query
+     * side; passages get none. Used when no queryTemplate is configured and
+     * the model name says BGE, because for that family a bare query measurably
+     * does not work (see the class docblock) and an operator who configured
+     * `bge-multilingual-gemma2` did not ask for a quarter of the recall.
+     */
+    private const BGE_QUERY_INSTRUCTION = "<instruct>Given a web search query, retrieve relevant passages that answer the query\n<query>{{ query }}";
 
     private readonly FrontendInterface $cache;
 
@@ -97,14 +125,15 @@ final class QueryVectorProvider implements LoggerAwareInterface
             $query = mb_substr($query, 0, self::MAX_QUERY_LENGTH);
         }
 
-        $key = $this->cacheKey($site, $query);
+        $text = $this->embedText($site, $query);
+        $key = $this->cacheKey($site, $text);
         $cached = $this->cache->get($key);
         if (is_array($cached) && $cached !== []) {
             return array_values(array_map('floatval', $cached));
         }
 
         try {
-            $vector = $this->clients->forSite($site)->embed($site, $query);
+            $vector = $this->clients->forSite($site)->embed($site, $text);
         } catch (\Throwable $e) {
             // Quota, timeout, model rename — all the same from here: the
             // search continues without its semantic half.
@@ -139,11 +168,46 @@ final class QueryVectorProvider implements LoggerAwareInterface
     }
 
     /**
-     * Everything that decides which vector space a query lands in goes into
-     * the key, so switching provider, model or width cannot serve a stale
-     * vector from the previous one.
+     * The text actually sent to the provider: the query wrapped in whatever
+     * instruction the model expects.
+     *
+     * `meilisearch.embedder.queryTemplate` wins when set. A template
+     * containing `{{ query }}` is filled at that spot; one without it is
+     * treated as a prefix and used verbatim, trailing space included, so an
+     * operator can write the instruction as a plain string and control the
+     * separator. With no template configured, BGE models get the wrapper above
+     * and everything else the bare query — a wrapper is model-specific, and
+     * guessing one for an unknown model would be worse than sending nothing.
      */
-    private function cacheKey(Site $site, string $query): string
+    private function embedText(Site $site, string $query): string
+    {
+        // NOT trimmed: a prefix template is sent exactly as written, so
+        // "Suchanfrage: " keeps the space that separates it from the question.
+        // Only the emptiness test ignores whitespace.
+        $template = (string)$site->getSettings()->get('meilisearch.embedder.queryTemplate', '');
+        if (trim($template) === '') {
+            $model = strtolower((string)$site->getSettings()->get('meilisearch.embedder.model', ''));
+            if (!str_contains($model, 'bge')) {
+                return $query;
+            }
+            $template = self::BGE_QUERY_INSTRUCTION;
+        }
+
+        $filled = preg_replace('/\{\{\s*query\s*\}\}/', $query, $template, -1, $count);
+        if ($count > 0 && is_string($filled)) {
+            return $filled;
+        }
+
+        return $template . $query;
+    }
+
+    /**
+     * Everything that decides which vector space a query lands in goes into
+     * the key, so switching provider, model, width or the query instruction
+     * cannot serve a stale vector from the previous one. Keyed on the finished
+     * text rather than the raw query for exactly that reason.
+     */
+    private function cacheKey(Site $site, string $text): string
     {
         $settings = $site->getSettings();
 
@@ -152,7 +216,7 @@ final class QueryVectorProvider implements LoggerAwareInterface
             (string)$settings->get('meilisearch.embedder.source', ''),
             (string)$settings->get('meilisearch.embedder.model', ''),
             (string)$settings->get('meilisearch.embedder.dimensions', ''),
-            $query,
+            $text,
         ]));
     }
 }

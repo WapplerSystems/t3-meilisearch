@@ -630,6 +630,12 @@ settings:
     type: bool
     default: true
 
+  meilisearch.embedder.queryTemplate:
+    label: 'Query template for the embedded search query'
+    description: 'How the search query is worded before it is embedded — the query-side counterpart to the document template. Retrieval embedders are asymmetric: the document side is embedded as the passage it is, the query side is trained with an instruction wrapped around the question, and a bare query therefore lands in a different region than the passages it should match. Measured on a 12-question set against a bge-multilingual-gemma2 index, pure vector search found 2 of 12 expected documents with the bare query and 8 of 12 with the instruction. Write `{{ query }}` where the question belongs; a template without the placeholder is used as a prefix. Empty is the default and then BGE models get the instruction they were trained on (`<instruct>Given a web search query, retrieve relevant passages that answer the query` + newline + `<query>…`) while every other model gets the bare query — a wrapper is model-specific, and guessing one for an unknown model would be worse than sending none. Only relevant when the query is embedded in PHP at all, i.e. in precompute mode.'
+    type: string
+    default: ''
+
   meilisearch.rag.suggestions.related:
     label: 'RAG: grounded related-topic buttons'
     description: 'How many suggestion buttons are taken from the index instead of from the model: the sibling documents of the ones this answer was built on, each offered under its own title. They exist because the retrieval probe can only remove generated suggestions, and an answer whose followups were all unretrievable would end up with no buttons at all. A title retrieves its own document first, so these cannot fail the way a paraphrased question can. They only fill slots the generated suggestions left free — the total never exceeds the maximum above, so raising this does not make the row longer, only fuller. Costs one filtered search per answer. Set to 0 to switch it off.'
