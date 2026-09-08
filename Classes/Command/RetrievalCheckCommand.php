@@ -52,7 +52,16 @@ final class RetrievalCheckCommand extends Command
     {
         $this->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (default: the test record\'s own site, else the first configured one)')
             ->addOption('question', null, InputOption::VALUE_REQUIRED, 'Check one ad-hoc question instead of the stored tests — prints the retrieved context.')
-            ->addOption('show', null, InputOption::VALUE_REQUIRED, 'How many retrieved documents to list per question', '5');
+            ->addOption('show', null, InputOption::VALUE_REQUIRED, 'How many retrieved documents to list per question', '5')
+            ->addOption(
+                'semantic-ratio',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Override meilisearch.rag.semanticRatio for this run (0 = keyword only, 1 = vector only). '
+                . 'Exists so the ratio can be swept without editing a live site\'s settings: the value governs '
+                . 'whether a paraphrase still finds its document, and answering that by flipping the setting on '
+                . 'a production site puts three untested ratios in front of visitors to learn one number.',
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -69,7 +78,7 @@ final class RetrievalCheckCommand extends Command
                 return Command::FAILURE;
             }
             $io->section($adHoc);
-            $this->printHits($io, $this->ragService->retrieveOnly($site, $adHoc), $show, []);
+            $this->printHits($io, $this->ragService->retrieveOnly($site, $adHoc, $this->overrides($input)), $show, []);
             return Command::SUCCESS;
         }
 
@@ -89,7 +98,7 @@ final class RetrievalCheckCommand extends Command
             }
             $groups = $this->parseExpectations($test['expected_doc_ids']);
             $expected = array_merge(...$groups ?: [[]]);
-            $hits = $this->ragService->retrieveOnly($site, $test['question']);
+            $hits = $this->ragService->retrieveOnly($site, $test['question'], $this->overrides($input));
             $ids = array_map(static fn (array $h): string => (string)($h['id'] ?? ''), $hits);
 
             $found = [];
@@ -270,6 +279,23 @@ final class RetrievalCheckCommand extends Command
             'context_requirement' => (string)$r['context_requirement'],
             'site_identifier' => (string)$r['site_identifier'],
         ], $rows);
+    }
+
+    /**
+     * Per-run retrieval overrides. Caller options win over the site settings
+     * in RagService::mergeRetrievalOptions(), so this is enough to sweep a
+     * parameter without touching any configuration.
+     *
+     * @return array<string,mixed>
+     */
+    private function overrides(InputInterface $input): array
+    {
+        $ratio = $input->getOption('semantic-ratio');
+        if ($ratio === null || $ratio === '' || !is_numeric($ratio)) {
+            return [];
+        }
+
+        return ['semanticRatio' => max(0.0, min(1.0, (float)$ratio))];
     }
 
     private function resolveSite(?string $identifier): ?Site
