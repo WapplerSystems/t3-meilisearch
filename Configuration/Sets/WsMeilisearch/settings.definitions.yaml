@@ -630,6 +630,12 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.collapseReleaseCopies:
+    label: 'RAG: collapse release copies out of the context'
+    description: 'When the knowledge base documents the same topic for several releases, keep one copy of it in the answer context instead of all of them. Without this the copies crowd out the other documents: measured on a versioned help corpus, a troubleshooting question returned 25 hits carrying five distinct titles, and six copies of one overview page filled the whole five-document context while the checklist that answered the question waited at rank seven. Grouped by title AND product, because the same title for a different product is a different answer. Which copy survives: the release the question names, else the release marked current, else the best-ranked one — so a question that names a release still gets that release and a prompt asking the model to name versions keeps working. Turn it off when your corpus deliberately carries the same title several times with answers that differ.'
+    type: bool
+    default: true
+
   meilisearch.embedder.queryTemplate:
     label: 'Query template for the embedded search query'
     description: 'How the search query is worded before it is embedded — the query-side counterpart to the document template. Retrieval embedders are asymmetric: the document side is embedded as the passage it is, the query side is trained with an instruction wrapped around the question, and a bare query therefore lands in a different region than the passages it should match. Measured on a 12-question set against a bge-multilingual-gemma2 index, pure vector search found 2 of 12 expected documents with the bare query and 8 of 12 with the instruction. Write `{{ query }}` where the question belongs; a template without the placeholder is used as a prefix. Empty is the default and then BGE models get the instruction they were trained on (`<instruct>Given a web search query, retrieve relevant passages that answer the query` + newline + `<query>…`) while every other model gets the bare query — a wrapper is model-specific, and guessing one for an unknown model would be worse than sending none. Only relevant when the query is embedded in PHP at all, i.e. in precompute mode.'

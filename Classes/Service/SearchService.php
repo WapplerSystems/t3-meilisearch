@@ -233,6 +233,38 @@ final class SearchService implements LoggerAwareInterface
     }
 
     /**
+     * The text the semantic half should be embedded from, which is not
+     * necessarily the string the keyword half searches for.
+     *
+     * RAG retrieval condenses the visitor's question into a keyword query
+     * before searching ("Wie erlaube ich Mitarbeitern zu sehen, wer welche
+     * Lizenz belegt?" → "Lizenzbelegung anzeigen"). That rewrite exists for
+     * the keyword half, and it earns its keep there. For the semantic half it
+     * is destructive: the condensation drops the subject and the intent, and
+     * an instruction-tuned embedder is trained on whole questions. Measured on
+     * the live corpus, the example above ranks its document first when the
+     * question is embedded as asked, and does not reach the context at all
+     * when the condensed form is embedded instead.
+     *
+     * So the caller may pass the original wording as `vectorQuery` and let the
+     * keyword query stay condensed. Both halves then get the form they were
+     * built for. Without the option the two are the same string, which is what
+     * the frontend search does — it has no rewrite step.
+     *
+     * Also deliberately read from the options rather than from the event
+     * query: the stop-word stripper and the zero-result recovery both rewrite
+     * `$query` on their way here, and neither should touch what gets embedded.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function vectorQueryFor(string $query, array $options): string
+    {
+        $vectorQuery = trim((string)($options['vectorQuery'] ?? ''));
+
+        return $vectorQuery !== '' ? $vectorQuery : $query;
+    }
+
+    /**
      * @param array<string,mixed> $options
      */
     private function keywordSearch(Site $site, string $query, array $options, int $page, int $perPage): SearchResult
@@ -303,7 +335,7 @@ final class SearchService implements LoggerAwareInterface
         // block and search by keyword, which is what those searches were
         // effectively doing anyway, only now it is deliberate and logged.
         if ($hybridParams !== null) {
-            $vector = $this->queryVectors->forQuery($site, $query);
+            $vector = $this->queryVectors->forQuery($site, $this->vectorQueryFor($query, $options));
             if ($vector !== null) {
                 $params['vector'] = $vector;
             } elseif ($this->queryVectors->isNeeded($site)) {

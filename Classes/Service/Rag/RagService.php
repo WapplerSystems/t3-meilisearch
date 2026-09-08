@@ -42,6 +42,15 @@ final class RagService implements LoggerAwareInterface
      */
     private const COLLAPSE_OVERFETCH = 4;
 
+    /**
+     * Over-fetch when release copies are collapsed by title. Measured on the
+     * LINEAR knowledge base: a question about the software protection returns
+     * 25 hits carrying five distinct titles — six copies of one topic, one per
+     * documented release and product. Fetching four times the context size is
+     * then not enough to fill it with five different documents.
+     */
+    private const TITLE_COLLAPSE_OVERFETCH = 8;
+
     /** Hard ceiling so a large maxContextHits cannot turn into a huge query. */
     private const COLLAPSE_MAX_FETCH = 50;
 
@@ -101,28 +110,35 @@ final class RagService implements LoggerAwareInterface
         int $maxHits,
         bool $collapseIdentical = true,
     ): array {
-        if ($collapseIdentical) {
+        $collapseByTitle = $this->collapsesReleaseCopies($site);
+        if ($collapseIdentical || $collapseByTitle) {
             // Ask for more than we need: the collapse below can only promote a
             // spare if one was fetched. Without the over-fetch a question whose
             // top five hits are five copies of one topic would end up with a
             // one-document context — worse than the duplication it fixes.
-            $searchOptions['perPage'] = min(
-                $maxHits * self::COLLAPSE_OVERFETCH,
-                self::COLLAPSE_MAX_FETCH,
-            );
+            $factor = $collapseByTitle ? self::TITLE_COLLAPSE_OVERFETCH : self::COLLAPSE_OVERFETCH;
+            $searchOptions['perPage'] = min($maxHits * $factor, self::COLLAPSE_MAX_FETCH);
         }
+
+        // Version preference for the collapse comes from the visitor's own
+        // wording, not from the condensed keyword query — the rewrite is free
+        // to drop a release number, and then a question about release 24 would
+        // silently be answered from the current one.
+        $askedAs = trim((string)($searchOptions['vectorQuery'] ?? '')) ?: $query;
 
         $searchResult = $this->searchService->search($site, $query, $searchOptions);
         $hits = array_values(array_slice(
-            $this->collapseIdenticalBodies($searchResult->hits, $collapseIdentical),
+            $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle),
             0,
             $maxHits,
         ));
         if ($hits === []) {
             $hits = array_values(array_slice(
-                $this->collapseIdenticalBodies(
+                $this->collapseContext(
                     $this->retrieveWithFallbacks($site, $query, $searchOptions, $maxHits),
+                    $askedAs,
                     $collapseIdentical,
+                    $collapseByTitle,
                 ),
                 0,
                 $maxHits,
@@ -130,6 +146,26 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $this->labelCitations($site, $hits);
+    }
+
+    /**
+     * Hand the retrieval the visitor's original wording alongside the
+     * condensed keyword query, so the semantic half is embedded from the
+     * question as asked. See SearchService::vectorQueryFor() for why the two
+     * must differ, and what it costs when they do not.
+     *
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function withVectorQuery(array $options, string $question): array
+    {
+        $question = trim($question);
+        if ($question === '' || isset($options['vectorQuery'])) {
+            return $options;
+        }
+        $options['vectorQuery'] = $question;
+
+        return $options;
     }
 
     /**
@@ -162,6 +198,158 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $hits;
+    }
+
+    /**
+     * Both collapse stages, in order: identical bodies first (cheap, exact),
+     * then the release copies that differ by a word but say the same thing.
+     *
+     * @param iterable<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function collapseContext(iterable $hits, string $askedAs, bool $byBody, bool $byTitle): array
+    {
+        $kept = $this->collapseIdenticalBodies($hits, $byBody);
+
+        return $byTitle ? $this->collapseReleaseCopies($kept, $askedAs) : $kept;
+    }
+
+    /**
+     * Keep one copy per topic when the knowledge base documents the same topic
+     * for several releases.
+     *
+     * collapseIdenticalBodies() only catches byte-identical text, and release
+     * copies are never quite that — a version number in a sentence, a renamed
+     * dialog. Measured on the live corpus: "Woran liegt es, wenn die
+     * Einrichtung des Softwareschutzes nicht klappt?" returns 25 hits with
+     * five distinct titles, and six copies of one overview page fill the entire
+     * five-document context while the checklist that actually answers the
+     * question waits at rank seven. That is not duplication the answer can use;
+     * it is the answer being crowded out by itself.
+     *
+     * Grouped by title AND product, because the same title exists per product
+     * (a task documented for both CAD platforms) and those are genuinely
+     * different answers. Which copy survives, in order:
+     *
+     *   1. the release the question names — asking about 24 must not be
+     *      answered from 26,
+     *   2. the release marked current,
+     *   3. the best-ranked copy.
+     *
+     * The version rule is what keeps this compatible with a prompt that asks
+     * the model to name the release a statement applies to: a question that
+     * names one still gets that one. A question that names none gets the
+     * current release instead of six variations of it.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function collapseReleaseCopies(array $hits, string $askedAs): array
+    {
+        if (count($hits) < 2) {
+            return $hits;
+        }
+        $wanted = $this->versionsNamedIn($askedAs, $hits);
+
+        $groups = [];
+        $order = [];
+        foreach ($hits as $hit) {
+            $title = mb_strtolower(trim((string)($hit['title'] ?? '')));
+            if ($title === '') {
+                // No title to group by — keep it under its own key rather than
+                // folding every untitled document onto one.
+                $order[] = $key = 'untitled:' . count($order);
+                $groups[$key] = [$hit];
+                continue;
+            }
+            $key = $title . "\0" . (string)($hit['kbProduct'] ?? '');
+            if (!isset($groups[$key])) {
+                $groups[$key] = [];
+                $order[] = $key;
+            }
+            $groups[$key][] = $hit;
+        }
+
+        $kept = [];
+        foreach ($order as $key) {
+            $kept[] = $this->pickReleaseCopy($groups[$key], $wanted);
+        }
+
+        return $kept;
+    }
+
+    /**
+     * The best copy of one topic: the named release, else the current one,
+     * else whatever ranked highest.
+     *
+     * @param list<array<string,mixed>> $group in rank order
+     * @param list<int> $wanted releases the question named
+     * @return array<string,mixed>
+     */
+    private function pickReleaseCopy(array $group, array $wanted): array
+    {
+        if ($wanted !== []) {
+            foreach ($group as $hit) {
+                if (in_array((int)($hit['kbVersion'] ?? 0), $wanted, true)) {
+                    return $hit;
+                }
+            }
+        }
+        foreach ($group as $hit) {
+            if (!empty($hit['kbIsCurrent'])) {
+                return $hit;
+            }
+        }
+
+        return $group[0];
+    }
+
+    /**
+     * Release numbers the question names, restricted to the ones actually
+     * present in the hit set.
+     *
+     * Matching against the hits rather than against a pattern keeps stray
+     * numbers out: "Wie richte ich 3 Stränge ein?" names no release, and a
+     * corpus that documents 24 to 26 must not read "3" as one.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<int>
+     */
+    private function versionsNamedIn(string $askedAs, array $hits): array
+    {
+        $present = [];
+        foreach ($hits as $hit) {
+            $version = (int)($hit['kbVersion'] ?? 0);
+            if ($version > 0) {
+                $present[$version] = true;
+            }
+        }
+        if ($present === []) {
+            return [];
+        }
+        preg_match_all('/\d+/u', $askedAs, $matches);
+        $named = [];
+        foreach ($matches[0] as $number) {
+            $number = (int)$number;
+            if (isset($present[$number])) {
+                $named[$number] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($named));
+    }
+
+    /**
+     * Whether release copies of one topic are collapsed out of the context.
+     *
+     * On by default: six copies of one page are six times the same answer, and
+     * they take the places of the five different documents the context was
+     * sized for. A site turns it off when its corpus deliberately carries the
+     * same title several times with answers that differ.
+     */
+    private function collapsesReleaseCopies(Site $site): bool
+    {
+        return (bool)$site->getSettings()->get('meilisearch.rag.collapseReleaseCopies', true);
     }
 
     /**
@@ -262,7 +450,13 @@ final class RagService implements LoggerAwareInterface
             );
         }
 
-        return $this->searchForContext($site, $query, $event->options, $maxHits, $this->collapsesIdentical($settings));
+        return $this->searchForContext(
+            $site,
+            $query,
+            $this->withVectorQuery($event->options, $event->question),
+            $maxHits,
+            $this->collapsesIdentical($settings),
+        );
     }
 
     /**
@@ -355,7 +549,13 @@ final class RagService implements LoggerAwareInterface
             $this->resolveLanguageLabel($site, $options),
         );
 
-        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
+        $hits = $this->searchForContext(
+            $site,
+            $retrievalQuestion,
+            $this->withVectorQuery($event->options, $event->question),
+            $maxHits,
+            $this->collapsesIdentical($settings),
+        );
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
@@ -520,7 +720,13 @@ final class RagService implements LoggerAwareInterface
 
         // Same retrieval as ask() — including the fallback ladder — so the
         // streaming path cannot degrade differently on identical questions.
-        $hits = $this->searchForContext($site, $retrievalQuestion, $event->options, $maxHits, $this->collapsesIdentical($settings));
+        $hits = $this->searchForContext(
+            $site,
+            $retrievalQuestion,
+            $this->withVectorQuery($event->options, $event->question),
+            $maxHits,
+            $this->collapsesIdentical($settings),
+        );
         if ($hits === []) {
             if ($chunk = $this->fallbackChunk($site, 'no_context', [])) {
                 yield $chunk;
@@ -1060,7 +1266,7 @@ final class RagService implements LoggerAwareInterface
                 $probe = $this->searchForContext(
                     $site,
                     $query,
-                    $searchOptions,
+                    $this->withVectorQuery($searchOptions, $value),
                     $probeHits,
                     $this->collapsesIdentical($settings),
                 );
