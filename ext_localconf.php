@@ -57,6 +57,26 @@ $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilise
     'groups' => ['system'],
 ];
 
+// Query-vector cache. With a `userProvided` embedder Meilisearch cannot embed
+// the search query itself, so PHP does it (QueryVectorProvider) — one provider
+// roundtrip per search, which is exactly the kind of cost worth spending once.
+// Keyed by site + source + model + dimensions + the query text, so a model or
+// provider switch invalidates by construction instead of serving vectors from
+// a different vector space. Lifetime is long because a query maps to the same
+// vector forever under one model.
+//
+// FileBackend, not the database: a new database-backed cache needs its table
+// created before the first request that touches it, which turns a code deploy
+// into a schema migration — and the entry here is a few dozen kilobytes of
+// floats that has no business in a DB row. FileBackend also supports the
+// lifetime and the tag, which SimpleFileBackend (used for Tika) does not.
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilisearch_query_vector'] ??= [
+    'backend' => \TYPO3\CMS\Core\Cache\Backend\FileBackend::class,
+    'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+    'options' => ['defaultLifetime' => 2592000],
+    'groups' => ['system'],
+];
+
 // Per-site Meilisearch metadata cache (doc count + active embedder). 60s
 // TTL keeps the Overview / Diagnostics BE tabs snappy on multi-site
 // installs without burning a roundtrip per site per page render. Cache

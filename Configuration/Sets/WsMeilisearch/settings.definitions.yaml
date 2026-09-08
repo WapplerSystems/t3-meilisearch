@@ -624,6 +624,12 @@ settings:
     type: int
     default: 3
 
+  meilisearch.embedder.embedQueries:
+    label: 'Embed the search query in PHP (precompute mode only)'
+    description: 'Only relevant with precompute enabled. In that mode the embedder registered on the index is `userProvided`, which has no provider credentials — so Meilisearch can embed the documents (they arrive with their vector) but NOT the visitor''s query, and a hybrid search runs with nothing to compare against: every semantic ratio up to 0.5 then behaves exactly like keyword-only search and 1.0 returns nothing. With this on, PHP embeds the query and sends the vector along, which is what makes the semantic ratio a real setting. Costs one provider roundtrip per search, cached per site/model/query, and the suggest dropdown is never affected (it searches without hybrid). When the provider is unreachable the search falls back to keyword-only instead of failing. Turn it off to accept keyword-only retrieval and spend nothing per search.'
+    type: bool
+    default: true
+
   meilisearch.rag.suggestions.related:
     label: 'RAG: grounded related-topic buttons'
     description: 'How many suggestion buttons are taken from the index instead of from the model: the sibling documents of the ones this answer was built on, each offered under its own title. They exist because the retrieval probe can only remove generated suggestions, and an answer whose followups were all unretrievable would end up with no buttons at all. A title retrieves its own document first, so these cannot fail the way a paraphrased question can. They only fill slots the generated suggestions left free — the total never exceeds the maximum above, so raising this does not make the row longer, only fuller. Costs one filtered search per answer. Set to 0 to switch it off.'

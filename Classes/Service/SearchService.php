@@ -44,6 +44,7 @@ final class SearchService implements LoggerAwareInterface
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly SearchConfigurationProvider $configProvider,
         private readonly QueryRecoveryService $queryRecovery,
+        private readonly QueryVectorProvider $queryVectors,
     ) {}
 
     /**
@@ -293,6 +294,22 @@ final class SearchService implements LoggerAwareInterface
             $params['facets'] = $facets;
         }
 
+        // With a `userProvided` embedder Meilisearch cannot embed the query
+        // itself, so PHP supplies the vector (QueryVectorProvider). Without it
+        // the hybrid block is theatre: the semantic half has nothing to compare
+        // against, every ratio up to 0.5 measures the same as keyword-only, and
+        // 1.0 returns nothing. So if the vector is needed but unavailable —
+        // provider down, quota reached, wrong dimensions — drop the hybrid
+        // block and search by keyword, which is what those searches were
+        // effectively doing anyway, only now it is deliberate and logged.
+        if ($hybridParams !== null) {
+            $vector = $this->queryVectors->forQuery($site, $query);
+            if ($vector !== null) {
+                $params['vector'] = $vector;
+            } elseif ($this->queryVectors->isNeeded($site)) {
+                $hybridParams = null;
+            }
+        }
         if ($hybridParams !== null) {
             $params['hybrid'] = $hybridParams;
         }
@@ -386,6 +403,12 @@ final class SearchService implements LoggerAwareInterface
             }
             if ($hybridParams !== null) {
                 $sideParams['hybrid'] = $hybridParams;
+                // Same query, same vector — a side query that ranked
+                // differently from the main one would count the wrong facet
+                // values. Reuses the cached vector, no second roundtrip.
+                if (isset($params['vector'])) {
+                    $sideParams['vector'] = $params['vector'];
+                }
             }
             try {
                 $sideRaw = $index->search($query, $sideParams)->toArray();
