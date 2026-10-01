@@ -17,11 +17,33 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
 final class Conversation
 {
     /**
+     * Format of {@see $id}: 32 lowercase hex digits (128 random bits).
+     */
+    public const ID_PATTERN = '/^[0-9a-f]{32}$/';
+
+    /**
      * @param list<Turn> $turns ordered oldest → newest
+     * @param string $id stable identifier of this conversation, the key of
+     *        its rows in the chat protocol. Deliberately NOT the session id:
+     *        it is handed to the visitor (e.g. as a parameter of a contact
+     *        form link), and a session id in a URL is a session takeover
+     *        waiting to happen. Empty until {@see withId()} assigns one.
      */
     public function __construct(
         public readonly array $turns = [],
+        public readonly string $id = '',
     ) {}
+
+    /**
+     * This conversation with an id, generating one if it has none yet.
+     * Called once per request before the turn is answered, so the id exists
+     * while the answer — and the escalation card that may link to its
+     * protocol — is being produced.
+     */
+    public function withId(): self
+    {
+        return $this->id !== '' ? $this : new self($this->turns, bin2hex(random_bytes(16)));
+    }
 
     public static function empty(): self
     {
@@ -45,7 +67,7 @@ final class Conversation
         if ($maxTurns > 0 && count($turns) > $maxTurns) {
             $turns = array_slice($turns, -$maxTurns);
         }
-        return new self(array_values($turns));
+        return new self(array_values($turns), $this->id);
     }
 
     /**
@@ -66,11 +88,12 @@ final class Conversation
     }
 
     /**
-     * @return array{turns: list<TurnArray>}
+     * @return array{id: string, turns: list<TurnArray>}
      */
     public function toArray(): array
     {
         return [
+            'id' => $this->id,
             'turns' => array_map(static fn (Turn $t) => [
                 'question' => $t->question,
                 'answer' => $t->answer,
@@ -105,6 +128,10 @@ final class Conversation
         if (!is_array($data) || !is_array($data['turns'] ?? null)) {
             return self::empty();
         }
+        // Sessions written before ids existed carry none; withId() gives
+        // them one on their next turn.
+        $id = (string)($data['id'] ?? '');
+        $id = preg_match(self::ID_PATTERN, $id) === 1 ? $id : '';
         $turns = [];
         foreach ($data['turns'] as $row) {
             if (!is_array($row)) {
@@ -128,6 +155,6 @@ final class Conversation
                 )),
             );
         }
-        return new self($turns);
+        return new self($turns, $id);
     }
 }

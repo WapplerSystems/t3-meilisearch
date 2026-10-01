@@ -62,12 +62,6 @@
             you: root.dataset.labelYou || 'You',
             assistant: root.dataset.labelAssistant || 'Assistant',
             suggestions: root.dataset.labelSuggestions || '',
-            fallbackHeading: root.dataset.labelFallbackHeading || '',
-            fallbackIntro: root.dataset.labelFallbackIntro || '',
-            fallbackEmail: root.dataset.labelFallbackEmail || '',
-            fallbackPhone: root.dataset.labelFallbackPhone || '',
-            fallbackTicket: root.dataset.labelFallbackTicket || '',
-            fallbackSubject: root.dataset.labelFallbackSubject || '',
             loading: root.dataset.labelLoading || 'Generating answer…',
             interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.',
             // Terminal-state wording, same rag.status.* labels the synchronous
@@ -182,7 +176,7 @@
             // The contact card belongs to a finished turn, and every path that
             // finishes one — answered, clarified, failed, dropped — comes
             // through here. Rendering it anywhere else would miss a path.
-            renderFallback(turn, labels);
+            renderFallback(turn);
         }
 
         function ask(q) {
@@ -257,8 +251,8 @@
             es.addEventListener('fallback', function (ev) {
                 try {
                     const p = JSON.parse(ev.data);
-                    if (p.fallback && typeof p.fallback === 'object') {
-                        turn.fallback = p.fallback;
+                    if (p.escalation && typeof p.escalation === 'object') {
+                        turn.fallback = p.escalation;
                     }
                 } catch (_) { /* ignore */ }
             });
@@ -349,37 +343,35 @@
     // Partials/Rag/FallbackContact.html — same classes, same order, same
     // "stay invisible when nothing is configured" rule — because the streamed
     // and the server-rendered answer have to look identical to the visitor.
-    // `labels` is passed in rather than closed over: this function lives at
-    // module scope, the label map inside init() — same reason
-    // renderSuggestions() takes its heading as an argument.
-    function renderFallback(turn, labels) {
+    // No labels needed: the server sends the card fully translated, which is
+    // also what lets a RagEscalationEvent listener change any of its texts.
+    function renderFallback(turn) {
         if (!turn.fallbackEl) return;
-        const f = turn.fallback;
-        if (!f || (!f.email && !f.phone && !f.ticketUrl)) {
+        const card = turn.fallback;
+        const actions = card && Array.isArray(card.actions) ? card.actions : [];
+        if (!actions.length) {
             turn.fallbackEl.innerHTML = '';
             return;
         }
-        const items = [];
-        if (f.email) {
-            const subject = (labels.fallbackSubject ? labels.fallbackSubject + ': ' : '') + (turn.question || '');
-            items.push('<li><strong>' + escapeText(labels.fallbackEmail) + ':</strong> '
-                + '<a class="ws-meilisearch-rag-fallback__email" href="mailto:' + escapeAttr(f.email)
-                + '?subject=' + escapeAttr(encodeURIComponent(subject)) + '">' + escapeText(f.email) + '</a></li>');
-        }
-        if (f.phone) {
-            items.push('<li><strong>' + escapeText(labels.fallbackPhone) + ':</strong> '
-                + '<a class="ws-meilisearch-rag-fallback__phone" href="tel:' + escapeAttr(f.telHref || f.phone) + '">'
-                + escapeText(f.phone) + '</a></li>');
-        }
-        if (f.ticketUrl) {
-            items.push('<li><a class="btn btn-sm btn-outline-primary ws-meilisearch-rag-fallback__ticket" '
-                + 'href="' + escapeAttr(f.ticketUrl) + '" target="_blank" rel="noopener">'
-                + escapeText(labels.fallbackTicket) + '</a></li>');
-        }
+        // Same markup as Partials/Rag/FallbackContact.html. Texts and hrefs
+        // arrive final from EscalationResolver (translated, placeholders
+        // substituted, schemes checked) — the client only draws them.
+        const items = actions.map(function (a) {
+            const type = (a.type || 'link').toString();
+            const href = escapeAttr((a.href || '').toString());
+            const label = escapeText((a.label || '').toString());
+            if (type === 'link') {
+                return '<li><a class="btn btn-sm btn-outline-primary ws-meilisearch-rag-fallback__link" href="' + href + '"'
+                    + (a.newWindow ? ' target="_blank" rel="noopener"' : '') + '>' + label + '</a></li>';
+            }
+            return '<li>' + (label ? '<strong>' + label + ':</strong> ' : '')
+                + '<a class="ws-meilisearch-rag-fallback__' + escapeAttr(type) + '" href="' + href + '">'
+                + escapeText((a.value || '').toString()) + '</a></li>';
+        });
         turn.fallbackEl.innerHTML =
             '<aside class="ws-meilisearch-rag-fallback alert alert-light border mt-3" role="complementary">'
-            + '<h3 class="h6 mb-2">' + escapeText(f.contactName || labels.fallbackHeading) + '</h3>'
-            + (labels.fallbackIntro ? '<p class="small text-muted mb-2">' + escapeText(labels.fallbackIntro) + '</p>' : '')
+            + (card.heading ? '<h3 class="h6 mb-2">' + escapeText(card.heading.toString()) + '</h3>' : '')
+            + (card.text ? '<p class="small text-muted mb-2">' + escapeText(card.text.toString()) + '</p>' : '')
             + '<ul class="list-unstyled mb-0 d-flex flex-wrap gap-3">' + items.join('') + '</ul>'
             + '</aside>';
     }

@@ -151,9 +151,26 @@ settings:
 
   meilisearch.rag.fallback.ticketUrl:
     label: 'Ticket system URL'
-    description: 'Optional URL to a ticket system (Jira, Redmine, Zammad, …). Renders as a button "Open a ticket" when set.'
+    description: 'Optional URL to a ticket system or contact form (Jira, Redmine, Zammad, …). Renders as a button "Open a ticket" when set. Placeholders, substituted URL-encoded: {conversationId} (id of the stored chat protocol, see meilisearch.rag.protocol.enabled), {language} (ISO code), {languageId}, {question}. A site package can replace the whole card per language through RagEscalationEvent.'
     type: string
     default: ''
+
+  # --- RAG chat protocol -----------------------------------------------
+  # One row per finished chat turn in tx_wsmeilisearch_rag_protocol, for
+  # quality control (backend tab "Chat-Protokoll") and for support: the
+  # conversation id can travel to a contact form via {conversationId}.
+
+  meilisearch.rag.protocol.enabled:
+    label: 'RAG: store chat protocol'
+    description: 'When true, every finished chat turn (question, answer, status, context documents, whether a contact was offered) is stored under the conversation id. Holds the visitors'' full wording — mention it in the privacy policy and set a retention period. Default: disabled.'
+    type: bool
+    default: false
+
+  meilisearch.rag.protocol.retentionDays:
+    label: 'RAG: chat protocol retention (days)'
+    description: 'Turns older than this are deleted by the console command ws_meilisearch:rag:protocol:prune (schedule it daily via the "Execute console commands" scheduler task). 0 keeps the protocol forever. Default 90.'
+    type: int
+    default: 90
 
   # --- RAG floating chat widget ----------------------------------------
   # When enabled, a bubble appears bottom-right on every FE page that

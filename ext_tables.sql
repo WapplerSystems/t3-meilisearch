@@ -157,6 +157,36 @@ CREATE TABLE tx_wsmeilisearch_search_log (
     KEY zero_results (result_count, crdate)
 );
 
+-- Chat protocol: one row per finished RAG chat turn, grouped by the
+-- conversation id the chat hands to the visitor (e.g. as a contact-form
+-- parameter, so support can read what was already asked). Written by
+-- ChatProtocolRecorder, gated on meilisearch.rag.protocol.enabled, pruned by
+-- ws_meilisearch:rag:protocol:prune after meilisearch.rag.protocol.retentionDays.
+-- Unlike tx_wsmeilisearch_search_log this holds the full wording of question
+-- and answer — personal data whenever visitors type it in.
+CREATE TABLE tx_wsmeilisearch_rag_protocol (
+    uid             INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    crdate          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    site_identifier VARCHAR(64) DEFAULT '' NOT NULL,
+    language_id     INT(11) DEFAULT 0 NOT NULL,
+    -- 32 hex digits, see Conversation::ID_PATTERN.
+    conversation_id CHAR(32) DEFAULT '' NOT NULL,
+    question        TEXT,
+    answer          MEDIUMTEXT,
+    -- ok | no_context | failed | clarify | aborted
+    status          VARCHAR(16) DEFAULT '' NOT NULL,
+    -- JSON list of the source ids the answer cited.
+    cited_ids       TEXT,
+    -- JSON list of every context hit the model saw: {id,type,title,uri}.
+    sources         MEDIUMTEXT,
+    -- 1 when the "ask a human" card was shown under this turn.
+    escalated       TINYINT(1) UNSIGNED DEFAULT 0 NOT NULL,
+
+    PRIMARY KEY (uid),
+    KEY conversation (conversation_id, crdate),
+    KEY site_crdate (site_identifier, crdate)
+);
+
 -- One row per RagTestRunner invocation per test. Drives the
 -- score-history sparkline in the BE tab + lets operators eyeball
 -- the trend after a model rotation. Pruned to RagTestRunner::HISTORY_KEEP

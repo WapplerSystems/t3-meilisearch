@@ -17,6 +17,12 @@ services:
       - '../Classes/Service/Llm/LlmProviderInterface.php'
       - '../Classes/Service/Llm/LlmException.php'
       - '../Classes/Service/Rag/RagAnswer.php'
+      # Value objects of the escalation card and the chat protocol; built
+      # by EscalationResolver / ChatProtocolRepository, never injected.
+      - '../Classes/Service/Rag/Escalation/Escalation.php'
+      - '../Classes/Service/Rag/Escalation/EscalationAction.php'
+      - '../Classes/Service/Rag/Protocol/ProtocolEntry.php'
+      - '../Classes/Service/Rag/Protocol/ProtocolFilter.php'
       # Plain value object built by QueryClassifier (private constructor);
       # never injected.
       - '../Classes/Service/Rag/Clarification.php'

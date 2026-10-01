@@ -115,13 +115,13 @@
         <f:comment>
             Contact fallback — rendered below whatever the switch
             produced (answer card, no_context/failed alert, or the
-            conversation thread). Controller sets {showFallback} per
-            meilisearch.rag.fallback.show; the partial itself
-            additionally bails out if no email/phone/ticketUrl is set,
-            so an empty contact config produces no extra markup.
+            conversation thread). EscalationResolver decides per
+            meilisearch.rag.fallback.show and RagEscalationEvent; it
+            returns no card at all when there is no way to reach
+            anyone, so an empty contact config produces no markup.
         </f:comment>
-        <f:if condition="{showFallback}">
-            <f:render partial="Rag/FallbackContact" arguments="{fallback: fallback, question: question}"/>
+        <f:if condition="{escalation}">
+            <f:render partial="Rag/FallbackContact" arguments="{escalation: escalation}"/>
         </f:if>
     </div>
 </f:section>

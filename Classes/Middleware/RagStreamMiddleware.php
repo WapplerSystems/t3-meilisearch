@@ -17,6 +17,7 @@ use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
+use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
 use WapplerSystems\Meilisearch\Service\Rag\RagStreamChunk;
 use WapplerSystems\Meilisearch\Service\Rag\Turn;
@@ -48,6 +49,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
         private readonly RagService $ragService,
         private readonly ConversationStore $conversationStore,
         private readonly AccessControlFilter $accessControlFilter,
+        private readonly ChatProtocolRecorder $protocolRecorder,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -81,7 +83,9 @@ final class RagStreamMiddleware implements MiddlewareInterface
             return $this->jsonError('q parameter is required', 400);
         }
 
-        $conversation = $this->loadConversation($site, $request);
+        // The id exists before the answer does: the escalation card that may
+        // come with it links to this conversation's protocol.
+        $conversation = $this->loadConversation($site, $request)->withId();
         // Pin the LLM answer language to the active FE language so the
         // model doesn't drift to English when context excerpts span
         // multiple languages — matches the non-streaming controller.
@@ -106,7 +110,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
         $askOptions['filters'] = $this->accessControlFilter->applyTo($existingFilters, $site, $request);
         $stream = $this->ragService->askStreaming($site, $question, $askOptions);
 
-        $this->writeSseStream($stream, $site, $request, $question, $conversation);
+        $this->writeSseStream($stream, $site, $request, $question, $conversation, $askOptions['language'] ?? null);
 
         // Headers + body were already flushed directly to the client.
         // Returning NullResponse tells TYPO3 not to emit any additional
@@ -140,12 +144,20 @@ final class RagStreamMiddleware implements MiddlewareInterface
         ServerRequestInterface $request,
         string $question,
         Conversation $conversation,
+        ?int $languageId,
     ): void {
         // Drop any output buffer the rest of the stack would otherwise
         // accumulate behind us — SSE needs each frame flushed immediately.
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
+
+        // Without this PHP terminates the script at the first flush after the
+        // visitor closed the chat, and the connection_aborted() check below
+        // never gets to break the loop — the turn would vanish from both the
+        // conversation and the protocol. The loop still stops on abort, so
+        // the LLM is not kept streaming for nobody.
+        ignore_user_abort(true);
 
         $this->sendSessionCookie($request, $site, $conversation);
 
@@ -161,8 +173,28 @@ final class RagStreamMiddleware implements MiddlewareInterface
         // can store the documents the answer ends up citing.
         $sources = [];
         $suggestions = [];
+        // For the chat protocol: the terminal frame of any kind, the answer
+        // text as far as it got, and whether the escalation card went out.
+        $terminalChunk = null;
+        $streamedText = '';
+        $escalated = false;
         foreach ($stream as $chunk) {
             $this->emitFrame($chunk);
+            if ($chunk->type === RagStreamChunk::TYPE_TOKEN) {
+                $streamedText .= (string)($chunk->data['text'] ?? '');
+            }
+            if ($chunk->type === RagStreamChunk::TYPE_FALLBACK) {
+                $escalated = true;
+            }
+            if (in_array($chunk->type, [
+                RagStreamChunk::TYPE_DONE,
+                RagStreamChunk::TYPE_CLARIFY,
+                RagStreamChunk::TYPE_FAILED,
+                RagStreamChunk::TYPE_NO_CONTEXT,
+                RagStreamChunk::TYPE_DISABLED,
+            ], true)) {
+                $terminalChunk = $chunk;
+            }
             if ($chunk->type === RagStreamChunk::TYPE_SOURCES) {
                 $sources = (array)($chunk->data['sources'] ?? []);
             }
@@ -180,6 +212,8 @@ final class RagStreamMiddleware implements MiddlewareInterface
                 break;
             }
         }
+
+        $this->recordProtocol($site, $languageId, $conversation->id, $question, $terminalChunk, $streamedText, $sources, $escalated);
 
         // Persist the conversation turn if we produced an answer or asked a
         // clarifying question. We can't piggy-back this on the controller (the
@@ -226,6 +260,39 @@ final class RagStreamMiddleware implements MiddlewareInterface
             $conversation = $conversation->withTurn($turn, $maxTurns);
             $this->conversationStore->save($request, $this->sessionKey($site), $conversation);
         }
+    }
+
+    /**
+     * One protocol row per streamed turn, whatever way it ended. A visitor
+     * who closed the chat mid-answer leaves no terminal frame; that turn is
+     * stored as `aborted` with the text that had arrived so far, because a
+     * cancelled answer is a quality signal of its own.
+     *
+     * @param list<array<string,mixed>> $sources
+     */
+    private function recordProtocol(
+        Site $site,
+        ?int $languageId,
+        string $conversationId,
+        string $question,
+        ?RagStreamChunk $terminalChunk,
+        string $streamedText,
+        array $sources,
+        bool $escalated,
+    ): void {
+        [$status, $answer, $citedIds] = match ($terminalChunk?->type) {
+            RagStreamChunk::TYPE_DONE => [
+                'ok',
+                (string)($terminalChunk->data['answer'] ?? ''),
+                array_values(array_map('strval', (array)($terminalChunk->data['citedIds'] ?? []))),
+            ],
+            RagStreamChunk::TYPE_CLARIFY => ['clarify', (string)($terminalChunk->data['question'] ?? ''), []],
+            RagStreamChunk::TYPE_FAILED => ['failed', trim($streamedText), []],
+            RagStreamChunk::TYPE_NO_CONTEXT => ['no_context', '', []],
+            RagStreamChunk::TYPE_DISABLED => ['disabled', '', []],
+            default => [ChatProtocolRecorder::STATUS_ABORTED, trim($streamedText), []],
+        };
+        $this->protocolRecorder->record($site, $languageId, $conversationId, $question, $answer, $status, $citedIds, $sources, $escalated);
     }
 
     private function emitFrame(RagStreamChunk $chunk): void

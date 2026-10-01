@@ -13,6 +13,8 @@ use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
+use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
+use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
@@ -82,7 +84,7 @@ final class RagService implements LoggerAwareInterface
         private readonly QueryRewriter $queryRewriter,
         private readonly SuggestionGenerator $suggestionGenerator,
         private readonly QueryClassifier $queryClassifier,
-        private readonly FallbackContact $fallbackContact,
+        private readonly EscalationResolver $escalationResolver,
         private readonly NeighbourSuggestions $neighbourSuggestions,
     ) {}
 
@@ -669,7 +671,7 @@ final class RagService implements LoggerAwareInterface
     {
         $question = trim($question);
         if ($question === '') {
-            if ($chunk = $this->fallbackChunk($site, 'no_context', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::noContext();
@@ -679,7 +681,7 @@ final class RagService implements LoggerAwareInterface
         $settings = $site->getSettings();
         $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
         if ($providerName === '') {
-            if ($chunk = $this->fallbackChunk($site, 'disabled', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'disabled', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::disabled();
@@ -687,7 +689,7 @@ final class RagService implements LoggerAwareInterface
         }
         $provider = $this->providerRegistry->get($providerName);
         if ($provider === null) {
-            if ($chunk = $this->fallbackChunk($site, 'failed', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'failed', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::failed('provider "' . $providerName . '" not registered');
@@ -728,7 +730,7 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
         );
         if ($hits === []) {
-            if ($chunk = $this->fallbackChunk($site, 'no_context', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::noContext();
@@ -754,7 +756,7 @@ final class RagService implements LoggerAwareInterface
             $llmOptions,
         );
         if ($clarification->needed) {
-            if ($chunk = $this->fallbackChunk($site, 'clarify', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'clarify', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::clarify(
@@ -800,7 +802,7 @@ final class RagService implements LoggerAwareInterface
         if ($before->response !== null) {
             yield RagStreamChunk::token($before->response);
             $citedIds = $this->extractCitations($before->response, $hits);
-            if ($chunk = $this->fallbackChunk($site, 'ok', $citedIds)) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
                 yield $chunk;
             }
             yield RagStreamChunk::done($before->response, $citedIds);
@@ -855,7 +857,7 @@ final class RagService implements LoggerAwareInterface
                 'message' => $e->getMessage(),
                 'exception' => $e,
             ]);
-            if ($chunk = $this->fallbackChunk($site, 'failed', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'failed', [])) {
                 yield $chunk;
             }
             yield RagStreamChunk::failed($e->getMessage());
@@ -872,7 +874,7 @@ final class RagService implements LoggerAwareInterface
         // Before `done`, because `done` is the terminal frame the client may
         // close on — see RagStreamChunk. An answer that cited nothing is the
         // "ok but ungrounded" case the contact card exists for.
-        if ($chunk = $this->fallbackChunk($site, 'ok', $citedIds)) {
+        if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
             yield $chunk;
         }
         yield RagStreamChunk::done(trim($accumulated), $citedIds);
@@ -1150,22 +1152,27 @@ final class RagService implements LoggerAwareInterface
 
     /**
      * The contact-card frame for a streamed turn, or null when it does not
-     * apply. See FallbackContact for the rule and for why the streamed path
-     * needed its own entry point at all.
+     * apply. See EscalationResolver for the rule and for why the streamed
+     * path needed its own entry point at all. The conversation id rides in
+     * via $options so a listener can link the card to the stored protocol.
      *
+     * @param array<string,mixed> $options
      * @param list<string> $citedIds
      */
-    private function fallbackChunk(Site $site, string $status, array $citedIds): ?RagStreamChunk
+    private function fallbackChunk(Site $site, array $options, string $question, string $status, array $citedIds): ?RagStreamChunk
     {
-        if (!$this->fallbackContact->shouldStream($site, $status, $citedIds)) {
-            return null;
-        }
-        $fallback = $this->fallbackContact->resolve($site);
-        if (!$this->fallbackContact->hasContact($fallback)) {
-            return null;
-        }
+        $conversation = $options['conversation'] ?? null;
+        $escalation = $this->escalationResolver->resolve(
+            $site,
+            $this->resolveLanguageId($options),
+            EscalationResolver::CONTEXT_STREAM,
+            $status,
+            $citedIds,
+            $question,
+            $conversation instanceof Conversation ? $conversation->id : '',
+        );
 
-        return RagStreamChunk::fallback($fallback);
+        return $escalation instanceof Escalation ? RagStreamChunk::fallback($escalation) : null;
     }
 
     /**

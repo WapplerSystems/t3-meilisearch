@@ -13,7 +13,8 @@ use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
-use WapplerSystems\Meilisearch\Service\Rag\FallbackContact;
+use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
+use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\Turn;
@@ -34,7 +35,8 @@ final class RagController extends ActionController
         private readonly SiteFinder $siteFinder,
         private readonly ConversationStore $conversationStore,
         private readonly AccessControlFilter $accessControlFilter,
-        private readonly FallbackContact $fallbackContact,
+        private readonly EscalationResolver $escalationResolver,
+        private readonly ChatProtocolRecorder $protocolRecorder,
     ) {}
 
     private function resolveSite(): ?Site
@@ -65,17 +67,23 @@ final class RagController extends ActionController
     {
         $site = $this->resolveSite();
         $conversation = $this->loadConversation($site);
-        // The initial form has no answer to anchor a fallback on, so
-        // only show the contact card when the operator explicitly
-        // wants it always-on. In onlyEmpty mode the streamed path now
-        // decides per answer instead (FallbackContact::shouldStream),
-        // which is what the static card here cannot do.
+        // The initial form has no answer to anchor a card on, so only the
+        // always-on card renders here. In onlyEmpty mode the streamed path
+        // decides per answer instead (EscalationResolver::CONTEXT_STREAM).
+        // The conversation id is the stored one if there is a conversation —
+        // a fresh visitor has none yet, and generating one for every page
+        // view would open a session per visitor just to fill a placeholder.
+        $escalation = $this->escalationResolver->resolve(
+            $site,
+            $this->resolveCurrentLanguageId(),
+            EscalationResolver::CONTEXT_STATIC,
+            conversationId: $conversation->id,
+        );
         $this->view->assignMultiple([
             'question' => $q,
             'conversation' => $conversation->turns,
             'conversationEnabled' => $this->conversationEnabled($site),
-            'fallback' => $this->fallbackContact->resolve($site),
-            'showFallback' => $this->fallbackContact->isAlways($site),
+            'escalation' => $escalation?->toArray(),
             'pageType' => $this->currentPageType(),
             'streamEndpoint' => $this->streamEndpoint(),
         ]);
@@ -94,7 +102,7 @@ final class RagController extends ActionController
             return $this->htmlResponse();
         }
 
-        $conversation = $this->loadConversation($site);
+        $conversation = $this->loadConversation($site)->withId();
         $options = ['conversation' => $conversation];
 
         // Scope retrieval to the active site language. Without it, FileSchema-
@@ -128,6 +136,26 @@ final class RagController extends ActionController
         $options['filters'] = $this->accessControlFilter->applyTo($existingFilters, $site, $accessReq);
 
         $answer = $this->ragService->ask($site, $q, $options);
+        $escalation = $this->escalationResolver->resolve(
+            $site,
+            $languageId,
+            EscalationResolver::CONTEXT_ANSWER,
+            $answer->status,
+            $answer->citedIds,
+            $q,
+            $conversation->id,
+        );
+        $this->protocolRecorder->record(
+            $site,
+            $languageId,
+            $conversation->id,
+            $q,
+            $answer->answer,
+            $answer->status,
+            $answer->citedIds,
+            $answer->sources,
+            $escalation !== null,
+        );
 
         // Persist answered turns and clarification turns alike: the reply to a
         // clarifying question needs the question in history so the query
@@ -150,6 +178,11 @@ final class RagController extends ActionController
             $conversation = $conversation->withTurn($turn, $maxTurns);
             $sessionKey = $this->sessionKey($site);
             $this->conversationStore->save($this->request, $sessionKey, $conversation);
+        } elseif ($this->conversationEnabled($site) && trim($q) !== '') {
+            // No turn to keep, but the id has to survive: the protocol already
+            // holds this question under it, and the next one belongs to the
+            // same conversation. The streamed path gets this from establish().
+            $this->conversationStore->save($this->request, $this->sessionKey($site), $conversation);
         }
 
         $this->view->assignMultiple([
@@ -157,8 +190,7 @@ final class RagController extends ActionController
             'answer' => $answer,
             'conversation' => $conversation->turns,
             'conversationEnabled' => $this->conversationEnabled($site),
-            'fallback' => $this->fallbackContact->resolve($site),
-            'showFallback' => $this->fallbackContact->shouldShow($site, $answer->status, $answer->citedIds),
+            'escalation' => $escalation?->toArray(),
             'pageType' => $this->currentPageType(),
             'streamEndpoint' => $this->streamEndpoint(),
         ]);

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service\Rag;
 
+use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
+
 /**
  * One frame in the streaming RAG response. The streaming middleware
  * walks the iterator from askStreaming() and translates each chunk into
@@ -23,7 +25,8 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  *             question is too ambiguous / underspecified to answer. Carries
  *             one clarifying question; no sources or tokens are emitted.
  *   fallback → optional, ALWAYS immediately before the terminal frame:
- *             carries the "ask a human" contact fields when the answer did
+ *             carries the "ask a human" card ({escalation: {heading, text,
+ *             actions}}) when the answer did
  *             not ground in any source. Emitted ahead of the terminal frame
  *             on purpose — the client closes the stream on `clarify`,
  *             `failed`, `no_context` and `disabled`, so a frame sent after
@@ -94,11 +97,12 @@ final class RagStreamChunk
      * The contact card for an answer the model could not ground. See the
      * class docblock for why this precedes the terminal frame.
      *
-     * @param array{contactName:string,email:string,phone:string,telHref:string,ticketUrl:string} $fallback
+     * The frame carries {@see Escalation::toArray()} — the same shape the
+     * Fluid partial renders, so client and server draw the identical card.
      */
-    public static function fallback(array $fallback): self
+    public static function fallback(Escalation $escalation): self
     {
-        return new self(self::TYPE_FALLBACK, ['fallback' => $fallback]);
+        return new self(self::TYPE_FALLBACK, ['escalation' => $escalation->toArray()]);
     }
 
     public static function failed(string $error): self
