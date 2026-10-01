@@ -160,7 +160,14 @@ final class RecordChangeListener
             if ($table === 'pages') {
                 return $this->siteFinder->getSiteByPageId($uid);
             }
+            // On an update the field array carries only the changed fields,
+            // and a cmdmap (delete, hide via move …) carries none — reading the
+            // pid from it alone meant that editing, hiding or deleting an
+            // existing record never reached the index; only creating one did.
             $pid = (int)($fieldArray['pid'] ?? 0);
+            if ($pid <= 0) {
+                $pid = $this->resolvePid($table, $uid);
+            }
             if ($pid > 0) {
                 return $this->siteFinder->getSiteByPageId($pid);
             }
@@ -168,6 +175,27 @@ final class RecordChangeListener
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * The record's pid straight from the table, restrictions removed: after a
+     * delete the row is already soft-deleted, and the pid is exactly what is
+     * needed to find the index the document has to leave.
+     */
+    private function resolvePid(string $table, int $uid): int
+    {
+        if (!isset($GLOBALS['TCA'][$table])) {
+            return 0;
+        }
+        $qb = $this->connectionPool->getQueryBuilderForTable($table);
+        $qb->getRestrictions()->removeAll();
+        $pid = $qb->select('pid')
+            ->from($table)
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchOne();
+
+        return (int)$pid;
     }
 
     private function resolveFileUidFromMetadata(int $metadataUid): int
