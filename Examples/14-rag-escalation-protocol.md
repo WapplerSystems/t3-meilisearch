@@ -72,3 +72,31 @@ To get the transcript into a form mail, read it with
 it with `ChatProtocolTranscript::toText()` — e.g. from a `MailBeforeSendingEvent`
 listener of `wapplersystems/form`, attached only to the mail to the site owner,
 never to the visitor's confirmation.
+
+## Close the gap — hand-written knowledge
+
+The backend module **Site → Chatbot-Wissen** (`site_wsmeilisearch_knowledge`)
+lets editors add, change, hide and delete entries of
+`tx_wsmeilisearch_knowledge_entry`: a title, the information itself in plain
+sentences, alternative wordings, optional start/end time. In the protocol
+detail view every turn has **Als Wissen ergänzen**, which opens a new entry
+with question, language and conversation pre-filled.
+
+Entries are indexed on save (DataHandler hook) as internal grounding —
+`type = knowledge_resource`, `resourceType = manual`, id `knowledge-<uid>` —
+so the assistant uses them, while they appear neither as search hits nor as
+citations. They belong to one site: the module stores them on the site's root
+page. A brand-new installation needs one full reindex so the index knows the
+document type; after that saves suffice.
+
+Two rules make sure an entry is actually used:
+
+* `meilisearch.rag.retrievalFilters` narrows the imported corpus only —
+  manual entries are OR-ed back in (`meilisearch.rag.manualKnowledge.bypassRetrievalFilters`,
+  default true). Language and access filters still apply.
+* When a manual entry is among the top three hits, the clarify step does not
+  ask back: the entry was written for exactly that question.
+
+Non-admin editors need the module in their group plus `tables_select` /
+`tables_modify` on `tx_wsmeilisearch_knowledge_entry` and the site root page
+in their web mounts.

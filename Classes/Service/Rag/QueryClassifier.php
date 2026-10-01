@@ -66,6 +66,14 @@ PROMPT;
         if (!(bool)$settings->get('meilisearch.rag.clarify.enabled', false)) {
             return Clarification::answerable();
         }
+        // A hand-written knowledge entry among the top hits was written for
+        // exactly this kind of question — usually because the assistant
+        // could not answer it before. Asking back "which product?" would
+        // put the visitor through the very dead end the entry exists to
+        // close.
+        if ($this->manualKnowledgeAmongTopHits($hits)) {
+            return Clarification::answerable();
+        }
         if (!$this->productAmbiguityPresent($settings, $question, $hits)) {
             // Nothing to disambiguate — don't even spend an LLM call on it.
             return Clarification::answerable();
@@ -358,5 +366,20 @@ PROMPT;
             }
         }
         return count($found) >= 2;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $hits
+     */
+    private function manualKnowledgeAmongTopHits(array $hits): bool
+    {
+        foreach (array_slice($hits, 0, 3) as $hit) {
+            if ((string)($hit['resourceType'] ?? '') === 'manual'
+                || str_starts_with((string)($hit['id'] ?? ''), 'knowledge-')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -215,6 +215,98 @@
                 <source>Origin</source>
                 <target>Herkunft</target>
             </trans-unit>
+            <trans-unit id="module.knowledge.title" resname="module.knowledge.title">
+                <source>Chatbot knowledge</source>
+                <target>Chatbot-Wissen</target>
+            </trans-unit>
+            <trans-unit id="module.knowledge.description" resname="module.knowledge.description">
+                <source>Hand-written knowledge the chat assistant answers from</source>
+                <target>Eigenes Wissen, aus dem der Chat-Assistent antwortet</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.table" resname="knowledgeEntry.table">
+                <source>Chatbot knowledge entry</source>
+                <target>Chatbot-Wissenseintrag</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.tab.content" resname="knowledgeEntry.tab.content">
+                <source>Content</source>
+                <target>Inhalt</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.tab.access" resname="knowledgeEntry.tab.access">
+                <source>Validity &amp; weighting</source>
+                <target>Gültigkeit &amp; Gewichtung</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.tab.internal" resname="knowledgeEntry.tab.internal">
+                <source>Internal</source>
+                <target>Intern</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.sys_language_uid" resname="knowledgeEntry.sys_language_uid">
+                <source>Language</source>
+                <target>Sprache</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.l10n_parent" resname="knowledgeEntry.l10n_parent">
+                <source>Translation of</source>
+                <target>Übersetzung von</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.hidden" resname="knowledgeEntry.hidden">
+                <source>Hidden</source>
+                <target>Ausgeblendet</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.starttime" resname="knowledgeEntry.starttime">
+                <source>Valid from</source>
+                <target>Gültig ab</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.endtime" resname="knowledgeEntry.endtime">
+                <source>Valid until</source>
+                <target>Gültig bis</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.title" resname="knowledgeEntry.title">
+                <source>Topic or question</source>
+                <target>Thema oder Frage</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.title.description" resname="knowledgeEntry.title.description">
+                <source>What the entry is about, phrased the way a customer would ask, e.g. "Which operating systems are supported?"</source>
+                <target>Worum es geht, so formuliert, wie Kunden fragen, z. B. „Welche Betriebssysteme werden unterstützt?“</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.body" resname="knowledgeEntry.body">
+                <source>Information</source>
+                <target>Information</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.body.description" resname="knowledgeEntry.body.description">
+                <source>The information itself, in complete sentences. The assistant reads exactly this text — write it as you would explain it to a customer. One topic per entry.</source>
+                <target>Die Information selbst, in ganzen Sätzen. Der Assistent liest genau diesen Text – schreiben Sie ihn so, wie Sie es einem Kunden erklären würden. Ein Thema pro Eintrag.</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.keywords" resname="knowledgeEntry.keywords">
+                <source>Alternative wordings</source>
+                <target>Andere Formulierungen</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.keywords.description" resname="knowledgeEntry.keywords.description">
+                <source>Synonyms and wordings customers use, comma-separated, so the entry is found even when the question uses different words.</source>
+                <target>Synonyme und Formulierungen, die Kunden verwenden, durch Komma getrennt – damit der Eintrag auch bei anders formulierten Fragen gefunden wird.</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.notes" resname="knowledgeEntry.notes">
+                <source>Internal note</source>
+                <target>Interne Notiz</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.notes.description" resname="knowledgeEntry.notes.description">
+                <source>Why the entry exists, who confirmed it. Never shown to the assistant.</source>
+                <target>Warum es den Eintrag gibt, wer ihn bestätigt hat. Wird dem Assistenten nie gezeigt.</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.source_conversation" resname="knowledgeEntry.source_conversation">
+                <source>From chat conversation</source>
+                <target>Aus Chat-Gespräch</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.source_conversation.description" resname="knowledgeEntry.source_conversation.description">
+                <source>Chat conversation this entry was written for (see the chat protocol).</source>
+                <target>Chat-Gespräch, für das dieser Eintrag angelegt wurde (siehe Chat-Protokoll).</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.tx_wsmeilisearch_boost" resname="knowledgeEntry.tx_wsmeilisearch_boost">
+                <source>Weighting</source>
+                <target>Gewichtung</target>
+            </trans-unit>
+            <trans-unit id="knowledgeEntry.tx_wsmeilisearch_boost.description" resname="knowledgeEntry.tx_wsmeilisearch_boost.description">
+                <source>Keep it high so hand-written knowledge wins over imported documentation on the same topic.</source>
+                <target>Hoch lassen, damit eigenes Wissen bei gleichem Thema vor der importierten Dokumentation steht.</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

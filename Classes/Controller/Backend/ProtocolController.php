@@ -5,6 +5,7 @@ namespace WapplerSystems\Meilisearch\Controller\Backend;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Routing\UriBuilder as BackendUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Http\Response;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -37,6 +38,7 @@ final class ProtocolController
         private readonly ChatProtocolTranscript $transcript,
         private readonly SiteFinder $siteFinder,
         private readonly BackendContext $context,
+        private readonly BackendUriBuilder $backendUriBuilder,
     ) {}
 
     public function handle(ServerRequestInterface $request, string $action): ResponseInterface
@@ -218,6 +220,16 @@ final class ProtocolController
                 'isProblem' => in_array($entry->status, ProtocolFilter::PROBLEM_STATUSES, true)
                     || ($entry->status === 'ok' && $entry->citedIds === []),
                 'sources' => $sources,
+                // The way from an unanswered question to the knowledge that
+                // answers it next time: opens a new knowledge entry with the
+                // question, language and conversation pre-filled.
+                'knowledgeUrl' => (string)$this->backendUriBuilder->buildUriFromRoute('site_wsmeilisearch_knowledge', [
+                    'action' => 'new',
+                    'site' => $entry->siteIdentifier,
+                    'language' => $entry->languageId,
+                    'title' => mb_substr($entry->question, 0, 255),
+                    'conversation' => $entry->conversationId,
+                ]),
             ];
         }
 

@@ -157,6 +157,28 @@ CREATE TABLE tx_wsmeilisearch_search_log (
     KEY zero_results (result_count, crdate)
 );
 
+-- Hand-written knowledge for the chat assistant: facts, answers, product
+-- details editors add in the backend module "Chatbot-Wissen" — typically
+-- for a question the protocol shows went unanswered. Indexed by
+-- KnowledgeEntrySchemaProvider as internal grounding (type
+-- knowledge_resource), so it feeds the assistant without showing up as a
+-- search hit or a citation. Kept apart from tx_wsmeilisearch_knowledge_resource
+-- on purpose: the importer purges and rebuilds that table per language and
+-- would throw manual entries away. Site scope comes from pid (the site's
+-- root page); TYPO3 adds the standard columns from TCA.
+CREATE TABLE tx_wsmeilisearch_knowledge_entry (
+    title               VARCHAR(255) DEFAULT '' NOT NULL,
+    body                MEDIUMTEXT,
+    -- Synonyms / alternative wordings, comma-separated; indexed so the
+    -- entry is found for phrasings the body does not contain.
+    keywords            TEXT,
+    -- Editor note, never indexed (why the entry exists, who confirmed it).
+    notes               TEXT,
+    -- Chat conversation the entry was written for, if any.
+    source_conversation CHAR(32) DEFAULT '' NOT NULL,
+    tx_wsmeilisearch_boost TINYINT(1) UNSIGNED DEFAULT 3 NOT NULL
+);
+
 -- Chat protocol: one row per finished RAG chat turn, grouped by the
 -- conversation id the chat hands to the visitor (e.g. as a contact-form
 -- parameter, so support can read what was already asked). Written by

@@ -1083,6 +1083,16 @@ final class RagService implements LoggerAwareInterface
                 static fn ($f) => trim((string)$f),
                 $rawFilters,
             ), static fn (string $f) => $f !== ''));
+            // Hand-written knowledge (KnowledgeEntrySchemaProvider) is
+            // exempt from these filters: they narrow the *imported* corpus
+            // ("only pages of the knowledge base"), and an editor who writes
+            // an entry for a question the assistant could not answer expects
+            // it to be used — not to vanish behind a filter on a field it
+            // does not even have. Language and access filters still apply,
+            // they are separate expressions.
+            if ($expressions !== [] && (bool)$settings->get('meilisearch.rag.manualKnowledge.bypassRetrievalFilters', true)) {
+                $expressions = ['((' . implode(') AND (', $expressions) . ')) OR resourceType = "manual"'];
+            }
             if ($expressions !== []) {
                 $opts['filters'] ??= [];
                 $opts['filters']['__rawFilters'] = array_merge(

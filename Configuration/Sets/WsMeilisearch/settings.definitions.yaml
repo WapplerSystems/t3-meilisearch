@@ -695,6 +695,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.manualKnowledge.bypassRetrievalFilters:
+    label: 'RAG: hand-written knowledge ignores the retrieval filters'
+    description: 'When true (default), entries from the backend module "Chatbot-Wissen" (resourceType = "manual") are retrieved even when meilisearch.rag.retrievalFilters narrows the corpus, e.g. to the pages of a knowledge base. Language and access restrictions still apply.'
+    type: bool
+    default: true
+
   meilisearch.rag.promptMetaFields:
     label: 'RAG: document fields exposed in the prompt context'
     description: 'Extra document fields written into each context block header, e.g. ["kbVersion", "kbProduct"]. Without them the LLM only sees `[id | type] Title` and cannot reason about any dimension the documents carry — with several documentation releases indexed side by side it cannot tell which release an excerpt belongs to and will answer from whichever copy ranked first. Fields absent on a hit are skipped. Keep the list short: every field costs context tokens on every hit.'

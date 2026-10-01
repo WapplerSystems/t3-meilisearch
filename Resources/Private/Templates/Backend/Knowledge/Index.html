@@ -1,0 +1,157 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+    <f:layout name="Module" />
+    <f:section name="Content">
+        <h1>Chatbot-Wissen</h1>
+        <p class="text-muted">
+            Einträge werden vom Chat-Assistenten als Wissensquelle verwendet (nicht als Suchtreffer oder Quellen angezeigt) und beim Speichern indexiert.
+            Bitte ganze Sätze in der Sprache des Eintrags schreiben; ein Thema pro Eintrag; im Feld „Andere Formulierungen“ stehen Synonyme und Formulierungen, die Kunden verwenden.
+        </p>
+
+        <f:if condition="{noSites}">
+            <f:then>
+                <div class="alert alert-warning">Sie haben keinen Zugriff auf eine Site.</div>
+            </f:then>
+            <f:else>
+                <div class="card mb-3">
+                    <div class="card-header">Filter</div>
+                    <div class="card-body">
+                        <form method="post" action="{listUrl}">
+                            <div class="row g-3 align-items-end">
+                                <div class="col">
+                                    <label class="form-label" for="site">Site</label>
+                                    <select class="form-select" id="site" name="site">
+                                        <f:for each="{sites}" as="site">
+                                            <f:if condition="{site.identifier} == {siteIdentifier}">
+                                                <f:then><option value="{site.identifier}" selected="selected">{site.title}</option></f:then>
+                                                <f:else><option value="{site.identifier}">{site.title}</option></f:else>
+                                            </f:if>
+                                        </f:for>
+                                    </select>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label" for="language">Sprache</label>
+                                    <select class="form-select" id="language" name="language">
+                                        <f:if condition="{filterLanguage} == ''">
+                                            <f:then><option value="" selected="selected">alle</option></f:then>
+                                            <f:else><option value="">alle</option></f:else>
+                                        </f:if>
+                                        <f:for each="{languages}" as="language">
+                                            <f:if condition="{filterLanguage} == {language.id}">
+                                                <f:then><option value="{language.id}" selected="selected">{language.title}</option></f:then>
+                                                <f:else><option value="{language.id}">{language.title}</option></f:else>
+                                            </f:if>
+                                        </f:for>
+                                    </select>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label" for="q">Suche</label>
+                                    <input class="form-control" id="q" name="q" type="search" value="{q}" placeholder="Titel, Inhalt oder Schlüsselwörter">
+                                </div>
+                                <div class="col">
+                                    <label class="form-label" for="state">Status</label>
+                                    <select class="form-select" id="state" name="state">
+                                        <f:if condition="{state} == ''">
+                                            <f:then><option value="" selected="selected">alle</option></f:then>
+                                            <f:else><option value="">alle</option></f:else>
+                                        </f:if>
+                                        <f:if condition="{state} == 'visible'">
+                                            <f:then><option value="visible" selected="selected">sichtbar</option></f:then>
+                                            <f:else><option value="visible">sichtbar</option></f:else>
+                                        </f:if>
+                                        <f:if condition="{state} == 'hidden'">
+                                            <f:then><option value="hidden" selected="selected">ausgeblendet</option></f:then>
+                                            <f:else><option value="hidden">ausgeblendet</option></f:else>
+                                        </f:if>
+                                    </select>
+                                </div>
+                                <div class="col-auto">
+                                    <button class="btn btn-primary" type="submit">Filtern</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <f:if condition="{canModify}">
+                    <f:then>
+                        <a class="btn btn-primary mb-3" href="{newUrl}">Neuer Eintrag</a>
+                    </f:then>
+                </f:if>
+
+                <f:if condition="{rows}">
+                    <f:then>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Titel</th>
+                                    <th>Sprache</th>
+                                    <th>Status</th>
+                                    <th>Geändert</th>
+                                    <th>Aus Chat</th>
+                                    <f:if condition="{canModify}">
+                                        <f:then><th>Aktionen</th></f:then>
+                                    </f:if>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <f:for each="{rows}" as="row">
+                                    <tr>
+                                        <td>
+                                            <div>{row.title}</div>
+                                            <small class="text-muted">{row.excerpt}</small>
+                                        </td>
+                                        <td>
+                                            <f:if condition="{row.languageFlag}">
+                                                <f:then><core:icon identifier="{row.languageFlag}" /></f:then>
+                                            </f:if>
+                                            <span title="{row.languageTitle}">{row.languageTitle}</span>
+                                        </td>
+                                        <td>
+                                            <f:if condition="{row.hidden}">
+                                                <f:then><span class="badge bg-secondary">ausgeblendet</span></f:then>
+                                                <f:else>
+                                                    <f:if condition="{row.active}">
+                                                        <f:then><span class="badge bg-success">aktiv</span></f:then>
+                                                        <f:else><span class="badge bg-warning text-dark">zeitgesteuert</span></f:else>
+                                                    </f:if>
+                                                </f:else>
+                                            </f:if>
+                                        </td>
+                                        <td><f:format.date format="d.m.Y H:i">{row.tstamp}</f:format.date></td>
+                                        <td>
+                                            <f:if condition="{row.sourceConversation}">
+                                                <f:then><small class="text-muted"><code>{row.sourceConversationShort}</code></small></f:then>
+                                            </f:if>
+                                        </td>
+                                        <f:if condition="{canModify}">
+                                            <f:then>
+                                                <td>
+                                                    <a class="btn btn-sm btn-outline-primary" href="{row.editUrl}">Bearbeiten</a>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="{row.toggleUrl}">
+                                                        <f:if condition="{row.hidden}">
+                                                            <f:then>Einblenden</f:then>
+                                                            <f:else>Ausblenden</f:else>
+                                                        </f:if>
+                                                    </a>
+                                                    <a href="{row.deleteUrl}" class="btn btn-sm btn-outline-danger t3js-modal-trigger" data-title="Eintrag löschen?" data-content="„{row.title}“ wird gelöscht und aus dem Suchindex entfernt." data-severity="warning" data-button-close-text="Abbrechen" data-button-ok-text="Löschen">Löschen</a>
+                                                </td>
+                                            </f:then>
+                                        </f:if>
+                                    </tr>
+                                </f:for>
+                            </tbody>
+                        </table>
+                        <f:if condition="{limitReached}">
+                            <f:then><small class="text-muted">Es werden maximal 500 Einträge angezeigt.</small></f:then>
+                        </f:if>
+                    </f:then>
+                    <f:else>
+                        <div class="alert alert-info">Keine Einträge für diese Auswahl.</div>
+                    </f:else>
+                </f:if>
+            </f:else>
+        </f:if>
+    </f:section>
+</html>
