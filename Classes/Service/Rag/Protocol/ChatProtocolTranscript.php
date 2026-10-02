@@ -22,6 +22,26 @@ final class ChatProtocolTranscript
     ];
 
     /**
+     * The transcript labels in a given language, from locallang_be.xlf —
+     * for the backend download in the editor's language and for a mail
+     * attachment in the language of whoever reads the mail.
+     *
+     * @return array<string,string>
+     */
+    public static function labels(\TYPO3\CMS\Core\Localization\LanguageService $languageService): array
+    {
+        $labels = [];
+        foreach (array_keys(self::DEFAULT_LABELS) as $key) {
+            $text = $languageService->sL('LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:transcript.' . $key);
+            if ($text !== '') {
+                $labels[$key] = $text;
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * @param list<ProtocolEntry> $entries
      * @param array<string,string> $labels
      */

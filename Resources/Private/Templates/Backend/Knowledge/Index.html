@@ -3,24 +3,23 @@
       data-namespace-typo3-fluid="true">
     <f:layout name="Module" />
     <f:section name="Content">
-        <h1>Chatbot-Wissen</h1>
+        <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.headline"/></h1>
         <p class="text-muted">
-            Einträge werden vom Chat-Assistenten als Wissensquelle verwendet (nicht als Suchtreffer oder Quellen angezeigt) und beim Speichern indexiert.
-            Bitte ganze Sätze in der Sprache des Eintrags schreiben; ein Thema pro Eintrag; im Feld „Andere Formulierungen“ stehen Synonyme und Formulierungen, die Kunden verwenden.
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.intro"/>
         </p>
 
         <f:if condition="{noSites}">
             <f:then>
-                <div class="alert alert-warning">Sie haben keinen Zugriff auf eine Site.</div>
+                <div class="alert alert-warning"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.noSiteAccess"/></div>
             </f:then>
             <f:else>
                 <div class="card mb-3">
-                    <div class="card-header">Filter</div>
+                    <div class="card-header"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.filter"/></div>
                     <div class="card-body">
                         <form method="post" action="{listUrl}">
                             <div class="row g-3 align-items-end">
                                 <div class="col">
-                                    <label class="form-label" for="site">Site</label>
+                                    <label class="form-label" for="site"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.site"/></label>
                                     <select class="form-select" id="site" name="site">
                                         <f:for each="{sites}" as="site">
                                             <f:if condition="{site.identifier} == {siteIdentifier}">
@@ -31,11 +30,11 @@
                                     </select>
                                 </div>
                                 <div class="col">
-                                    <label class="form-label" for="language">Sprache</label>
+                                    <label class="form-label" for="language"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.language"/></label>
                                     <select class="form-select" id="language" name="language">
                                         <f:if condition="{filterLanguage} == ''">
-                                            <f:then><option value="" selected="selected">alle</option></f:then>
-                                            <f:else><option value="">alle</option></f:else>
+                                            <f:then><option value="" selected="selected"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.all"/></option></f:then>
+                                            <f:else><option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.all"/></option></f:else>
                                         </f:if>
                                         <f:for each="{languages}" as="language">
                                             <f:if condition="{filterLanguage} == {language.id}">
@@ -46,28 +45,28 @@
                                     </select>
                                 </div>
                                 <div class="col">
-                                    <label class="form-label" for="q">Suche</label>
-                                    <input class="form-control" id="q" name="q" type="search" value="{q}" placeholder="Titel, Inhalt oder Schlüsselwörter">
+                                    <label class="form-label" for="q"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.search"/></label>
+                                    <input class="form-control" id="q" name="q" type="search" value="{q}" placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.searchPlaceholder')}">
                                 </div>
                                 <div class="col">
-                                    <label class="form-label" for="state">Status</label>
+                                    <label class="form-label" for="state"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.status"/></label>
                                     <select class="form-select" id="state" name="state">
                                         <f:if condition="{state} == ''">
-                                            <f:then><option value="" selected="selected">alle</option></f:then>
-                                            <f:else><option value="">alle</option></f:else>
+                                            <f:then><option value="" selected="selected"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.all"/></option></f:then>
+                                            <f:else><option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.all"/></option></f:else>
                                         </f:if>
                                         <f:if condition="{state} == 'visible'">
-                                            <f:then><option value="visible" selected="selected">sichtbar</option></f:then>
-                                            <f:else><option value="visible">sichtbar</option></f:else>
+                                            <f:then><option value="visible" selected="selected"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.visible"/></option></f:then>
+                                            <f:else><option value="visible"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.visible"/></option></f:else>
                                         </f:if>
                                         <f:if condition="{state} == 'hidden'">
-                                            <f:then><option value="hidden" selected="selected">ausgeblendet</option></f:then>
-                                            <f:else><option value="hidden">ausgeblendet</option></f:else>
+                                            <f:then><option value="hidden" selected="selected"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.hidden"/></option></f:then>
+                                            <f:else><option value="hidden"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.hidden"/></option></f:else>
                                         </f:if>
                                     </select>
                                 </div>
                                 <div class="col-auto">
-                                    <button class="btn btn-primary" type="submit">Filtern</button>
+                                    <button class="btn btn-primary" type="submit"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.applyFilter"/></button>
                                 </div>
                             </div>
                         </form>
@@ -76,7 +75,7 @@
 
                 <f:if condition="{canModify}">
                     <f:then>
-                        <a class="btn btn-primary mb-3" href="{newUrl}">Neuer Eintrag</a>
+                        <a class="btn btn-primary mb-3" href="{newUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.newEntry"/></a>
                     </f:then>
                 </f:if>
 
@@ -85,13 +84,13 @@
                         <table class="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>Titel</th>
-                                    <th>Sprache</th>
-                                    <th>Status</th>
-                                    <th>Geändert</th>
-                                    <th>Aus Chat</th>
+                                    <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.columnTitle"/></th>
+                                    <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.language"/></th>
+                                    <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.status"/></th>
+                                    <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.changed"/></th>
+                                    <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.fromChat"/></th>
                                     <f:if condition="{canModify}">
-                                        <f:then><th>Aktionen</th></f:then>
+                                        <f:then><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.actions"/></th></f:then>
                                     </f:if>
                                 </tr>
                             </thead>
@@ -110,11 +109,11 @@
                                         </td>
                                         <td>
                                             <f:if condition="{row.hidden}">
-                                                <f:then><span class="badge bg-secondary">ausgeblendet</span></f:then>
+                                                <f:then><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.hidden"/></span></f:then>
                                                 <f:else>
                                                     <f:if condition="{row.active}">
-                                                        <f:then><span class="badge bg-success">aktiv</span></f:then>
-                                                        <f:else><span class="badge bg-warning text-dark">zeitgesteuert</span></f:else>
+                                                        <f:then><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.active"/></span></f:then>
+                                                        <f:else><span class="badge bg-warning text-dark"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.scheduled"/></span></f:else>
                                                     </f:if>
                                                 </f:else>
                                             </f:if>
@@ -128,14 +127,14 @@
                                         <f:if condition="{canModify}">
                                             <f:then>
                                                 <td>
-                                                    <a class="btn btn-sm btn-outline-primary" href="{row.editUrl}">Bearbeiten</a>
+                                                    <a class="btn btn-sm btn-outline-primary" href="{row.editUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.edit"/></a>
                                                     <a class="btn btn-sm btn-outline-secondary" href="{row.toggleUrl}">
                                                         <f:if condition="{row.hidden}">
-                                                            <f:then>Einblenden</f:then>
-                                                            <f:else>Ausblenden</f:else>
+                                                            <f:then><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.show"/></f:then>
+                                                            <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.hide"/></f:else>
                                                         </f:if>
                                                     </a>
-                                                    <a href="{row.deleteUrl}" class="btn btn-sm btn-outline-danger t3js-modal-trigger" data-title="Eintrag löschen?" data-content="„{row.title}“ wird gelöscht und aus dem Suchindex entfernt." data-severity="warning" data-button-close-text="Abbrechen" data-button-ok-text="Löschen">Löschen</a>
+                                                    <a href="{row.deleteUrl}" class="btn btn-sm btn-outline-danger t3js-modal-trigger" data-title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.deleteConfirmTitle')}" data-content="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.deleteConfirmText', arguments: {0: row.title})}" data-severity="warning" data-button-close-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.cancel')}" data-button-ok-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.delete')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.delete"/></a>
                                                 </td>
                                             </f:then>
                                         </f:if>
@@ -144,11 +143,11 @@
                             </tbody>
                         </table>
                         <f:if condition="{limitReached}">
-                            <f:then><small class="text-muted">Es werden maximal 500 Einträge angezeigt.</small></f:then>
+                            <f:then><small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.maxEntriesShown"/></small></f:then>
                         </f:if>
                     </f:then>
                     <f:else>
-                        <div class="alert alert-info">Keine Einträge für diese Auswahl.</div>
+                        <div class="alert alert-info"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.knowledge.noEntries"/></div>
                     </f:else>
                 </f:if>
             </f:else>

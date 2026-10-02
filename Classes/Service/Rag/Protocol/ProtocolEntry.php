@@ -31,6 +31,8 @@ final class ProtocolEntry
         public readonly bool $escalated = false,
         public readonly int $crdate = 0,
         public readonly int $uid = 0,
+        /** web | mcp — see ChatProtocolRecorder::CHANNEL_* */
+        public readonly string $channel = 'web',
     ) {}
 
     /**
@@ -50,6 +52,7 @@ final class ProtocolEntry
             escalated: (bool)($row['escalated'] ?? false),
             crdate: (int)($row['crdate'] ?? 0),
             uid: (int)($row['uid'] ?? 0),
+            channel: (string)($row['channel'] ?? 'web'),
         );
     }
 
@@ -69,6 +72,7 @@ final class ProtocolEntry
             'cited_ids' => (string)json_encode($this->citedIds, JSON_UNESCAPED_UNICODE),
             'sources' => (string)json_encode($this->sources, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'escalated' => $this->escalated ? 1 : 0,
+            'channel' => mb_substr($this->channel, 0, 16),
         ];
     }
 

@@ -31,6 +31,7 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
  *   ?action=diagnose|repushEmbedder|pingRag → DiagnoseController
  *   ?action=knowledgeResources|runImporter|purgeKnowledgeResources → KnowledgeResourceController
  *   ?action=protocol|protocolDownload → ProtocolController (chat protocol)
+ *   ?action=mcpTokens|mcpTokenCreate|mcpTokenToggle|mcpTokenRevoke → McpTokenController
  */
 #[AsController]
 final class OverviewController
@@ -48,6 +49,7 @@ final class OverviewController
         private readonly RagTestController $ragTestController,
         private readonly AnalyticsController $analyticsController,
         private readonly ProtocolController $protocolController,
+        private readonly McpTokenController $mcpTokenController,
         private readonly DashboardController $dashboardController,
     ) {}
 
@@ -65,6 +67,7 @@ final class OverviewController
                 $this->ragTestController->handle($request, $action),
             'analytics' => $this->analyticsController->handle($request),
             'protocol', 'protocolDownload' => $this->protocolController->handle($request, $action),
+            'mcpTokens', 'mcpTokenCreate', 'mcpTokenToggle', 'mcpTokenRevoke' => $this->mcpTokenController->handle($request, $action),
             'dashboard' => $this->dashboardController->handle($request),
             default => $this->indexAction($request),
         };

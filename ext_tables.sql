@@ -179,6 +179,34 @@ CREATE TABLE tx_wsmeilisearch_knowledge_entry (
     tx_wsmeilisearch_boost TINYINT(1) UNSIGNED DEFAULT 3 NOT NULL
 );
 
+-- Access tokens of the MCP endpoint (/_ws_meilisearch/mcp), managed in the
+-- backend tab "MCP-Zugänge". Only the SHA-256 of a token is stored; the token
+-- itself is shown once on creation. Each access carries its scopes, the sites
+-- it may use and the backend user its writes run as.
+CREATE TABLE tx_wsmeilisearch_mcp_token (
+    uid             INT(11) UNSIGNED AUTO_INCREMENT NOT NULL,
+    crdate          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    tstamp          INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    deleted         SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+    hidden          SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
+    title           VARCHAR(255) DEFAULT '' NOT NULL,
+    token_hash      CHAR(64) DEFAULT '' NOT NULL,
+    -- First characters of the token, so an access can be recognised in the
+    -- list without the token being recoverable.
+    token_prefix    VARCHAR(16) DEFAULT '' NOT NULL,
+    -- Comma-separated McpClient::SCOPE_* values.
+    scopes          VARCHAR(255) DEFAULT '' NOT NULL,
+    -- Comma-separated site identifiers; empty = every site.
+    sites           VARCHAR(1024) DEFAULT '' NOT NULL,
+    be_user         INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    expires         INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    last_used       INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    created_by      INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+
+    PRIMARY KEY (uid),
+    UNIQUE KEY token_hash (token_hash)
+);
+
 -- Chat protocol: one row per finished RAG chat turn, grouped by the
 -- conversation id the chat hands to the visitor (e.g. as a contact-form
 -- parameter, so support can read what was already asked). Written by
@@ -203,6 +231,10 @@ CREATE TABLE tx_wsmeilisearch_rag_protocol (
     sources         MEDIUMTEXT,
     -- 1 when the "ask a human" card was shown under this turn.
     escalated       TINYINT(1) UNSIGNED DEFAULT 0 NOT NULL,
+    -- Where the turn came from: web (chat on the site) or mcp (an AI client
+    -- through the MCP endpoint) — so test questions of the site owner do not
+    -- distort the picture of what visitors ask.
+    channel         VARCHAR(16) DEFAULT 'web' NOT NULL,
 
     PRIMARY KEY (uid),
     KEY conversation (conversation_id, crdate),

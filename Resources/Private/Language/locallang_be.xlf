@@ -243,6 +243,501 @@
             <trans-unit id="knowledgeEntry.tx_wsmeilisearch_boost.description" resname="knowledgeEntry.tx_wsmeilisearch_boost.description">
                 <source>Keep it high so hand-written knowledge wins over imported documentation on the same topic.</source>
             </trans-unit>
+            <trans-unit id="be.flash.protocolNotFound" resname="be.flash.protocolNotFound">
+                <source>No protocol found for this id.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.mcpAdminOnly" resname="be.flash.mcpAdminOnly">
+                <source>Only administrators may manage MCP accesses.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.mcpNotFound" resname="be.flash.mcpNotFound">
+                <source>Access not found.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.mcpLocked" resname="be.flash.mcpLocked">
+                <source>Access locked.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.mcpUnlocked" resname="be.flash.mcpUnlocked">
+                <source>Access unlocked.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.mcpRevoked" resname="be.flash.mcpRevoked">
+                <source>Access revoked.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.title" resname="be.mcp.error.title">
+                <source>The title must not be empty.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.noScope" resname="be.mcp.error.noScope">
+                <source>Select at least one permission.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.unknownScope" resname="be.mcp.error.unknownScope">
+                <source>Unknown permission selected.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.unknownSite" resname="be.mcp.error.unknownSite">
+                <source>Unknown site selected.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.beUser" resname="be.mcp.error.beUser">
+                <source>The selected backend user does not exist or is disabled.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.writeNeedsUser" resname="be.mcp.error.writeNeedsUser">
+                <source>Write access requires a backend user.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.error.expires" resname="be.mcp.error.expires">
+                <source>The expiry date must have the format YYYY-MM-DD.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.beUserNone" resname="be.mcp.beUserNone">
+                <source>— none (read only) —</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.allSites" resname="be.mcp.allSites">
+                <source>all sites</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.ask" resname="be.mcp.scope.ask">
+                <source>Ask the chatbot</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.search" resname="be.mcp.scope.search">
+                <source>Search the index</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.knowledge.read" resname="be.mcp.scope.knowledge.read">
+                <source>Read knowledge</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.knowledge.write" resname="be.mcp.scope.knowledge.write">
+                <source>Create, change, delete knowledge</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.protocol.read" resname="be.mcp.scope.protocol.read">
+                <source>Read the chat protocol</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.title" resname="be.knowledge.title">
+                <source>Chatbot knowledge</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNoRead" resname="be.flash.knowledgeNoRead">
+                <source>You are not allowed to view knowledge entries.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNoCreate" resname="be.flash.knowledgeNoCreate">
+                <source>You are not allowed to create knowledge entries.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNoSite" resname="be.flash.knowledgeNoSite">
+                <source>No site you have access to was found.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNoEdit" resname="be.flash.knowledgeNoEdit">
+                <source>You are not allowed to edit knowledge entries.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNotFound" resname="be.flash.knowledgeNotFound">
+                <source>Entry not found or no permission.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeSaveError" resname="be.flash.knowledgeSaveError">
+                <source>Error while saving: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeHidden" resname="be.flash.knowledgeHidden">
+                <source>Entry hidden.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeShown" resname="be.flash.knowledgeShown">
+                <source>Entry shown.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeNoDelete" resname="be.flash.knowledgeNoDelete">
+                <source>You are not allowed to delete knowledge entries.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeDeleteError" resname="be.flash.knowledgeDeleteError">
+                <source>Error while deleting: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.knowledgeDeleted" resname="be.flash.knowledgeDeleted">
+                <source>Entry deleted.</source>
+            </trans-unit>
+            <trans-unit id="transcript.title" resname="transcript.title">
+                <source>Chat protocol</source>
+            </trans-unit>
+            <trans-unit id="transcript.conversation" resname="transcript.conversation">
+                <source>Conversation</source>
+            </trans-unit>
+            <trans-unit id="transcript.question" resname="transcript.question">
+                <source>Question</source>
+            </trans-unit>
+            <trans-unit id="transcript.answer" resname="transcript.answer">
+                <source>Answer</source>
+            </trans-unit>
+            <trans-unit id="transcript.status" resname="transcript.status">
+                <source>Status</source>
+            </trans-unit>
+            <trans-unit id="transcript.sources" resname="transcript.sources">
+                <source>Sources</source>
+            </trans-unit>
+            <trans-unit id="transcript.cited" resname="transcript.cited">
+                <source>cited</source>
+            </trans-unit>
+            <trans-unit id="transcript.escalated" resname="transcript.escalated">
+                <source>contact offered</source>
+            </trans-unit>
+            <trans-unit id="transcript.noAnswer" resname="transcript.noAnswer">
+                <source>(no answer)</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.heading" resname="be.protocol.heading">
+                <source>Meilisearch — Chat protocol</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.backToList" resname="be.protocol.backToList">
+                <source>← back to list</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.siteLabelWithValue" resname="be.protocol.siteLabelWithValue">
+                <source>Site: %s</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.downloadAsText" resname="be.protocol.downloadAsText">
+                <source>Download as text</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.okWithoutSources" resname="be.protocol.okWithoutSources">
+                <source>ok, without sources</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.ok" resname="be.protocol.ok">
+                <source>ok</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.contactOffer" resname="be.protocol.contactOffer">
+                <source>Contact offer</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.mcpBadgeTitle" resname="be.protocol.mcpBadgeTitle">
+                <source>Submitted via the MCP interface, not by a visitor</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.mcp" resname="be.protocol.mcp">
+                <source>MCP</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.addAsKnowledge" resname="be.protocol.addAsKnowledge">
+                <source>Add as knowledge</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.questionLabel" resname="be.protocol.questionLabel">
+                <source>Question:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.answerLabel" resname="be.protocol.answerLabel">
+                <source>Answer:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.noAnswer" resname="be.protocol.noAnswer">
+                <source>no answer</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.sourcesCount" resname="be.protocol.sourcesCount">
+                <source>Sources (%d)</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.cited" resname="be.protocol.cited">
+                <source>cited</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.conversationIdLabel" resname="be.protocol.conversationIdLabel">
+                <source>Conversation ID</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.conversationIdPlaceholder" resname="be.protocol.conversationIdPlaceholder">
+                <source>32-character conversation ID</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.searchLabel" resname="be.protocol.searchLabel">
+                <source>Search in questions/answers</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.siteLabel" resname="be.protocol.siteLabel">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.allSites" resname="be.protocol.allSites">
+                <source>— all —</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.period" resname="be.protocol.period">
+                <source>Time period</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.all" resname="be.protocol.all">
+                <source>all</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.days1" resname="be.protocol.days1">
+                <source>1 day</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.days7" resname="be.protocol.days7">
+                <source>7 days</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.days30" resname="be.protocol.days30">
+                <source>30 days</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.days90" resname="be.protocol.days90">
+                <source>90 days</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.onlyWithContactOffer" resname="be.protocol.onlyWithContactOffer">
+                <source>only with contact offer</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.onlyProblems" resname="be.protocol.onlyProblems">
+                <source>only problematic</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.filter" resname="be.protocol.filter">
+                <source>Filter</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.totalConversations" resname="be.protocol.totalConversations">
+                <source>%d conversations</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.lastActivity" resname="be.protocol.lastActivity">
+                <source>Last activity</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.firstQuestion" resname="be.protocol.firstQuestion">
+                <source>First question</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.turns" resname="be.protocol.turns">
+                <source>Turns</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.notes" resname="be.protocol.notes">
+                <source>Notes</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.problemsCount" resname="be.protocol.problemsCount">
+                <source>%d problematic</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.open" resname="be.protocol.open">
+                <source>Open</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.noConversations" resname="be.protocol.noConversations">
+                <source>No conversations for this selection.</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.previousPage" resname="be.protocol.previousPage">
+                <source>← back</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.pageOfPages" resname="be.protocol.pageOfPages">
+                <source>Page %d of %d</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.nextPage" resname="be.protocol.nextPage">
+                <source>next →</source>
+            </trans-unit>
+
+            <trans-unit id="be.protocol.intro" resname="be.protocol.intro">
+                <source>One row is stored per chat turn. The protocol contains the full wording of the visitors (personal data).</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.settingEnable" resname="be.protocol.settingEnable">
+                <source>Enable per site:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.settingRetention" resname="be.protocol.settingRetention">
+                <source>Retention in days:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.settingPrune" resname="be.protocol.settingPrune">
+                <source>Delete old turns (scheduler, daily):</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.noSiteEnabled" resname="be.protocol.noSiteEnabled">
+                <source>Not enabled on any site. Site setting:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.conversationHeading" resname="be.protocol.conversationHeading">
+                <source>Conversation</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.heading" resname="be.mcp.heading">
+                <source>Meilisearch — MCP access tokens</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.intro" resname="be.mcp.intro">
+                <source>Via the MCP interface, AI clients (Claude Code, Claude Desktop, the Claude API) can query the chat assistant, search the index, read the chat protocol and maintain the chatbot knowledge — depending on the access rights.
+                Create a separate access token for each client or person so that it can be blocked individually. The token is only displayed once.
+                Write operations run as the selected backend user and appear under that user’s name in the history.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.newTokenAlert" resname="be.mcp.newTokenAlert">
+                <source>New access token “%s” — copy the token now, it will not be shown again:</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.sites" resname="be.mcp.sites">
+                <source>Sites</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.site" resname="be.mcp.site">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.endpoint" resname="be.mcp.endpoint">
+                <source>Endpoint</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.status" resname="be.mcp.status">
+                <source>Status</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.active" resname="be.mcp.active">
+                <source>active</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.siteDisabled" resname="be.mcp.siteDisabled">
+                <source>deactivated — set %s</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.accessTokens" resname="be.mcp.accessTokens">
+                <source>Access tokens</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.title" resname="be.mcp.title">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.token" resname="be.mcp.token">
+                <source>Token</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.permissions" resname="be.mcp.permissions">
+                <source>Permissions</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.writesAs" resname="be.mcp.writesAs">
+                <source>Writes as</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.expiry" resname="be.mcp.expiry">
+                <source>Expiry</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.lastUsed" resname="be.mcp.lastUsed">
+                <source>Last used</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.actions" resname="be.mcp.actions">
+                <source>Actions</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.expired" resname="be.mcp.expired">
+                <source>expired</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.never" resname="be.mcp.never">
+                <source>never</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.locked" resname="be.mcp.locked">
+                <source>locked</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.unlock" resname="be.mcp.unlock">
+                <source>Unlock</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.lock" resname="be.mcp.lock">
+                <source>Lock</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.revokeTitle" resname="be.mcp.revokeTitle">
+                <source>Revoke access token?</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.revokeContent" resname="be.mcp.revokeContent">
+                <source>The token will no longer work afterwards. This cannot be undone.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.cancel" resname="be.mcp.cancel">
+                <source>Cancel</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.revoke" resname="be.mcp.revoke">
+                <source>Revoke</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.noTokens" resname="be.mcp.noTokens">
+                <source>No MCP access tokens have been created yet.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.createAccessToken" resname="be.mcp.createAccessToken">
+                <source>Create new access token</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.allSitesHint" resname="be.mcp.allSitesHint">
+                <source>No selection = all sites</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.writesAsBackendUser" resname="be.mcp.writesAsBackendUser">
+                <source>Writes as backend user</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.dedicatedUserHint" resname="be.mcp.dedicatedUserHint">
+                <source>Recommended: create a dedicated non-admin user who only has permissions on the tx_wsmeilisearch_knowledge_entry table.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.expiryDate" resname="be.mcp.expiryDate">
+                <source>Expiration date</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.dateFormatHint" resname="be.mcp.dateFormatHint">
+                <source>Optional, format YYYY-MM-DD.</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.createToken" resname="be.mcp.createToken">
+                <source>Create access token</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.overview" resname="be.tabnav.overview">
+                <source>Overview</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.dashboard" resname="be.tabnav.dashboard">
+                <source>Dashboard</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.testSearchAndRag" resname="be.tabnav.testSearchAndRag">
+                <source>Test search &amp; RAG</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.diagnostics" resname="be.tabnav.diagnostics">
+                <source>Diagnostics</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.knowledgeResources" resname="be.tabnav.knowledgeResources">
+                <source>Knowledge resources</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.ragTests" resname="be.tabnav.ragTests">
+                <source>RAG tests</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.analytics" resname="be.tabnav.analytics">
+                <source>Analytics</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.chatLog" resname="be.tabnav.chatLog">
+                <source>Chat protocol</source>
+            </trans-unit>
+            <trans-unit id="be.tabnav.mcpAccess" resname="be.tabnav.mcpAccess">
+                <source>MCP access</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.headline" resname="be.knowledge.headline">
+                <source>Chatbot knowledge</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.intro" resname="be.knowledge.intro">
+                <source>Entries are used by the chat assistant as knowledge sources (not shown as search hits or sources) and indexed when saved. Please write full sentences in the language of the entry; one topic per entry; in the “Alternative wordings” field, add synonyms and phrasings that customers use.</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.noSiteAccess" resname="be.knowledge.noSiteAccess">
+                <source>You do not have access to a site.</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.filter" resname="be.knowledge.filter">
+                <source>Filter</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.site" resname="be.knowledge.site">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.language" resname="be.knowledge.language">
+                <source>Language</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.search" resname="be.knowledge.search">
+                <source>Search</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.searchPlaceholder" resname="be.knowledge.searchPlaceholder">
+                <source>Title, content or alternative wordings</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.status" resname="be.knowledge.status">
+                <source>Status</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.all" resname="be.knowledge.all">
+                <source>all</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.visible" resname="be.knowledge.visible">
+                <source>visible</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.hidden" resname="be.knowledge.hidden">
+                <source>hidden</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.applyFilter" resname="be.knowledge.applyFilter">
+                <source>Filter</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.newEntry" resname="be.knowledge.newEntry">
+                <source>New entry</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.changed" resname="be.knowledge.changed">
+                <source>Changed</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.fromChat" resname="be.knowledge.fromChat">
+                <source>From chat</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.actions" resname="be.knowledge.actions">
+                <source>Actions</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.active" resname="be.knowledge.active">
+                <source>active</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.scheduled" resname="be.knowledge.scheduled">
+                <source>scheduled</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.edit" resname="be.knowledge.edit">
+                <source>Edit</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.show" resname="be.knowledge.show">
+                <source>Show</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.hide" resname="be.knowledge.hide">
+                <source>Hide</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.delete" resname="be.knowledge.delete">
+                <source>Delete</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.deleteConfirmTitle" resname="be.knowledge.deleteConfirmTitle">
+                <source>Delete entry?</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.deleteConfirmText" resname="be.knowledge.deleteConfirmText">
+                <source>“%s” will be deleted and removed from the search index.</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.cancel" resname="be.knowledge.cancel">
+                <source>Cancel</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.noEntries" resname="be.knowledge.noEntries">
+                <source>No entries for this selection.</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.maxEntriesShown" resname="be.knowledge.maxEntriesShown">
+                <source>A maximum of 500 entries is shown.</source>
+            </trans-unit>
+            <trans-unit id="be.knowledge.columnTitle" resname="be.knowledge.columnTitle">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.status.no_context" resname="be.protocol.status.no_context">
+                <source>no matching documents</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.status.failed" resname="be.protocol.status.failed">
+                <source>error</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.status.clarify" resname="be.protocol.status.clarify">
+                <source>asked back</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.status.aborted" resname="be.protocol.status.aborted">
+                <source>aborted by the visitor</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
+                <source>assistant disabled</source>
+            </trans-unit>
     </body>
     </file>
 </xliff>

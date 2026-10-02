@@ -24,6 +24,7 @@ read top-to-bottom and then either pasted into a site's
 | [`12-tika-ocr.md`](12-tika-ocr.md) | OCR for scanned PDFs and image files via the `apache/tika:*-full` image. |
 | [`13-sort-pagination.md`](13-sort-pagination.md) | Sort dropdown + Prev/Next pagination in the FE plugin. |
 | [`14-rag-escalation-protocol.md`](14-rag-escalation-protocol.md) | "Ask a human" card per language via `RagEscalationEvent`, chat protocol + backend tab, conversation id for contact forms, hand-written knowledge module. |
+| [`15-mcp-endpoint.md`](15-mcp-endpoint.md) | MCP endpoint for Claude & other AI clients: ask, search, chat protocol, knowledge CRUD; tokens, scopes, security model. |
 
 Every example is self-contained; pick one and ignore the rest if you
 already have the rest of the stack wired.

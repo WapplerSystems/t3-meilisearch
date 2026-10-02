@@ -23,6 +23,11 @@ services:
       - '../Classes/Service/Rag/Escalation/EscalationAction.php'
       - '../Classes/Service/Rag/Protocol/ProtocolEntry.php'
       - '../Classes/Service/Rag/Protocol/ProtocolFilter.php'
+      # MCP value objects, built per request.
+      - '../Classes/Mcp/McpClient.php'
+      - '../Classes/Mcp/McpContext.php'
+      - '../Classes/Mcp/McpToolException.php'
+      - '../Classes/Mcp/McpToolInterface.php'
       # Plain value object built by QueryClassifier (private constructor);
       # never injected.
       - '../Classes/Service/Rag/Clarification.php'
@@ -58,6 +63,8 @@ services:
       tags: ['ws_meilisearch.plugin_record_source']
     WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface:
       tags: ['ws_meilisearch.llm_provider']
+    WapplerSystems\Meilisearch\Mcp\McpToolInterface:
+      tags: ['ws_meilisearch.mcp_tool']
     WapplerSystems\Meilisearch\Service\Import\KnowledgeResourceSourceImporter:
       tags: ['ws_meilisearch.source_importer']
     WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientInterface:
@@ -149,3 +156,7 @@ services:
         channel: ws_meilisearch_extindex
       - name: messenger.middleware
         before: 'Symfony\Component\Messenger\Middleware\HandleMessageMiddleware'
+
+  WapplerSystems\Meilisearch\Mcp\McpServer:
+    arguments:
+      $tools: !tagged_iterator ws_meilisearch.mcp_tool

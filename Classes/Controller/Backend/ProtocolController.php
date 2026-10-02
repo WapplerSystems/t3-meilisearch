@@ -109,7 +109,7 @@ final class ProtocolController
 
         if ($conversationParam !== '') {
             $this->context->addFlash(
-                'Kein Protokoll zu dieser ID gefunden.',
+                $this->context->label('be.flash.protocolNotFound'),
                 ContextualFeedbackSeverity::WARNING
             );
         }
@@ -217,6 +217,7 @@ final class ProtocolController
                 'answerHtml' => CitationRenderer::render($entry->answer, $entry->sources),
                 'status' => $entry->status,
                 'escalated' => $entry->escalated,
+                'channel' => $entry->channel,
                 'isProblem' => in_array($entry->status, ProtocolFilter::PROBLEM_STATUSES, true)
                     || ($entry->status === 'ok' && $entry->citedIds === []),
                 'sources' => $sources,
@@ -246,24 +247,14 @@ final class ProtocolController
 
         if ($entries === []) {
             $this->context->addFlash(
-                'Kein Protokoll zu dieser ID gefunden.',
+                $this->context->label('be.flash.protocolNotFound'),
                 ContextualFeedbackSeverity::WARNING
             );
 
             return $this->context->redirect('protocol');
         }
 
-        $labels = [
-            'title' => 'Chat-Protokoll',
-            'conversation' => 'Gespräch',
-            'question' => 'Frage',
-            'answer' => 'Antwort',
-            'status' => 'Status',
-            'sources' => 'Quellen',
-            'cited' => 'zitiert',
-            'escalated' => 'Kontaktangebot angezeigt',
-            'noAnswer' => '(keine Antwort)',
-        ];
+        $labels = ChatProtocolTranscript::labels($GLOBALS['LANG']);
 
         $transcript = $this->transcript->toText($entries, $labels);
 

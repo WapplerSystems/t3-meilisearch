@@ -1,0 +1,191 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.heading"/></h1>
+    <f:variable name="active" value="mcp"/>
+    <f:render partial="Backend/TabNav" arguments="{_all}" />
+
+    <p class="text-muted">
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.intro"/>
+    </p>
+
+    <f:if condition="{newToken}">
+        <f:then>
+            <div class="alert alert-success">
+                <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.newTokenAlert" arguments="{0: newTokenTitle}"/></strong>
+                <pre class="user-select-all">{newToken}</pre>
+                <f:comment>Claude-Code-Setup pro Site mit MCP enabled</f:comment>
+                <f:for each="{sites}" as="site">
+                    <f:if condition="{site.mcpEnabled}">
+                        <pre>claude mcp add --transport http {site.identifier} {site.endpoint} --header "Authorization: Bearer {newToken}"</pre>
+                    </f:if>
+                </f:for>
+            </div>
+        </f:then>
+    </f:if>
+
+    <h2><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.sites"/></h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.site"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.endpoint"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.status"/></th>
+            </tr>
+        </thead>
+        <tbody>
+            <f:for each="{sites}" as="site">
+                <tr>
+                    <td>{site.title}</td>
+                    <td><code>{site.endpoint}</code></td>
+                    <td>
+                        <f:if condition="{site.mcpEnabled}">
+                            <f:then><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.active"/></span></f:then>
+                            <f:else><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.siteDisabled" arguments="{0: 'meilisearch.mcp.enabled'}"/></span></f:else>
+                        </f:if>
+                    </td>
+                </tr>
+            </f:for>
+        </tbody>
+    </table>
+
+    <h2><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.accessTokens"/></h2>
+    <f:if condition="{tokens}">
+        <f:then>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.title"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.token"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.permissions"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.sites"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.writesAs"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.expiry"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.lastUsed"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.status"/></th>
+                        <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.actions"/></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <f:for each="{tokens}" as="token">
+                        <tr>
+                            <td>{token.title}</td>
+                            <td><code>{token.tokenPrefix}…</code></td>
+                            <td>
+                                <f:for each="{token.scopeBadges}" as="badge">
+                                    <span class="badge bg-info me-1">{badge.label}</span>
+                                </f:for>
+                            </td>
+                            <td>{token.sitesLabel}</td>
+                            <td>
+                                <f:if condition="{token.beUserName}">
+                                    <f:then>{token.beUserName}</f:then>
+                                    <f:else>—</f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <f:if condition="{token.expires} > 0">
+                                    <f:then>
+                                        <f:format.date format="d.m.Y H:i">{token.expires}</f:format.date>
+                                        <f:if condition="{token.expired}">
+                                            <f:then><span class="badge bg-danger"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.expired"/></span></f:then>
+                                        </f:if>
+                                    </f:then>
+                                    <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.never"/></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <f:if condition="{token.lastUsed} > 0">
+                                    <f:then><f:format.date format="d.m.Y H:i">{token.lastUsed}</f:format.date></f:then>
+                                    <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.never"/></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <f:if condition="{token.hidden}">
+                                    <f:then><span class="badge bg-warning text-dark"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.locked"/></span></f:then>
+                                    <f:else><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.active"/></span></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <form action="{toggleUrl}" method="post" class="d-inline">
+                                    <input type="hidden" name="uid" value="{token.uid}" />
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                        <f:if condition="{token.hidden}">
+                                            <f:then><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.unlock"/></f:then>
+                                            <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.lock"/></f:else>
+                                        </f:if>
+                                    </button>
+                                </form>
+                                <form action="{revokeUrl}" method="post" class="d-inline">
+                                    <input type="hidden" name="uid" value="{token.uid}" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm t3js-modal-trigger"
+                                            data-title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.revokeTitle')}"
+                                            data-content="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.revokeContent')}"
+                                            data-severity="warning"
+                                            data-button-close-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.cancel')}"
+                                            data-button-ok-text="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.revoke')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.revoke"/></button>
+                                </form>
+                            </td>
+                        </tr>
+                    </f:for>
+                </tbody>
+            </table>
+        </f:then>
+        <f:else>
+            <div class="alert alert-info"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.noTokens"/></div>
+        </f:else>
+    </f:if>
+
+    <h2><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.createAccessToken"/></h2>
+    <div class="card">
+        <div class="card-body">
+            <form action="{createUrl}" method="post" class="mb-0" name="mcpTokenCreate">
+                <div class="mb-3">
+                    <label class="form-label" for="mcp-title"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.title"/></label>
+                    <input type="text" id="mcp-title" name="title" value="{formValues.title}" required="required" maxlength="255" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.permissions"/></label>
+                    <f:for each="{scopeOptions}" as="scope">
+                        <div class="form-check">
+                            <input type="checkbox" name="scopes[]" value="{scope.value}" class="form-check-input" id="scope-{scope.value}" {f:if(condition: scope.checked, then: 'checked="checked"')} />
+                            <label class="form-check-label" for="scope-{scope.value}">{scope.label}</label>
+                        </div>
+                    </f:for>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.sites"/></label>
+                    <f:for each="{siteOptions}" as="site">
+                        <div class="form-check">
+                            <input type="checkbox" name="sites[]" value="{site.identifier}" class="form-check-input" id="site-{site.identifier}" {f:if(condition: site.checked, then: 'checked="checked"')} />
+                            <label class="form-check-label" for="site-{site.identifier}">{site.title}</label>
+                        </div>
+                    </f:for>
+                    <div class="form-text"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.allSitesHint"/></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="be_user"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.writesAsBackendUser"/></label>
+                    <select class="form-select" id="be_user" name="be_user">
+                        <f:for each="{beUserOptions}" as="user">
+                            <f:if condition="{user.selected}">
+                                <f:then><option value="{user.uid}" selected="selected">{user.label}</option></f:then>
+                                <f:else><option value="{user.uid}">{user.label}</option></f:else>
+                            </f:if>
+                        </f:for>
+                    </select>
+                    <div class="form-text"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.dedicatedUserHint"/></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="expires"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.expiryDate"/></label>
+                    <input type="date" id="expires" name="expires" value="{formValues.expires}" class="form-control" />
+                    <div class="form-text"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.dateFormatHint"/></div>
+                </div>
+                <button type="submit" class="btn btn-primary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.mcp.createToken"/></button>
+            </form>
+        </div>
+    </div>
+</f:section>
+</html>

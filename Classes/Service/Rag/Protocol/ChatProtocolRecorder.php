@@ -29,6 +29,11 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
     /** Status for a streamed answer the visitor cancelled before it finished. */
     public const STATUS_ABORTED = 'aborted';
 
+    /** A visitor in the chat on the site. */
+    public const CHANNEL_WEB = 'web';
+    /** An AI client through the MCP endpoint. */
+    public const CHANNEL_MCP = 'mcp';
+
     public function __construct(
         private readonly ChatProtocolRepository $repository,
     ) {}
@@ -53,6 +58,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
         array $citedIds,
         array $hits,
         bool $escalated,
+        string $channel = self::CHANNEL_WEB,
     ): void {
         if (!$this->isEnabled($site) || preg_match(Conversation::ID_PATTERN, $conversationId) !== 1) {
             return;
@@ -86,6 +92,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
                 citedIds: array_values(array_map('strval', $citedIds)),
                 sources: $sources,
                 escalated: $escalated,
+                channel: $channel,
             ));
         } catch (\Throwable $e) {
             // A protocol that cannot be written must never cost the visitor

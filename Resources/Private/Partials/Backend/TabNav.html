@@ -1,28 +1,31 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'index\'', then: 'active')}" href="{indexUrl}">Overview</a>
+        <a class="nav-link {f:if(condition: '{active} == \'index\'', then: 'active')}" href="{indexUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.overview"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'dashboard\'', then: 'active')}" href="{dashboardUrl}">Dashboard</a>
+        <a class="nav-link {f:if(condition: '{active} == \'dashboard\'', then: 'active')}" href="{dashboardUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.dashboard"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'test\'', then: 'active')}" href="{testUrl}">Test search &amp; RAG</a>
+        <a class="nav-link {f:if(condition: '{active} == \'test\'', then: 'active')}" href="{testUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.testSearchAndRag"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'diagnose\'', then: 'active')}" href="{diagnoseUrl}">Diagnostics</a>
+        <a class="nav-link {f:if(condition: '{active} == \'diagnose\'', then: 'active')}" href="{diagnoseUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.diagnostics"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'knowledgeResources\'', then: 'active')}" href="{knowledgeResourcesUrl}">Wissens-Resourcen</a>
+        <a class="nav-link {f:if(condition: '{active} == \'knowledgeResources\'', then: 'active')}" href="{knowledgeResourcesUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.knowledgeResources"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'ragtests\'', then: 'active')}" href="{ragTestsUrl}">RAG tests</a>
+        <a class="nav-link {f:if(condition: '{active} == \'ragtests\'', then: 'active')}" href="{ragTestsUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.ragTests"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'analytics\'', then: 'active')}" href="{analyticsUrl}">Analytics</a>
+        <a class="nav-link {f:if(condition: '{active} == \'analytics\'', then: 'active')}" href="{analyticsUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.analytics"/></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {f:if(condition: '{active} == \'protocol\'', then: 'active')}" href="{protocolUrl}">Chat-Protokoll</a>
+        <a class="nav-link {f:if(condition: '{active} == \'protocol\'', then: 'active')}" href="{protocolUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.chatLog"/></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {f:if(condition: '{active} == \'mcp\'', then: 'active')}" href="{mcpUrl}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.tabnav.mcpAccess"/></a>
     </li>
 </ul>
 </html>

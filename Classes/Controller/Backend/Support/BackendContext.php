@@ -35,6 +35,8 @@ final class BackendContext
      */
     private const ROUTE_NAME = 'system_wsmeilisearch';
 
+    private const LLL = 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:';
+
     public function __construct(
         private readonly BackendUriBuilder $backendUriBuilder,
         private readonly FlashMessageService $flashMessageService,
@@ -81,10 +83,26 @@ final class BackendContext
             'ragTestsUrl' => $this->route('ragtests'),
             'analyticsUrl' => $this->route('analytics'),
             'protocolUrl' => $this->route('protocol'),
+            'mcpUrl' => $this->route('mcpTokens'),
             'token' => $this->formProtectionFactory
                 ->createForType('backend')
                 ->generateToken('route', self::ROUTE_NAME),
         ];
+    }
+
+    /**
+     * A label of locallang_be.xlf in the backend user's language, with
+     * sprintf-style arguments. Falls back to the key, so a missing label
+     * shows up as such instead of as an empty message.
+     */
+    public function label(string $key, mixed ...$arguments): string
+    {
+        $text = (string)($GLOBALS['LANG']?->sL(self::LLL . $key) ?? '');
+        if ($text === '') {
+            return $key;
+        }
+
+        return $arguments === [] ? $text : vsprintf($text, $arguments);
     }
 
     public function addFlash(string $message, ContextualFeedbackSeverity $severity = ContextualFeedbackSeverity::OK): void

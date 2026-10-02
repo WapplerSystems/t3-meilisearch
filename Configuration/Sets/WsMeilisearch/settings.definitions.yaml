@@ -172,6 +172,13 @@ settings:
     type: int
     default: 90
 
+  # --- MCP endpoint -------------------------------------------------------
+  meilisearch.mcp.enabled:
+    label: 'MCP endpoint'
+    description: 'When true, <site base>/_ws_meilisearch/mcp answers MCP clients (Claude Code, Claude Desktop, the Claude API MCP connector) with tools to ask the assistant, search the index, read the chat protocol and maintain hand-written knowledge. Every request needs a bearer token from the backend tab "MCP-Zugänge"; the token decides the tools and sites. Default: disabled.'
+    type: bool
+    default: false
+
   # --- RAG floating chat widget ----------------------------------------
   # When enabled, a bubble appears bottom-right on every FE page that
   # is rendered by this site's TypoScript root. Click → slide-up panel

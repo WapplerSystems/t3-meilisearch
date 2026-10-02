@@ -69,14 +69,14 @@ final class KnowledgeEntryController
     private function listAction(ServerRequestInterface $request, array $params): ResponseInterface
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
-        $moduleTemplate->setTitle('Chatbot-Wissen');
+        $moduleTemplate->setTitle($this->label('be.knowledge.title'));
 
         $canSelect = $this->hasTableSelectPermission();
         $canModify = $this->hasTableModifyPermission();
 
         if (!$canSelect) {
             $this->addFlash(
-                'Sie haben keine Berechtigung, Wissenseinträge zu sehen.',
+                $this->label('be.flash.knowledgeNoRead'),
                 ContextualFeedbackSeverity::ERROR
             );
         }
@@ -294,7 +294,7 @@ final class KnowledgeEntryController
     {
         if (!$this->hasTableModifyPermission()) {
             $this->addFlash(
-                'Sie haben keine Berechtigung, Wissenseinträge zu erstellen.',
+                $this->label('be.flash.knowledgeNoCreate'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -303,7 +303,7 @@ final class KnowledgeEntryController
 
         $site = $this->selectedSiteFromParams($params);
         if ($site === null) {
-            $this->addFlash('Keine Site mit Zugriff gefunden.', ContextualFeedbackSeverity::ERROR);
+            $this->addFlash($this->label('be.flash.knowledgeNoSite'), ContextualFeedbackSeverity::ERROR);
 
             return new RedirectResponse($this->listUrl());
         }
@@ -356,7 +356,7 @@ final class KnowledgeEntryController
     {
         if (!$this->hasTableModifyPermission()) {
             $this->addFlash(
-                'Sie haben keine Berechtigung, Wissenseinträge zu bearbeiten.',
+                $this->label('be.flash.knowledgeNoEdit'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -369,7 +369,7 @@ final class KnowledgeEntryController
 
         if ($row === null || $site === null) {
             $this->addFlash(
-                'Eintrag nicht gefunden oder keine Berechtigung.',
+                $this->label('be.flash.knowledgeNotFound'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -390,7 +390,7 @@ final class KnowledgeEntryController
     {
         if (!$this->hasTableModifyPermission()) {
             $this->addFlash(
-                'Sie haben keine Berechtigung, Wissenseinträge zu bearbeiten.',
+                $this->label('be.flash.knowledgeNoEdit'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -403,7 +403,7 @@ final class KnowledgeEntryController
 
         if ($row === null || $site === null) {
             $this->addFlash(
-                'Eintrag nicht gefunden oder keine Berechtigung.',
+                $this->label('be.flash.knowledgeNotFound'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -424,12 +424,12 @@ final class KnowledgeEntryController
 
         if ($dataHandler->errorLog !== []) {
             $this->addFlash(
-                'Fehler beim Speichern: ' . implode(' ', $dataHandler->errorLog),
+                $this->label('be.flash.knowledgeSaveError', implode(' ', $dataHandler->errorLog)),
                 ContextualFeedbackSeverity::ERROR
             );
         } else {
             $this->addFlash(
-                $newHidden ? 'Eintrag ausgeblendet.' : 'Eintrag eingeblendet.',
+                $this->label($newHidden ? 'be.flash.knowledgeHidden' : 'be.flash.knowledgeShown'),
                 ContextualFeedbackSeverity::OK
             );
         }
@@ -443,7 +443,7 @@ final class KnowledgeEntryController
     {
         if (!$this->hasTableModifyPermission()) {
             $this->addFlash(
-                'Sie haben keine Berechtigung, Wissenseinträge zu löschen.',
+                $this->label('be.flash.knowledgeNoDelete'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -456,7 +456,7 @@ final class KnowledgeEntryController
 
         if ($row === null || $site === null) {
             $this->addFlash(
-                'Eintrag nicht gefunden oder keine Berechtigung.',
+                $this->label('be.flash.knowledgeNotFound'),
                 ContextualFeedbackSeverity::ERROR
             );
 
@@ -472,11 +472,11 @@ final class KnowledgeEntryController
 
         if ($dataHandler->errorLog !== []) {
             $this->addFlash(
-                'Fehler beim Löschen: ' . implode(' ', $dataHandler->errorLog),
+                $this->label('be.flash.knowledgeDeleteError', implode(' ', $dataHandler->errorLog)),
                 ContextualFeedbackSeverity::ERROR
             );
         } else {
-            $this->addFlash('Eintrag gelöscht.', ContextualFeedbackSeverity::OK);
+            $this->addFlash($this->label('be.flash.knowledgeDeleted'), ContextualFeedbackSeverity::OK);
         }
 
         $returnUrl = $this->sanitizeReturnUrl($params['returnUrl'] ?? '', $site->getIdentifier());
@@ -610,5 +610,15 @@ final class KnowledgeEntryController
     {
         $queue = $this->flashMessageService->getMessageQueueByIdentifier();
         $queue->addMessage(new FlashMessage($message, '', $severity, true));
+    }
+
+    private function label(string $key, mixed ...$arguments): string
+    {
+        $text = (string)($GLOBALS['LANG']?->sL('LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:' . $key) ?? '');
+        if ($text === '') {
+            return $key;
+        }
+
+        return $arguments === [] ? $text : vsprintf($text, $arguments);
     }
 }
