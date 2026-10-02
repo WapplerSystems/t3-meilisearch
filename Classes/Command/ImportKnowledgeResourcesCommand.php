@@ -82,7 +82,7 @@ final class ImportKnowledgeResourcesCommand extends Command
 
         $config = $this->collectConfig($input);
 
-        $io->section(sprintf('Import via "%s"', $importer->label()));
+        $io->section(sprintf('Import via "%s"', $this->text($importer->label())));
 
         $progressBar = null;
         $onProgress = function (int $current, int $total, string $marker) use (&$progressBar, $io): void {
@@ -149,8 +149,8 @@ final class ImportKnowledgeResourcesCommand extends Command
     private function printImporters(SymfonyStyle $io): void
     {
         foreach ($this->registry->all() as $importer) {
-            $io->section($importer->name() . ' — ' . $importer->label());
-            $io->writeln($importer->description());
+            $io->section($importer->name() . ' — ' . $this->text($importer->label()));
+            $io->writeln($this->text($importer->description()));
             $rows = [];
             foreach ($importer->describeFields() as $field) {
                 $rows[] = [
@@ -158,10 +158,25 @@ final class ImportKnowledgeResourcesCommand extends Command
                     $field['type'],
                     !empty($field['required']) ? 'yes' : 'no',
                     isset($field['default']) ? (is_scalar($field['default']) ? (string)$field['default'] : '…') : '',
-                    $field['help'] ?? '',
+                    $this->text((string)($field['help'] ?? '')),
                 ];
             }
             $io->table(['name', 'type', 'required', 'default', 'help'], $rows);
         }
+    }
+
+    /**
+     * Importer labels may be LLL references (they are shared with the backend
+     * form); the console shows them in English.
+     */
+    private function text(string $text): string
+    {
+        if (!str_starts_with($text, 'LLL:')) {
+            return $text;
+        }
+        $GLOBALS['LANG'] ??= \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Localization\LanguageServiceFactory::class)->create('default');
+        $translated = (string)$GLOBALS['LANG']->sL($text);
+
+        return $translated !== '' ? $translated : $text;
     }
 }

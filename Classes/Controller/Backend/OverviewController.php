@@ -106,20 +106,20 @@ final class OverviewController
         try {
             $site = $this->siteFinder->getSiteByIdentifier($siteId);
         } catch (\Throwable) {
-            $this->context->addFlash('Unknown site: ' . $siteId, ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.unknownSite', $siteId), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect();
         }
 
         try {
             if (!$this->indexerService->ensureSchema($site, $rebuild)) {
-                $this->context->addFlash(sprintf('Site "%s" is not configured for Meilisearch.', $siteId), ContextualFeedbackSeverity::WARNING);
+                $this->context->addFlash($this->context->label('be.flash.siteNotConfigured', $siteId), ContextualFeedbackSeverity::WARNING);
                 return $this->context->redirect();
             }
             $count = $this->indexerService->indexAll($site);
             $this->metadataProvider->invalidate($site);
-            $this->context->addFlash(sprintf('Reindexed %d document(s) for site "%s".', $count, $siteId), ContextualFeedbackSeverity::OK);
+            $this->context->addFlash($this->context->label('be.flash.reindexed', $count, $siteId), ContextualFeedbackSeverity::OK);
         } catch (\Throwable $e) {
-            $this->context->addFlash('Reindex failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.reindexFailed', $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
         return $this->context->redirect();
     }

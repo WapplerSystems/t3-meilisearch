@@ -80,7 +80,7 @@ final class DiagnoseController
         try {
             $site = $this->siteFinder->getSiteByIdentifier($siteId);
         } catch (\Throwable) {
-            $this->context->addFlash('Unknown site: ' . $siteId, ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.unknownSite', $siteId), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('diagnose');
         }
         try {
@@ -97,9 +97,9 @@ final class DiagnoseController
                 'skipped'    => ContextualFeedbackSeverity::WARNING,
                 default      => ContextualFeedbackSeverity::INFO,
             };
-            $this->context->addFlash(sprintf('Embedder push for "%s": %s', $siteId, $result), $severity);
+            $this->context->addFlash($this->context->label('be.flash.embedderPush', $siteId, $result), $severity);
         } catch (\Throwable $e) {
-            $this->context->addFlash('Embedder push failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.embedderPushFailed', $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
         return $this->context->redirect('diagnose');
     }
@@ -116,19 +116,19 @@ final class DiagnoseController
         try {
             $site = $this->siteFinder->getSiteByIdentifier($siteId);
         } catch (\Throwable) {
-            $this->context->addFlash('Unknown site: ' . $siteId, ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.unknownSite', $siteId), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('diagnose');
         }
 
         $settings = $site->getSettings();
         $providerName = trim((string)$settings->get('meilisearch.rag.provider', ''));
         if ($providerName === '') {
-            $this->context->addFlash(sprintf('Site "%s" has no RAG provider configured.', $siteId), ContextualFeedbackSeverity::WARNING);
+            $this->context->addFlash($this->context->label('be.flash.ragNoProvider', $siteId), ContextualFeedbackSeverity::WARNING);
             return $this->context->redirect('diagnose');
         }
         $provider = $this->providerRegistry->get($providerName);
         if ($provider === null) {
-            $this->context->addFlash(sprintf('Provider "%s" not registered.', $providerName), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.providerNotRegistered', $providerName), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('diagnose');
         }
 
@@ -158,13 +158,13 @@ final class DiagnoseController
             $elapsedMs = (int)round((microtime(true) - $start) * 1000);
             $excerpt = trim(mb_substr($answer, 0, 80));
             $this->context->addFlash(
-                sprintf('RAG ping for "%s" succeeded in %d ms — reply: "%s"', $siteId, $elapsedMs, $excerpt),
+                $this->context->label('be.flash.ragPingSuccess', $siteId, $elapsedMs, $excerpt),
                 ContextualFeedbackSeverity::OK,
             );
         } catch (LlmException $e) {
             $elapsedMs = (int)round((microtime(true) - $start) * 1000);
             $this->context->addFlash(
-                sprintf('RAG ping for "%s" failed after %d ms: %s', $siteId, $elapsedMs, $e->getMessage()),
+                $this->context->label('be.flash.ragPingFailed', $siteId, $elapsedMs, $e->getMessage()),
                 ContextualFeedbackSeverity::ERROR,
             );
         }

@@ -159,7 +159,7 @@ final class KnowledgeResourceController
         $body = (array)$request->getParsedBody();
         $slug = trim((string)($body['_importer'] ?? ''));
         if ($slug === '' || !$this->importerRegistry->has($slug)) {
-            $this->context->addFlash(sprintf('Unknown importer "%s".', $slug), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.unknownImporter', $slug), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('knowledgeResources');
         }
         $importer = $this->importerRegistry->get($slug);
@@ -167,15 +167,15 @@ final class KnowledgeResourceController
         try {
             $config = $this->buildImporterConfig($importer, $body, $request->getUploadedFiles());
         } catch (\Throwable $e) {
-            $this->context->addFlash(sprintf('%s: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.importerConfigError', $this->context->resolve($importer->label()), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('knowledgeResources');
         }
 
         try {
             $result = $importer->import($config);
-            $message = sprintf(
-                '%s: imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.',
-                $importer->label(),
+            $message = $this->context->label(
+                'be.flash.importerResult',
+                $this->context->resolve($importer->label()),
                 $result->imported,
                 $result->skipped,
                 $result->mediaCopied,
@@ -184,14 +184,14 @@ final class KnowledgeResourceController
             // operator sees what broke without digging into the log.
             $errors = (array)($result->extras['errors'] ?? []);
             if ($errors !== []) {
-                $message .= ' First errors: ' . implode(' | ', array_slice($errors, 0, 3));
+                $message .= ' ' . $this->context->label('be.flash.importerFirstErrors', implode(' | ', array_slice($errors, 0, 3)));
             }
             $severity = $result->imported === 0 || $errors !== [] || $result->skipped > 0
                 ? ContextualFeedbackSeverity::WARNING
                 : ContextualFeedbackSeverity::OK;
             $this->context->addFlash($message, $severity);
         } catch (\Throwable $e) {
-            $this->context->addFlash(sprintf('%s failed: %s', $importer->label(), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.importerFailed', $this->context->resolve($importer->label()), $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
         return $this->context->redirect('knowledgeResources');
     }
@@ -226,7 +226,7 @@ final class KnowledgeResourceController
                 if ($upload instanceof UploadedFileInterface && $upload->getError() !== UPLOAD_ERR_NO_FILE) {
                     $config[$name] = $upload;
                 } elseif ($required) {
-                    throw new \RuntimeException(sprintf('"%s" is required.', $label));
+                    throw new \RuntimeException($this->context->label('be.flash.fieldRequired', $this->context->resolve($label)));
                 }
                 continue;
             }
@@ -248,7 +248,7 @@ final class KnowledgeResourceController
                 $value = trim($value);
             }
             if ($required && ($value === '' || $value === null)) {
-                throw new \RuntimeException(sprintf('"%s" is required.', $label));
+                throw new \RuntimeException($this->context->label('be.flash.fieldRequired', $this->context->resolve($label)));
             }
             $config[$name] = $value;
         }
@@ -263,22 +263,22 @@ final class KnowledgeResourceController
         $body = (array)$request->getParsedBody();
         $languageId = (int)($body['language'] ?? -1);
         if ($languageId < 0) {
-            $this->context->addFlash('Language is required.', ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.languageRequired'), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('knowledgeResources');
         }
         $confirmed = isset($body['confirm']) && (string)$body['confirm'] === '1';
         if (!$confirmed) {
-            $this->context->addFlash('Purge skipped — confirmation checkbox was not ticked.', ContextualFeedbackSeverity::WARNING);
+            $this->context->addFlash($this->context->label('be.flash.purgeSkipped'), ContextualFeedbackSeverity::WARNING);
             return $this->context->redirect('knowledgeResources');
         }
         try {
             $deleted = $this->helpDocRepository->purgeLanguage($languageId);
             $this->context->addFlash(
-                sprintf('Purged %d knowledge resource row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.', $deleted, $languageId),
+                $this->context->label('be.flash.purged', $deleted, $languageId),
                 ContextualFeedbackSeverity::OK,
             );
         } catch (\Throwable $e) {
-            $this->context->addFlash('Purge failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.purgeFailed', $e->getMessage()), ContextualFeedbackSeverity::ERROR);
         }
         return $this->context->redirect('knowledgeResources');
     }

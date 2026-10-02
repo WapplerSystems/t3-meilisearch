@@ -4,40 +4,37 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Analytics</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.heading" /></h1>
     <f:variable name="active" value="analytics"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="text-muted">
-        Aggregierte FE-Suchanfragen aus <code>tx_wsmeilisearch_search_log</code>.
-        Nur opt-in pro Site via <code>meilisearch.analytics.enabled = true</code>.
-        Es werden ausschließlich {Query, Trefferzahl, Site, Sprache, Quelle, Zeitstempel} gespeichert — keine IPs, keine User-IDs.
+        <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.intro"/></f:format.raw>
     </p>
 
     <f:if condition="!{analyticsEnabled}">
         <div class="alert alert-warning">
-            Analytics ist aktuell auf keiner Site aktiviert. Setze <code>meilisearch.analytics.enabled: true</code> im Site-Setting,
-            damit zukünftige Such-Aufrufe protokolliert werden.
+            <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.notEnabled"/></f:format.raw>
         </div>
     </f:if>
 
-    <!-- ============== FILTER BAR ============== -->
+    <f:comment> ============== FILTER BAR ============== </f:comment>
     <div class="card mb-4">
         <div class="card-body">
             <form action="{baseUrl}" method="get" class="d-flex align-items-center gap-3 flex-wrap">
                 <input type="hidden" name="route" value="" />
-                <label class="m-0 fw-semibold">Zeitraum:</label>
+                <label class="m-0 fw-semibold"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.timePeriod" /></label>
                 <div class="btn-group btn-group-sm" role="group">
                     <f:for each="{0:1, 1:7, 2:30, 3:90}" as="d">
                         <button type="submit" name="days" value="{d}"
                                 class="btn {f:if(condition: '{windowDays} == {d}', then: 'btn-primary', else: 'btn-outline-primary')}">
-                            {d} Tag(e)
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.daysButton" arguments="{0: d}" />
                         </button>
                     </f:for>
                 </div>
-                <label class="m-0 fw-semibold ms-3">Site:</label>
+                <label class="m-0 fw-semibold ms-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.site" /></label>
                 <select name="site" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
-                    <option value="">— alle —</option>
+                    <option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.allSites" /></option>
                     <f:for each="{availableSites}" as="s">
                         <option value="{s}" {f:if(condition: '{siteFilter} == {s}', then: 'selected="selected"')}>{s}</option>
                     </f:for>
@@ -47,12 +44,12 @@
         </div>
     </div>
 
-    <!-- ============== TOTALS ============== -->
+    <f:comment> ============== TOTALS ============== </f:comment>
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Suchanfragen ({windowDays}d)</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.totalSearches" arguments="{0: windowDays}" /></div>
                     <div class="display-6">{totals.rows}</div>
                 </div>
             </div>
@@ -60,7 +57,7 @@
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Unterschiedliche Queries</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.distinctQueries" /></div>
                     <div class="display-6">{totals.distinctQueries}</div>
                 </div>
             </div>
@@ -68,24 +65,24 @@
         <div class="col-md-4">
             <div class="card h-100 {f:if(condition: '{totals.zeroResultRows} > 0', then: 'border-warning')}">
                 <div class="card-body">
-                    <div class="text-muted small">Davon ohne Treffer</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.withoutHits" /></div>
                     <div class="display-6 {f:if(condition: '{totals.zeroResultRows} > 0', then: 'text-warning')}">{totals.zeroResultRows}</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ============== TOP QUERIES + ZERO-RESULTS ============== -->
+    <f:comment> ============== TOP QUERIES + ZERO-RESULTS ============== </f:comment>
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="card h-100">
-                <div class="card-header"><strong>Top-Queries</strong> <small class="text-muted">(häufigste, Top 20)</small></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.topQueries" /></strong> <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.topQueriesHint" /></small></div>
                 <div class="card-body p-0">
                     <f:if condition="{topQueries}">
                         <f:then>
                             <table class="table table-sm m-0">
                                 <thead>
-                                    <tr><th>Query</th><th class="text-end">Hits</th><th class="text-end">Ø Treffer</th></tr>
+                                    <tr><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.query" /></th><th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.hits" /></th><th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.avgHits" /></th></tr>
                                 </thead>
                                 <tbody>
                                     <f:for each="{topQueries}" as="q">
@@ -99,7 +96,7 @@
                             </table>
                         </f:then>
                         <f:else>
-                            <div class="p-3 text-muted small">Keine Daten im gewählten Zeitraum.</div>
+                            <div class="p-3 text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.noData" /></div>
                         </f:else>
                     </f:if>
                 </div>
@@ -108,15 +105,15 @@
         <div class="col-md-6">
             <div class="card h-100 {f:if(condition: '{zeroResultQueries}', then: 'border-warning')}">
                 <div class="card-header">
-                    <strong>Zero-Result-Queries</strong>
-                    <small class="text-muted">(Top 20 — Kandidaten für Synonyme / Content)</small>
+                    <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.zeroResultQueries" /></strong>
+                    <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.zeroResultQueriesHint" /></small>
                 </div>
                 <div class="card-body p-0">
                     <f:if condition="{zeroResultQueries}">
                         <f:then>
                             <table class="table table-sm m-0">
                                 <thead>
-                                    <tr><th>Query</th><th class="text-end">Hits</th></tr>
+                                    <tr><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.query" /></th><th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.hits" /></th></tr>
                                 </thead>
                                 <tbody>
                                     <f:for each="{zeroResultQueries}" as="q">
@@ -129,7 +126,7 @@
                             </table>
                         </f:then>
                         <f:else>
-                            <div class="p-3 text-muted small">Keine Queries ohne Treffer — alles wird gefunden.</div>
+                            <div class="p-3 text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.noZeroResultQueries" /></div>
                         </f:else>
                     </f:if>
                 </div>
@@ -137,11 +134,11 @@
         </div>
     </div>
 
-    <!-- ============== SOURCE / HYBRID BREAKDOWN ============== -->
+    <f:comment> ============== SOURCE / HYBRID BREAKDOWN ============== </f:comment>
     <div class="row">
         <div class="col-md-6">
             <div class="card h-100">
-                <div class="card-header"><strong>Quelle</strong> <small class="text-muted">(Verteilung)</small></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.source" /></strong> <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.distribution" /></small></div>
                 <div class="card-body p-0">
                     <f:if condition="{sourceBreakdown}">
                         <f:then>
@@ -157,7 +154,7 @@
                             </table>
                         </f:then>
                         <f:else>
-                            <div class="p-3 text-muted small">—</div>
+                            <div class="p-3 text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.noDataPlaceholder" /></div>
                         </f:else>
                     </f:if>
                 </div>
@@ -165,29 +162,28 @@
         </div>
         <div class="col-md-6">
             <div class="card h-100">
-                <div class="card-header"><strong>Hybrid vs Keyword</strong> <small class="text-muted">(Anteil)</small></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.hybridVsKeyword" /></strong> <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.share" /></small></div>
                 <div class="card-body">
-                    <p class="mb-2"><strong>{hybridRate.hybridPct}%</strong> der Anfragen nutzen Hybrid-Modus.</p>
+                    <p class="mb-2"><strong>{hybridRate.hybridPct}%</strong> <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.hybridRateText" /></p>
                     <ul class="list-unstyled small mb-0">
-                        <li><strong>Hybrid:</strong> {hybridRate.hybrid}</li>
-                        <li><strong>Keyword:</strong> {hybridRate.keyword}</li>
+                        <li><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.hybrid" /></strong> {hybridRate.hybrid}</li>
+                        <li><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.keyword" /></strong> {hybridRate.keyword}</li>
                     </ul>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ============== RAG ============== -->
-    <h2 class="h4 mt-5">RAG</h2>
+    <f:comment> ============== RAG ============== </f:comment>
+    <h2 class="h4 mt-5"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.rag" /></h2>
     <p class="text-muted small">
-        Pro beantworteter RAG-Anfrage wird eine Zeile mit <code>source='rag'</code> gespeichert
-        ({Frage, Status, Anzahl Kontext-Treffer, Anzahl zitierter Quellen, Hybrid, Zeit}) — kein Antworttext.
+        <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragIntro"/></f:format.raw>
     </p>
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">RAG-Anfragen ({windowDays}d)</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragQueries" arguments="{0: windowDays}" /></div>
                     <div class="display-6">{rag.total}</div>
                 </div>
             </div>
@@ -195,16 +191,16 @@
         <div class="col-md-3">
             <div class="card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Beantwortet (ok)</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragAnswered" /></div>
                     <div class="display-6 text-success">{rag.ok}</div>
-                    <div class="small text-muted">Ø {rag.avgCited} zitierte Quellen</div>
+                    <div class="small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragAvgCited" arguments="{0: rag.avgCited}" /></div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card h-100 {f:if(condition: '{rag.lowConfidence} > 0', then: 'border-warning')}">
                 <div class="card-body">
-                    <div class="text-muted small">Low-Confidence (ok, 0 Zitate)</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragLowConfidence" /></div>
                     <div class="display-6 {f:if(condition: '{rag.lowConfidence} > 0', then: 'text-warning')}">{rag.lowConfidence}</div>
                 </div>
             </div>
@@ -212,9 +208,9 @@
         <div class="col-md-3">
             <div class="card h-100 {f:if(condition: '{rag.failed} > 0', then: 'border-danger')}">
                 <div class="card-body">
-                    <div class="text-muted small">Kein Kontext / Fehler</div>
-                    <div class="display-6">{rag.noContext} <small class="text-muted">/</small> <span class="{f:if(condition: '{rag.failed} > 0', then: 'text-danger')}">{rag.failed}</span></div>
-                    <div class="small text-muted">no_context / failed</div>
+                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragNoContextOrError" /></div>
+                    <div class="display-6">{rag.noContext} <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.slash" /></small> <span class="{f:if(condition: '{rag.failed} > 0', then: 'text-danger')}">{rag.failed}</span></div>
+                    <div class="small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.ragNoContextFailed" /></div>
                 </div>
             </div>
         </div>
@@ -222,13 +218,13 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header"><strong>Top RAG-Fragen</strong> <small class="text-muted">(häufigste, Top 20)</small></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.topRagQuestions" /></strong> <small class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.topQueriesHint" /></small></div>
                 <div class="card-body p-0">
                     <f:if condition="{ragTopQueries}">
                         <f:then>
                             <table class="table table-sm m-0">
                                 <thead>
-                                    <tr><th>Frage</th><th class="text-end">Anzahl</th><th class="text-end">Ø Kontext-Treffer</th></tr>
+                                    <tr><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.question" /></th><th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.count" /></th><th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.table.avgContextHits" /></th></tr>
                                 </thead>
                                 <tbody>
                                     <f:for each="{ragTopQueries}" as="q">
@@ -242,7 +238,7 @@
                             </table>
                         </f:then>
                         <f:else>
-                            <div class="p-3 text-muted small">Keine RAG-Anfragen im gewählten Zeitraum.</div>
+                            <div class="p-3 text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.analytics.noRagQueries" /></div>
                         </f:else>
                     </f:if>
                 </div>

@@ -35,30 +35,30 @@ final class DitaOtImporter implements KnowledgeResourceSourceImporter
 
     public function label(): string
     {
-        return 'DITA-OT XHTML drop';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.label';
     }
 
     public function description(): string
     {
-        return 'A folder containing an index.html TOC and a <langDir>/topics/*.html tree (the standard DITA-OT XHTML output).';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.description';
     }
 
     public function describeFields(): array
     {
         return [
-            ['name' => 'path', 'label' => 'Source path', 'type' => 'text', 'required' => true,
-             'help' => 'Absolute or relative to project root. Must contain index.html and the language subdir.'],
-            ['name' => 'langDir', 'label' => 'Language directory', 'type' => 'text', 'default' => 'de',
-             'help' => 'Subdirectory under --path that contains topics/ and figures/.'],
-            ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'pid', 'label' => 'Storage pid', 'type' => 'text', 'default' => '0',
-             'help' => 'Page id where the records live. 0 = site root.'],
-            ['name' => 'purge', 'label' => 'Purge before importing', 'type' => 'checkbox', 'default' => true,
-             'help' => 'Recommended — wipes existing rows for the chosen language so re-runs are idempotent.'],
-            ['name' => 'limit', 'label' => 'Limit', 'type' => 'text', 'default' => '0',
-             'help' => 'Only import the first N topics. 0 = no limit.'],
-            ['name' => 'targetFolder', 'label' => 'Target media folder', 'type' => 'folder',
-             'help' => 'Where the topic-specific media subfolders are created in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder).'],
+            ['name' => 'path', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.sourcePath.label', 'type' => 'text', 'required' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.sourcePath.help'],
+            ['name' => 'langDir', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.langDir.label', 'type' => 'text', 'default' => 'de',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.langDir.help'],
+            ['name' => 'language', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetLanguage', 'type' => 'language', 'default' => 0],
+            ['name' => 'pid', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.storagePid', 'type' => 'text', 'default' => '0',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.storagePidHelp'],
+            ['name' => 'purge', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.purge.label', 'type' => 'checkbox', 'default' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.purge.help'],
+            ['name' => 'limit', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.limit.label', 'type' => 'text', 'default' => '0',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.limit.help'],
+            ['name' => 'targetFolder', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.targetMediaFolder.label', 'type' => 'folder',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.ditaOt.targetMediaFolder.help'],
         ];
     }
 

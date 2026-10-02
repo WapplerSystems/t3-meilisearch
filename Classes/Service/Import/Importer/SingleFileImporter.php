@@ -41,27 +41,27 @@ final class SingleFileImporter implements KnowledgeResourceSourceImporter
 
     public function label(): string
     {
-        return 'Single document upload';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.label';
     }
 
     public function description(): string
     {
-        return 'One curated document at a time — PDF, DOCX, HTML, Markdown, Office, EPUB, plain text.';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.description';
     }
 
     public function describeFields(): array
     {
         return [
-            ['name' => 'upload', 'label' => 'File', 'type' => 'file', 'required' => true],
-            ['name' => 'title', 'label' => 'Title', 'type' => 'text',
-             'help' => 'Empty = file name. Drives how the entry appears in search results.'],
-            ['name' => 'abstract', 'label' => 'Abstract', 'type' => 'textarea',
-             'help' => 'Optional one-paragraph summary shown as the snippet in results.'],
-            ['name' => 'language', 'label' => 'Language', 'type' => 'language', 'default' => 0],
-            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'upload',
-             'options' => ['upload' => 'upload', 'concept' => 'concept', 'task' => 'task', 'reference' => 'reference']],
-            ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where the uploaded file lands in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). The "uploads/" subfolder is added automatically.'],
+            ['name' => 'upload', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.file.label', 'type' => 'file', 'required' => true],
+            ['name' => 'title', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.title.label', 'type' => 'text',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.title.help'],
+            ['name' => 'abstract', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.abstract.label', 'type' => 'textarea',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.abstract.help'],
+            ['name' => 'language', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.language', 'type' => 'language', 'default' => 0],
+            ['name' => 'resource_type', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.documentKind', 'type' => 'select', 'default' => 'upload',
+             'options' => ['upload' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.upload', 'concept' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.concept', 'task' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.task', 'reference' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.reference']],
+            ['name' => 'targetFolder', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetFolder', 'type' => 'folder',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.singleFile.targetFolder.help'],
         ];
     }
 

@@ -5,15 +5,12 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Diagnostics</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.heading"/></h1>
     <f:variable name="active" value="diagnose"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="lead">
-        Embedder + RAG state per site, live from the Meilisearch server.
-        Use the maintenance buttons to force-push the embedder configuration
-        (in case it drifted out of sync) or probe the LLM provider with a
-        minimal "ping" round-trip.
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.lead"/>
     </p>
 
     <f:for each="{cards}" as="card">
@@ -22,29 +19,29 @@
                 <strong>{card.identifier}</strong>
                 <f:if condition="{card.configured}">
                     <f:else>
-                        <span class="badge bg-secondary ms-2">not configured</span>
+                        <span class="badge bg-secondary ms-2"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.notConfigured"/></span>
                     </f:else>
                 </f:if>
                 <f:if condition="{card.error}">
-                    <span class="badge bg-danger ms-2" title="{card.error}">error</span>
+                    <span class="badge bg-danger ms-2" title="{card.error}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.error"/></span>
                 </f:if>
             </div>
             <div class="card-body">
 
                 <div class="row">
-                    <!-- Embedder column -->
+                    <f:comment>Embedder column</f:comment>
                     <div class="col-md-6 border-end">
-                        <h3 class="h5">Embedder</h3>
+                        <h3 class="h5"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.embedder"/></h3>
                         <f:if condition="{card.desiredEmbedder}">
                             <f:then>
-                                <h4 class="h6 text-muted mt-3">Desired (from settings)</h4>
+                                <h4 class="h6 text-muted mt-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.desired"/></h4>
                                 <dl class="row mb-0">
                                     <f:for each="{card.desiredEmbedder}" as="value" key="key">
                                         <dt class="col-sm-4"><code>{key}</code></dt>
                                         <dd class="col-sm-8"><code>{value}</code></dd>
                                     </f:for>
                                 </dl>
-                                <h4 class="h6 text-muted mt-3">Actual (on Meilisearch)</h4>
+                                <h4 class="h6 text-muted mt-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.actual"/></h4>
                                 <f:if condition="{card.actualEmbedder}">
                                     <f:then>
                                         <dl class="row mb-0">
@@ -55,76 +52,76 @@
                                         </dl>
                                     </f:then>
                                     <f:else>
-                                        <p class="text-warning">Not applied yet. Click "Re-push" to write it.</p>
+                                        <p class="text-warning"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.notAppliedYet"/></p>
                                     </f:else>
                                 </f:if>
                                 <f:if condition="{card.configured}">
                                     <form action="{repushUrl}" method="post" class="mt-3">
                                         <input type="hidden" name="site" value="{card.identifier}" />
-                                        <button type="submit" class="btn btn-sm btn-default">Re-push embedder</button>
+                                        <button type="submit" class="btn btn-sm btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.repushEmbedder"/></button>
                                     </form>
                                 </f:if>
                             </f:then>
                             <f:else>
-                                <p class="text-muted">No embedder configured for this site — keyword search only.</p>
+                                <p class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.noEmbedder"/></p>
                             </f:else>
                         </f:if>
                     </div>
 
-                    <!-- RAG column -->
+                    <f:comment>RAG column</f:comment>
                     <div class="col-md-6">
-                        <h3 class="h5">RAG</h3>
+                        <h3 class="h5"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.rag"/></h3>
                         <f:if condition="{card.rag}">
                             <f:then>
                                 <dl class="row mb-0">
-                                    <dt class="col-sm-4">Provider</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.provider"/></dt>
                                     <dd class="col-sm-8"><code>{card.rag.provider}</code></dd>
 
-                                    <dt class="col-sm-4">Model</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.model"/></dt>
                                     <dd class="col-sm-8"><code>{card.rag.model}</code></dd>
 
                                     <f:if condition="{card.rag.url}">
-                                        <dt class="col-sm-4">URL</dt>
+                                        <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.url"/></dt>
                                         <dd class="col-sm-8"><code>{card.rag.url}</code></dd>
                                     </f:if>
 
-                                    <dt class="col-sm-4">API key</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.apiKey"/></dt>
                                     <dd class="col-sm-8">
                                         <f:if condition="{card.rag.hasApiKey}">
-                                            <f:then><span class="badge bg-success">set</span></f:then>
-                                            <f:else><span class="badge bg-secondary">not set</span></f:else>
+                                            <f:then><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.set"/></span></f:then>
+                                            <f:else><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.notSet"/></span></f:else>
                                         </f:if>
                                     </dd>
 
-                                    <dt class="col-sm-4">Hybrid retrieval</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.hybridRetrieval"/></dt>
                                     <dd class="col-sm-8">
                                         <f:if condition="{card.rag.useHybrid}">
-                                            <f:then><span class="badge bg-success">on</span></f:then>
-                                            <f:else><span class="badge bg-secondary">off</span></f:else>
+                                            <f:then><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.on"/></span></f:then>
+                                            <f:else><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.off"/></span></f:else>
                                         </f:if>
                                     </dd>
 
-                                    <dt class="col-sm-4">Conversation memory</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.conversationMemory"/></dt>
                                     <dd class="col-sm-8">
                                         <f:if condition="{card.rag.conversationEnabled}">
-                                            <f:then><span class="badge bg-success">enabled</span></f:then>
-                                            <f:else><span class="badge bg-secondary">disabled</span></f:else>
+                                            <f:then><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.enabled"/></span></f:then>
+                                            <f:else><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.disabled"/></span></f:else>
                                         </f:if>
                                     </dd>
 
-                                    <dt class="col-sm-4">Max context hits</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.maxContextHits"/></dt>
                                     <dd class="col-sm-8">{card.rag.maxContextHits}</dd>
 
-                                    <dt class="col-sm-4">Temperature</dt>
+                                    <dt class="col-sm-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.temperature"/></dt>
                                     <dd class="col-sm-8">{card.rag.temperature}</dd>
                                 </dl>
                                 <form action="{pingUrl}" method="post" class="mt-3">
                                     <input type="hidden" name="site" value="{card.identifier}" />
-                                    <button type="submit" class="btn btn-sm btn-default">Ping provider</button>
+                                    <button type="submit" class="btn btn-sm btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.pingProvider"/></button>
                                 </form>
                             </f:then>
                             <f:else>
-                                <p class="text-muted">No RAG provider configured for this site.</p>
+                                <p class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.diagnose.noRag"/></p>
                             </f:else>
                         </f:if>
                     </div>

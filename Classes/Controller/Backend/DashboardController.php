@@ -80,7 +80,7 @@ final class DashboardController
 
         $client = $this->engineFactory->createClientForSite($site);
         if ($client === null) {
-            $card['error'] = 'Meilisearch client could not be created (check meilisearch.url / key).';
+            $card['error'] = $this->context->label('be.dashboard.clientCreateFailed');
             return $card;
         }
         $indexName = $this->engineFactory->getIndexName($site);

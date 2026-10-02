@@ -33,7 +33,7 @@ return [
                 . ' site_identifier, similarity_threshold, expected_doc_ids, context_requirement,'
                 . ' --div--;LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:ragtest.tab.lastrun,'
                 . ' --palette--;;lastrun,'
-                . ' --div--;LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_core.xlf:tabs.access,'
+                . ' --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,'
                 . ' hidden',
         ],
     ],

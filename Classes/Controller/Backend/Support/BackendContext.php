@@ -105,6 +105,21 @@ final class BackendContext
         return $arguments === [] ? $text : vsprintf($text, $arguments);
     }
 
+    /**
+     * Text that may be an LLL reference (importer labels, field help) in
+     * the backend user's language; anything else is returned unchanged, so
+     * third-party importers with plain strings keep working.
+     */
+    public function resolve(string $text): string
+    {
+        if (!str_starts_with($text, 'LLL:')) {
+            return $text;
+        }
+        $translated = (string)($GLOBALS['LANG']?->sL($text) ?? '');
+
+        return $translated !== '' ? $translated : $text;
+    }
+
     public function addFlash(string $message, ContextualFeedbackSeverity $severity = ContextualFeedbackSeverity::OK): void
     {
         $this->flashMessageService

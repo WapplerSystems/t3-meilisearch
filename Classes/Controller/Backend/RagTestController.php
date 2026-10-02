@@ -109,7 +109,7 @@ final class RagTestController
         }
         $uid = (int)(($request->getParsedBody() ?? [])['uid'] ?? 0);
         if ($uid <= 0) {
-            $this->context->addFlash('Test uid missing.', ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.testUidMissing'), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
 
@@ -118,7 +118,7 @@ final class RagTestController
         // without a second public entry point.
         $row = $this->loadOneRow($uid);
         if ($row === null) {
-            $this->context->addFlash(sprintf('Test #%d not found.', $uid), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.testNotFound', $uid), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
 
@@ -130,7 +130,7 @@ final class RagTestController
             // We expose runOne() on the runner below to avoid this.
             $result = $this->runner->runOne($uid);
         } catch (\Throwable $e) {
-            $this->context->addFlash(sprintf('Test #%d failed to run: %s', $uid, $e->getMessage()), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.ragTestRunFailed', $uid, $e->getMessage()), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
 
@@ -163,7 +163,7 @@ final class RagTestController
         }
         $uid = (int)(($request->getParsedBody() ?? [])['uid'] ?? 0);
         if ($uid <= 0) {
-            $this->context->addFlash('Test uid missing.', ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.testUidMissing'), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
         $qb = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
@@ -174,13 +174,13 @@ final class RagTestController
             ->executeQuery()
             ->fetchAssociative();
         if ($row === false) {
-            $this->context->addFlash(sprintf('Test #%d not found.', $uid), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.testNotFound', $uid), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
         $actual = trim((string)($row['last_actual_answer'] ?? ''));
         if ($actual === '') {
             $this->context->addFlash(
-                sprintf('Test #%d has no last_actual_answer yet — run the test first, then adopt.', $uid),
+                $this->context->label('be.flash.adoptNoLastActualAnswer', $uid),
                 ContextualFeedbackSeverity::WARNING,
             );
             return $this->context->redirect('ragtests');
@@ -188,7 +188,7 @@ final class RagTestController
         $oldExpected = (string)($row['expected_answer'] ?? '');
         if ($oldExpected === $actual) {
             $this->context->addFlash(
-                sprintf('Test #%d already matches the last actual answer — nothing to adopt.', $uid),
+                $this->context->label('be.flash.adoptAlreadyMatches', $uid),
                 ContextualFeedbackSeverity::INFO,
             );
             return $this->context->redirect('ragtests');
@@ -200,8 +200,8 @@ final class RagTestController
             ->where($upd->expr()->eq('uid', $upd->createNamedParameter($uid, \Doctrine\DBAL\ParameterType::INTEGER)))
             ->executeStatement();
         $this->context->addFlash(
-            sprintf(
-                '"%s" — adopted last actual answer as new expected (%d→%d chars). Re-run to confirm.',
+            $this->context->label(
+                'be.flash.adoptedActual',
                 (string)($row['title'] ?? '#' . $uid),
                 mb_strlen($oldExpected),
                 mb_strlen($actual),
@@ -219,11 +219,11 @@ final class RagTestController
         try {
             $results = $this->runner->runAll();
         } catch (\Throwable $e) {
-            $this->context->addFlash('Run-all failed: ' . $e->getMessage(), ContextualFeedbackSeverity::ERROR);
+            $this->context->addFlash($this->context->label('be.flash.runAllFailed', $e->getMessage()), ContextualFeedbackSeverity::ERROR);
             return $this->context->redirect('ragtests');
         }
         if ($results === []) {
-            $this->context->addFlash('No enabled tests to run.', ContextualFeedbackSeverity::WARNING);
+            $this->context->addFlash($this->context->label('be.flash.noEnabledTests'), ContextualFeedbackSeverity::WARNING);
             return $this->context->redirect('ragtests');
         }
         $passes = 0;
@@ -242,7 +242,7 @@ final class RagTestController
             ? ContextualFeedbackSeverity::WARNING
             : ($errors > 0 ? ContextualFeedbackSeverity::INFO : ContextualFeedbackSeverity::OK);
         $this->context->addFlash(
-            sprintf('Ran %d test(s): %d passed, %d failed, %d errored.', count($results), $passes, $fails, $errors),
+            $this->context->label('be.flash.runAllSummary', count($results), $passes, $fails, $errors),
             $severity,
         );
         return $this->context->redirect('ragtests');
@@ -319,9 +319,9 @@ final class RagTestController
     private function describe(string $title, RagTestResult $result): string
     {
         return match ($result->status) {
-            RagTestResult::PASS => sprintf('"%s" passed (score %.3f).', $title, $result->score),
-            RagTestResult::FAIL => sprintf('"%s" failed (score %.3f below threshold).', $title, $result->score),
-            default             => sprintf('"%s" errored: %s', $title, $result->error),
+            RagTestResult::PASS => $this->context->label('be.flash.ragTestPassed', $title, $result->score),
+            RagTestResult::FAIL => $this->context->label('be.flash.ragTestFailed', $title, $result->score),
+            default             => $this->context->label('be.flash.ragTestErrored', $title, $result->error),
         };
     }
 

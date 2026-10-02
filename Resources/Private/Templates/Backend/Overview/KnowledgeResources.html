@@ -5,30 +5,30 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Wissens-Resourcen</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.meilisearchKnowledgeResources" /></h1>
     <f:variable name="active" value="knowledgeResources"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="text-muted">
-        Help topics live in <code>tx_wsmeilisearch_knowledge_resource</code> and are pushed to Meilisearch as a separate doc type (<code>type=help</code>). Individual records can be tweaked in the <a href="{listEditUrl}">List module</a> — boost, hidden flag, or abstract overrides survive the next import only if you leave the identifier alone.
+        <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.intro" arguments="{0: '{listEditUrl -> f:format.htmlspecialchars()}'}"/></f:format.raw>
     </p>
 
-    <!-- ============== STATS ============== -->
+    <f:comment>============== STATS ==============</f:comment>
     <div class="card mb-4">
-        <div class="card-header"><strong>Current state</strong> <span class="text-muted ms-2">total {stats.grandTotal} record(s)</span></div>
+        <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.currentState" /></strong> <span class="text-muted ms-2"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.totalRecords" arguments="{0: stats.grandTotal}" /></span></div>
         <div class="card-body p-0">
             <f:if condition="{stats.languages}">
                 <f:then>
                     <table class="table table-sm table-striped mb-0">
                         <thead>
                             <tr>
-                                <th>Language</th>
-                                <th class="text-end">Total</th>
-                                <th class="text-end">With media</th>
-                                <th class="text-end">concept</th>
-                                <th class="text-end">task</th>
-                                <th class="text-end">reference</th>
-                                <th>Last imported</th>
+                                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.language" /></th>
+                                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.total" /></th>
+                                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.withMedia" /></th>
+                                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.concept" /></th>
+                                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.task" /></th>
+                                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.reference" /></th>
+                                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.lastImported" /></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -52,36 +52,36 @@
                     </table>
                 </f:then>
                 <f:else>
-                    <div class="p-3 text-muted">No help docs imported yet.</div>
+                    <div class="p-3 text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.noHelpDocsImportedYet" /></div>
                 </f:else>
             </f:if>
         </div>
     </div>
 
-    <!-- ============== IMPORTERS ============== -->
-    <h2 class="h5 mb-2">Run an importer</h2>
+    <f:comment>============== IMPORTERS ==============</f:comment>
+    <h2 class="h5 mb-2"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.runAnImporter" /></h2>
     <p class="text-muted small mb-3">
-        One card per registered <code>KnowledgeResourceSourceImporter</code>. New importers added in PHP appear here automatically — no template change needed.
+        <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.importerCardsIntro"/></f:format.raw>
     </p>
     <f:for each="{importers}" as="importer">
         <f:render partial="Backend/KnowledgeResources/ImporterForm"
                   arguments="{importer: importer, knownLanguages: knownLanguages, defaultTargetFolder: defaultTargetFolder, folderBrowserUrl: folderBrowserUrl, token: token, runImporterUrl: runImporterUrl}" />
     </f:for>
 
-    <!-- ============== PURGE FORM ============== -->
+    <f:comment>============== PURGE FORM ==============</f:comment>
     <section class="mt-4">
         <div class="card border-danger">
-            <div class="card-header text-danger"><strong>Purge by language</strong></div>
+            <div class="card-header text-danger"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.purgeByLanguage" /></strong></div>
             <div class="card-body">
                 <p class="small text-muted">
-                    Hard-deletes every knowledge resource row in the chosen language together with its FAL references. Meilisearch keeps the now-orphaned <code>help-&lt;uid&gt;</code> doc IDs until the next reindex.
+                    <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.purgeIntro"/></f:format.raw>
                 </p>
                 <form action="{purgeUrl}" method="post">
                     <input type="hidden" name="token" value="{token}" />
 
                     <div class="row g-2 align-items-end">
                         <div class="col-md-4">
-                            <label class="form-label small text-muted">Language</label>
+                            <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.language" /></label>
                             <select name="language" class="form-select form-select-sm">
                                 <f:for each="{knownLanguages}" as="label" key="langId">
                                     <option value="{langId}">{label}</option>
@@ -92,12 +92,12 @@
                             <div class="form-check">
                                 <input type="checkbox" name="confirm" value="1" id="hd-confirm" class="form-check-input" />
                                 <label for="hd-confirm" class="form-check-label small">
-                                    I understand this drops <strong>all</strong> knowledge resource rows for the selected language.
+                                    <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.confirmPurge"/></f:format.raw>
                                 </label>
                             </div>
                         </div>
                         <div class="col-md-3 text-end">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Purge</button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.purge" /></button>
                         </div>
                     </div>
                 </form>
@@ -105,14 +105,14 @@
         </div>
     </section>
 
-    <!-- ============== EDITOR ENTRY POINT ============== -->
+    <f:comment>============== EDITOR ENTRY POINT ==============</f:comment>
     <section class="mt-4">
-        <h2 class="h5">Editor edits</h2>
+        <h2 class="h5"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.editorEdits" /></h2>
         <p class="text-muted small mb-2">
-            Individual records (boost field, hidden flag, manual overrides) are managed in the standard List module:
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.individualRecordsManaged" />
         </p>
         <a href="{listEditUrl}" class="btn btn-secondary btn-sm">
-            Open knowledge resources in the List module
+            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.openKnowledgeResources" />
         </a>
     </section>
 </f:section>

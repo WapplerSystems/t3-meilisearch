@@ -738,6 +738,1086 @@
             <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
                 <source>assistant disabled</source>
             </trans-unit>
+            <trans-unit id="be.flash.unknownSite" resname="be.flash.unknownSite">
+                <source>Unknown site: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.siteNotConfigured" resname="be.flash.siteNotConfigured">
+                <source>Site "%s" is not configured for Meilisearch.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.reindexed" resname="be.flash.reindexed">
+                <source>Reindexed %d document(s) for site "%s".</source>
+            </trans-unit>
+            <trans-unit id="be.flash.reindexFailed" resname="be.flash.reindexFailed">
+                <source>Reindex failed: %s</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.clientCreateFailed" resname="be.dashboard.clientCreateFailed">
+                <source>Meilisearch client could not be created (check meilisearch.url / key).</source>
+            </trans-unit>
+            <trans-unit id="be.flash.embedderPush" resname="be.flash.embedderPush">
+                <source>Embedder push for "%s": %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.embedderPushFailed" resname="be.flash.embedderPushFailed">
+                <source>Embedder push failed: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragNoProvider" resname="be.flash.ragNoProvider">
+                <source>Site "%s" has no RAG provider configured.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.providerNotRegistered" resname="be.flash.providerNotRegistered">
+                <source>Provider "%s" not registered.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragPingSuccess" resname="be.flash.ragPingSuccess">
+                <source>RAG ping for "%s" succeeded in %d ms — reply: "%s"</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragPingFailed" resname="be.flash.ragPingFailed">
+                <source>RAG ping for "%s" failed after %d ms: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.unknownImporter" resname="be.flash.unknownImporter">
+                <source>Unknown importer "%s".</source>
+            </trans-unit>
+            <trans-unit id="be.flash.importerConfigError" resname="be.flash.importerConfigError">
+                <source>%s: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.importerResult" resname="be.flash.importerResult">
+                <source>%s: imported %d, skipped %d, media attached %d. Run reindex to push them to Meilisearch.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.importerFirstErrors" resname="be.flash.importerFirstErrors">
+                <source>First errors: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.importerFailed" resname="be.flash.importerFailed">
+                <source>%s failed: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.fieldRequired" resname="be.flash.fieldRequired">
+                <source>"%s" is required.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.languageRequired" resname="be.flash.languageRequired">
+                <source>Language is required.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.purgeSkipped" resname="be.flash.purgeSkipped">
+                <source>Purge skipped — confirmation checkbox was not ticked.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.purged" resname="be.flash.purged">
+                <source>Purged %d knowledge resource row(s) for language %d. Re-run reindex so Meilisearch drops the orphaned doc IDs too.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.purgeFailed" resname="be.flash.purgeFailed">
+                <source>Purge failed: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.testUidMissing" resname="be.flash.testUidMissing">
+                <source>Test uid missing.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.testNotFound" resname="be.flash.testNotFound">
+                <source>Test #%d not found.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragTestRunFailed" resname="be.flash.ragTestRunFailed">
+                <source>Test #%d failed to run: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.adoptNoLastActualAnswer" resname="be.flash.adoptNoLastActualAnswer">
+                <source>Test #%d has no last_actual_answer yet — run the test first, then adopt.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.adoptAlreadyMatches" resname="be.flash.adoptAlreadyMatches">
+                <source>Test #%d already matches the last actual answer — nothing to adopt.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.adoptedActual" resname="be.flash.adoptedActual">
+                <source>"%s" — adopted last actual answer as new expected (%d→%d chars). Re-run to confirm.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.runAllFailed" resname="be.flash.runAllFailed">
+                <source>Run-all failed: %s</source>
+            </trans-unit>
+            <trans-unit id="be.flash.noEnabledTests" resname="be.flash.noEnabledTests">
+                <source>No enabled tests to run.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.runAllSummary" resname="be.flash.runAllSummary">
+                <source>Ran %d test(s): %d passed, %d failed, %d errored.</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragTestPassed" resname="be.flash.ragTestPassed">
+                <source>"%s" passed (score %.3f).</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragTestFailed" resname="be.flash.ragTestFailed">
+                <source>"%s" failed (score %.3f below threshold).</source>
+            </trans-unit>
+            <trans-unit id="be.flash.ragTestErrored" resname="be.flash.ragTestErrored">
+                <source>"%s" errored: %s</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase1" resname="be.test.feature.phase1">
+                <source>phase 1</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase1Facets" resname="be.test.feature.phase1Facets">
+                <source>phase 1 + facets</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.sort" resname="be.test.feature.sort">
+                <source>sort</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.pagination" resname="be.test.feature.pagination">
+                <source>pagination</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase3" resname="be.test.feature.phase3">
+                <source>phase 3</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase3NoEmbedder" resname="be.test.feature.phase3NoEmbedder">
+                <source>phase 3 (no embedder)</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase4" resname="be.test.feature.phase4">
+                <source>phase 4</source>
+            </trans-unit>
+            <trans-unit id="be.test.feature.phase4NoProvider" resname="be.test.feature.phase4NoProvider">
+                <source>phase 4 (no provider)</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.keyword.label" resname="be.test.example.keyword.label">
+                <source>Keyword search</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.keyword.description" resname="be.test.example.keyword.description">
+                <source>Plain typo-tolerant full-text search across pages, news, and indexed files.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.filterFiles.label" resname="be.test.example.filterFiles.label">
+                <source>Filter: only files</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.filterFiles.description" resname="be.test.example.filterFiles.description">
+                <source>Same query restricted to `type=file` — handy for "find me the PDF".</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.sortBySize.label" resname="be.test.example.sortBySize.label">
+                <source>Sort by file size</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.sortBySize.description" resname="be.test.example.sortBySize.description">
+                <source>Empty query + sort descending. Surfaces the biggest indexed binaries.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.pagination.label" resname="be.test.example.pagination.label">
+                <source>Pagination</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.pagination.description" resname="be.test.example.pagination.description">
+                <source>Empty query → all docs, walk pages with Prev / Next at the bottom.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.hybrid.label" resname="be.test.example.hybrid.label">
+                <source>Hybrid (semantic + keyword)</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.hybrid.descriptionWithEmbedder" resname="be.test.example.hybrid.descriptionWithEmbedder">
+                <source>Vector + keyword blend — finds docs even when the wording is paraphrased.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.hybrid.descriptionNoEmbedder" resname="be.test.example.hybrid.descriptionNoEmbedder">
+                <source>Needs an embedder configured. The toggle stays a no-op on sites without one.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.rag.label" resname="be.test.example.rag.label">
+                <source>RAG: ask the site</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.rag.descriptionWithProvider" resname="be.test.example.rag.descriptionWithProvider">
+                <source>LLM-grounded answer with cited sources, retrieval bias toward the question topic.</source>
+            </trans-unit>
+            <trans-unit id="be.test.example.rag.descriptionNoProvider" resname="be.test.example.rag.descriptionNoProvider">
+                <source>Needs a RAG provider configured. Click anyway to see the "disabled" status.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.targetLanguage" resname="be.importer.common.targetLanguage">
+                <source>Target sys_language_uid</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.language" resname="be.importer.common.language">
+                <source>Language</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.storagePid" resname="be.importer.common.storagePid">
+                <source>Storage pid</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.storagePidHelp" resname="be.importer.common.storagePidHelp">
+                <source>Page id where the records live. 0 = site root.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.documentKind" resname="be.importer.common.documentKind">
+                <source>Document kind</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.resourceType.reference" resname="be.importer.common.resourceType.reference">
+                <source>reference</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.resourceType.concept" resname="be.importer.common.resourceType.concept">
+                <source>concept</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.resourceType.task" resname="be.importer.common.resourceType.task">
+                <source>task</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.resourceType.upload" resname="be.importer.common.resourceType.upload">
+                <source>upload</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.titleFromFilename" resname="be.importer.common.titleFromFilename">
+                <source>Use filename as title</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.titleFromFilenameHelp" resname="be.importer.common.titleFromFilenameHelp">
+                <source>When off, every knowledge resource starts with an empty title.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.common.targetFolder" resname="be.importer.common.targetFolder">
+                <source>Target folder</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.label" resname="be.importer.ditaOt.label">
+                <source>DITA-OT XHTML drop</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.description" resname="be.importer.ditaOt.description">
+                <source>A folder containing an index.html TOC and a &lt;langDir&gt;/topics/*.html tree (the standard DITA-OT XHTML output).</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.sourcePath.label" resname="be.importer.ditaOt.sourcePath.label">
+                <source>Source path</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.sourcePath.help" resname="be.importer.ditaOt.sourcePath.help">
+                <source>Absolute or relative to project root. Must contain index.html and the language subdir.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.langDir.label" resname="be.importer.ditaOt.langDir.label">
+                <source>Language directory</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.langDir.help" resname="be.importer.ditaOt.langDir.help">
+                <source>Subdirectory under --path that contains topics/ and figures/.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.purge.label" resname="be.importer.ditaOt.purge.label">
+                <source>Purge before importing</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.purge.help" resname="be.importer.ditaOt.purge.help">
+                <source>Recommended — wipes existing rows for the chosen language so re-runs are idempotent.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.limit.label" resname="be.importer.ditaOt.limit.label">
+                <source>Limit</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.limit.help" resname="be.importer.ditaOt.limit.help">
+                <source>Only import the first N topics. 0 = no limit.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.targetMediaFolder.label" resname="be.importer.ditaOt.targetMediaFolder.label">
+                <source>Target media folder</source>
+            </trans-unit>
+            <trans-unit id="be.importer.ditaOt.targetMediaFolder.help" resname="be.importer.ditaOt.targetMediaFolder.help">
+                <source>Where the topic-specific media subfolders are created in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder).</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.label" resname="be.importer.folder.label">
+                <source>FAL folder</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.description" resname="be.importer.folder.description">
+                <source>Walk a fileadmin folder and create one knowledge resource per file. Reuses existing FAL records.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.sourceFolder.label" resname="be.importer.folder.sourceFolder.label">
+                <source>Source folder</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.sourceFolder.help" resname="be.importer.folder.sourceFolder.help">
+                <source>FAL folder containing the files to import. Existing sys_file records are reused; nothing is copied.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.recursive.label" resname="be.importer.folder.recursive.label">
+                <source>Include subfolders</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.recursive.help" resname="be.importer.folder.recursive.help">
+                <source>Walk into subfolders recursively. Off by default — keeps re-runs predictable.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.folder.titleFromFilenameHelp" resname="be.importer.folder.titleFromFilenameHelp">
+                <source>When off, every knowledge resource starts with an empty title — only useful if you plan to edit them manually afterwards.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.label" resname="be.importer.singleFile.label">
+                <source>Single document upload</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.description" resname="be.importer.singleFile.description">
+                <source>One curated document at a time — PDF, DOCX, HTML, Markdown, Office, EPUB, plain text.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.file.label" resname="be.importer.singleFile.file.label">
+                <source>File</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.title.label" resname="be.importer.singleFile.title.label">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.title.help" resname="be.importer.singleFile.title.help">
+                <source>Empty = file name. Drives how the entry appears in search results.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.abstract.label" resname="be.importer.singleFile.abstract.label">
+                <source>Abstract</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.abstract.help" resname="be.importer.singleFile.abstract.help">
+                <source>Optional one-paragraph summary shown as the snippet in results.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.singleFile.targetFolder.help" resname="be.importer.singleFile.targetFolder.help">
+                <source>Where the uploaded file lands in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). The "uploads/" subfolder is added automatically.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.label" resname="be.importer.urlList.label">
+                <source>URL list (HTTP fetch)</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.description" resname="be.importer.urlList.description">
+                <source>Fetch a list of URLs and create one knowledge resource per response — body via Tika, source kept in FAL.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.urls.label" resname="be.importer.urlList.urls.label">
+                <source>URLs</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.urls.help" resname="be.importer.urlList.urls.help">
+                <source>One URL per line. Only http/https. Blank lines and lines starting with # are skipped.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.targetFolder.help" resname="be.importer.urlList.targetFolder.help">
+                <source>Where downloaded files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "urls/" subfolder is added automatically.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.timeout.label" resname="be.importer.urlList.timeout.label">
+                <source>HTTP timeout (s)</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.timeout.help" resname="be.importer.urlList.timeout.help">
+                <source>Per-URL fetch timeout. Slow servers fail individually without wedging the whole batch.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.maxSizeMb.label" resname="be.importer.urlList.maxSizeMb.label">
+                <source>Max response size (MB)</source>
+            </trans-unit>
+            <trans-unit id="be.importer.urlList.maxSizeMb.help" resname="be.importer.urlList.maxSizeMb.help">
+                <source>Responses larger than this are aborted and counted as skipped.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.label" resname="be.importer.zipBundle.label">
+                <source>ZIP bundle upload</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.description" resname="be.importer.zipBundle.description">
+                <source>Upload one .zip containing many documents — each entry becomes its own knowledge resource.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.file.label" resname="be.importer.zipBundle.file.label">
+                <source>ZIP file</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.file.help" resname="be.importer.zipBundle.file.help">
+                <source>A .zip archive containing the documents to import.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.targetFolder.help" resname="be.importer.zipBundle.targetFolder.help">
+                <source>Where the extracted files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "zips/" subfolder is added automatically.</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.preserveSubfolders.label" resname="be.importer.zipBundle.preserveSubfolders.label">
+                <source>Preserve subfolders</source>
+            </trans-unit>
+            <trans-unit id="be.importer.zipBundle.preserveSubfolders.help" resname="be.importer.zipBundle.preserveSubfolders.help">
+                <source>Off (default) flattens the zip — every file lands directly in zips/. On mirrors the zip's directory structure.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.heading" resname="be.analytics.heading">
+                <source>Meilisearch — Analytics</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.timePeriod" resname="be.analytics.timePeriod">
+                <source>Time period:</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.daysButton" resname="be.analytics.daysButton">
+                <source>%d day(s)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.site" resname="be.analytics.site">
+                <source>Site:</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.allSites" resname="be.analytics.allSites">
+                <source>— all —</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.totalSearches" resname="be.analytics.totalSearches">
+                <source>Search queries (%sd)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.distinctQueries" resname="be.analytics.distinctQueries">
+                <source>Distinct queries</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.withoutHits" resname="be.analytics.withoutHits">
+                <source>Without hits</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.topQueries" resname="be.analytics.topQueries">
+                <source>Top queries</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.topQueriesHint" resname="be.analytics.topQueriesHint">
+                <source>(most frequent, top 20)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.query" resname="be.analytics.table.query">
+                <source>Query</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.hits" resname="be.analytics.table.hits">
+                <source>Hits</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.avgHits" resname="be.analytics.table.avgHits">
+                <source>Ø hits</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.noData" resname="be.analytics.noData">
+                <source>No data in the selected time period.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.zeroResultQueries" resname="be.analytics.zeroResultQueries">
+                <source>Zero-result queries</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.zeroResultQueriesHint" resname="be.analytics.zeroResultQueriesHint">
+                <source>(Top 20 — candidates for synonyms / content)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.noZeroResultQueries" resname="be.analytics.noZeroResultQueries">
+                <source>No zero-result queries — everything is found.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.source" resname="be.analytics.source">
+                <source>Source</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.distribution" resname="be.analytics.distribution">
+                <source>(Distribution)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.noDataPlaceholder" resname="be.analytics.noDataPlaceholder">
+                <source>—</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.hybridVsKeyword" resname="be.analytics.hybridVsKeyword">
+                <source>Hybrid vs Keyword</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.share" resname="be.analytics.share">
+                <source>(Share)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.hybridRateText" resname="be.analytics.hybridRateText">
+                <source>of requests use hybrid mode.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.hybrid" resname="be.analytics.hybrid">
+                <source>Hybrid:</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.keyword" resname="be.analytics.keyword">
+                <source>Keyword:</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.rag" resname="be.analytics.rag">
+                <source>RAG</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragQueries" resname="be.analytics.ragQueries">
+                <source>RAG requests (%sd)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragAnswered" resname="be.analytics.ragAnswered">
+                <source>Answered (ok)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragAvgCited" resname="be.analytics.ragAvgCited">
+                <source>Ø %s cited sources</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragLowConfidence" resname="be.analytics.ragLowConfidence">
+                <source>Low-confidence (ok, 0 citations)</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragNoContextOrError" resname="be.analytics.ragNoContextOrError">
+                <source>No context / error</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.slash" resname="be.analytics.slash">
+                <source>/</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragNoContextFailed" resname="be.analytics.ragNoContextFailed">
+                <source>no_context / failed</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.topRagQuestions" resname="be.analytics.topRagQuestions">
+                <source>Top RAG questions</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.question" resname="be.analytics.table.question">
+                <source>Question</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.count" resname="be.analytics.table.count">
+                <source>Count</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.table.avgContextHits" resname="be.analytics.table.avgContextHits">
+                <source>Ø context hits</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.noRagQueries" resname="be.analytics.noRagQueries">
+                <source>No RAG requests in the selected time period.</source>
+            </trans-unit>
+            <trans-unit id="be.test.testSearchRag" resname="be.test.testSearchRag">
+                <source>Meilisearch — Test Search &amp; RAG</source>
+            </trans-unit>
+            <trans-unit id="be.test.search" resname="be.test.search">
+                <source>Search</source>
+            </trans-unit>
+            <trans-unit id="be.test.site" resname="be.test.site">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.test.query" resname="be.test.query">
+                <source>Query</source>
+            </trans-unit>
+            <trans-unit id="be.test.placeholderQuery" resname="be.test.placeholderQuery">
+                <source>e.g. saskatchewan</source>
+            </trans-unit>
+            <trans-unit id="be.test.sort" resname="be.test.sort">
+                <source>Sort</source>
+            </trans-unit>
+            <trans-unit id="be.test.sortRelevance" resname="be.test.sortRelevance">
+                <source>Relevance</source>
+            </trans-unit>
+            <trans-unit id="be.test.sortNewestFirst" resname="be.test.sortNewestFirst">
+                <source>Newest first</source>
+            </trans-unit>
+            <trans-unit id="be.test.sortOldestFirst" resname="be.test.sortOldestFirst">
+                <source>Oldest first</source>
+            </trans-unit>
+            <trans-unit id="be.test.sortLargestFile" resname="be.test.sortLargestFile">
+                <source>Largest file</source>
+            </trans-unit>
+            <trans-unit id="be.test.sortSmallestFile" resname="be.test.sortSmallestFile">
+                <source>Smallest file</source>
+            </trans-unit>
+            <trans-unit id="be.test.typeFilter" resname="be.test.typeFilter">
+                <source>Type filter</source>
+            </trans-unit>
+            <trans-unit id="be.test.filterAll" resname="be.test.filterAll">
+                <source>All</source>
+            </trans-unit>
+            <trans-unit id="be.test.filterPages" resname="be.test.filterPages">
+                <source>Pages</source>
+            </trans-unit>
+            <trans-unit id="be.test.filterNews" resname="be.test.filterNews">
+                <source>News</source>
+            </trans-unit>
+            <trans-unit id="be.test.filterFiles" resname="be.test.filterFiles">
+                <source>Files</source>
+            </trans-unit>
+            <trans-unit id="be.test.hybridSemanticKeyword" resname="be.test.hybridSemanticKeyword">
+                <source>Hybrid (semantic + keyword)</source>
+            </trans-unit>
+            <trans-unit id="be.test.runSearch" resname="be.test.runSearch">
+                <source>Run search</source>
+            </trans-unit>
+            <trans-unit id="be.test.rag" resname="be.test.rag">
+                <source>RAG</source>
+            </trans-unit>
+            <trans-unit id="be.test.askTheSite" resname="be.test.askTheSite">
+                <source>Ask the site</source>
+            </trans-unit>
+            <trans-unit id="be.test.question" resname="be.test.question">
+                <source>Question</source>
+            </trans-unit>
+            <trans-unit id="be.test.placeholderAsk" resname="be.test.placeholderAsk">
+                <source>Ask the site assistant…</source>
+            </trans-unit>
+            <trans-unit id="be.test.ask" resname="be.test.ask">
+                <source>Ask</source>
+            </trans-unit>
+            <trans-unit id="be.test.ragSubmitHint" resname="be.test.ragSubmitHint">
+                <source>Submits to the same Test view; the answer renders below the search results.</source>
+            </trans-unit>
+            <trans-unit id="be.test.searchResults" resname="be.test.searchResults">
+                <source>Search results</source>
+            </trans-unit>
+            <trans-unit id="be.test.numHit" resname="be.test.numHit">
+                <source>%d hit</source>
+            </trans-unit>
+            <trans-unit id="be.test.numHits" resname="be.test.numHits">
+                <source>%d hits</source>
+            </trans-unit>
+            <trans-unit id="be.test.pageXOf" resname="be.test.pageXOf">
+                <source>Page %d / %d</source>
+            </trans-unit>
+            <trans-unit id="be.test.id" resname="be.test.id">
+                <source>ID</source>
+            </trans-unit>
+            <trans-unit id="be.test.type" resname="be.test.type">
+                <source>Type</source>
+            </trans-unit>
+            <trans-unit id="be.test.title" resname="be.test.title">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="be.test.language" resname="be.test.language">
+                <source>Language</source>
+            </trans-unit>
+            <trans-unit id="be.test.noHits" resname="be.test.noHits">
+                <source>No hits.</source>
+            </trans-unit>
+            <trans-unit id="be.test.paginationPage" resname="be.test.paginationPage">
+                <source>Page %d of %d</source>
+            </trans-unit>
+            <trans-unit id="be.test.prev" resname="be.test.prev">
+                <source>Prev</source>
+            </trans-unit>
+            <trans-unit id="be.test.next" resname="be.test.next">
+                <source>Next</source>
+            </trans-unit>
+            <trans-unit id="be.test.ragAnswer" resname="be.test.ragAnswer">
+                <source>RAG answer</source>
+            </trans-unit>
+            <trans-unit id="be.test.sources" resname="be.test.sources">
+                <source>Sources</source>
+            </trans-unit>
+            <trans-unit id="be.test.numCited" resname="be.test.numCited">
+                <source>%d cited</source>
+            </trans-unit>
+            <trans-unit id="be.test.numFedAsContext" resname="be.test.numFedAsContext">
+                <source>%d fed as context</source>
+            </trans-unit>
+            <trans-unit id="be.test.cited" resname="be.test.cited">
+                <source>cited</source>
+            </trans-unit>
+            <trans-unit id="be.test.statusDisabled" resname="be.test.statusDisabled">
+                <source>Status: disabled.</source>
+            </trans-unit>
+            <trans-unit id="be.test.statusNoContext" resname="be.test.statusNoContext">
+                <source>Status: no context.</source>
+            </trans-unit>
+            <trans-unit id="be.test.noContextDescription" resname="be.test.noContextDescription">
+                <source>Retrieval returned no documents for this question — the LLM was not called.</source>
+            </trans-unit>
+            <trans-unit id="be.test.statusFailed" resname="be.test.statusFailed">
+                <source>Status: failed.</source>
+            </trans-unit>
+            <trans-unit id="be.test.examples" resname="be.test.examples">
+                <source>Examples</source>
+            </trans-unit>
+            <trans-unit id="be.test.examplesHint" resname="be.test.examplesHint">
+                <source>Click any preset to run it. Tags show which phase / feature it demonstrates.</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.headline" resname="be.ragtests.headline">
+                <source>Meilisearch — RAG regression tests</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.currentState" resname="be.ragtests.currentState">
+                <source>Current state</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryTotal" resname="be.ragtests.summaryTotal">
+                <source>%d total</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryEnabled" resname="be.ragtests.summaryEnabled">
+                <source>(%d enabled)</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryPass" resname="be.ragtests.summaryPass">
+                <source>%d pass</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryFail" resname="be.ragtests.summaryFail">
+                <source>%d fail</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryError" resname="be.ragtests.summaryError">
+                <source>%d error</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.summaryNeverRun" resname="be.ragtests.summaryNeverRun">
+                <source>%d never run</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.newTest" resname="be.ragtests.newTest">
+                <source>+ New test</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.openInListModule" resname="be.ragtests.openInListModule">
+                <source>Open in List module</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.runAll" resname="be.ragtests.runAll">
+                <source>Run all</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableTitle" resname="be.ragtests.tableTitle">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableQuestion" resname="be.ragtests.tableQuestion">
+                <source>Question</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableSite" resname="be.ragtests.tableSite">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableThreshold" resname="be.ragtests.tableThreshold">
+                <source>Threshold</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableLastScore" resname="be.ragtests.tableLastScore">
+                <source>Last score</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableTrend" resname="be.ragtests.tableTrend">
+                <source>Trend</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableStatus" resname="be.ragtests.tableStatus">
+                <source>Status</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableLastRun" resname="be.ragtests.tableLastRun">
+                <source>Last run</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.tableActions" resname="be.ragtests.tableActions">
+                <source>Actions</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.hidden" resname="be.ragtests.hidden">
+                <source>hidden</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.showLastActualAdopt" resname="be.ragtests.showLastActualAdopt">
+                <source>Show last actual / adopt</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.expectedBaseline" resname="be.ragtests.expectedBaseline">
+                <source>Expected (current baseline):</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.actualLastRun" resname="be.ragtests.actualLastRun">
+                <source>Actual (last run):</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.adoptTitle" resname="be.ragtests.adoptTitle">
+                <source>Replace the expected answer with the latest actual. Use only after manually verifying the actual is factually correct.</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.adoptButton" resname="be.ragtests.adoptButton">
+                <source>↻ Adopt actual as expected</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.sparklineTitle" resname="be.ragtests.sparklineTitle">
+                <source>%d runs — min %s, max %s, last %s</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.statusPass" resname="be.ragtests.statusPass">
+                <source>PASS</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.statusFail" resname="be.ragtests.statusFail">
+                <source>FAIL</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.statusError" resname="be.ragtests.statusError">
+                <source>ERROR</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.neverRun" resname="be.ragtests.neverRun">
+                <source>never run</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.runTitle" resname="be.ragtests.runTitle">
+                <source>Run this test now (calls the RAG provider once).</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.run" resname="be.ragtests.run">
+                <source>Run</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.confirmAdopt" resname="be.ragtests.confirmAdopt">
+                <source>Replace the expected answer with the last actual answer for this test? Make sure the actual answer is factually correct — it becomes the new regression baseline.</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.heading" resname="be.diagnose.heading">
+                <source>Meilisearch — Diagnostics</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.lead" resname="be.diagnose.lead">
+                <source>Embedder + RAG state per site, live from the Meilisearch server. Use the maintenance buttons to force-push the embedder configuration (in case it drifted out of sync) or probe the LLM provider with a minimal "ping" round-trip.</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.notConfigured" resname="be.diagnose.notConfigured">
+                <source>not configured</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.error" resname="be.diagnose.error">
+                <source>error</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.embedder" resname="be.diagnose.embedder">
+                <source>Embedder</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.desired" resname="be.diagnose.desired">
+                <source>Desired (from settings)</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.actual" resname="be.diagnose.actual">
+                <source>Actual (on Meilisearch)</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.notAppliedYet" resname="be.diagnose.notAppliedYet">
+                <source>Not applied yet. Click "Re-push" to write it.</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.repushEmbedder" resname="be.diagnose.repushEmbedder">
+                <source>Re-push embedder</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.noEmbedder" resname="be.diagnose.noEmbedder">
+                <source>No embedder configured for this site — keyword search only.</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.rag" resname="be.diagnose.rag">
+                <source>RAG</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.provider" resname="be.diagnose.provider">
+                <source>Provider</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.model" resname="be.diagnose.model">
+                <source>Model</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.url" resname="be.diagnose.url">
+                <source>URL</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.apiKey" resname="be.diagnose.apiKey">
+                <source>API key</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.set" resname="be.diagnose.set">
+                <source>set</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.notSet" resname="be.diagnose.notSet">
+                <source>not set</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.hybridRetrieval" resname="be.diagnose.hybridRetrieval">
+                <source>Hybrid retrieval</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.on" resname="be.diagnose.on">
+                <source>on</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.off" resname="be.diagnose.off">
+                <source>off</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.conversationMemory" resname="be.diagnose.conversationMemory">
+                <source>Conversation memory</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.enabled" resname="be.diagnose.enabled">
+                <source>enabled</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.disabled" resname="be.diagnose.disabled">
+                <source>disabled</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.maxContextHits" resname="be.diagnose.maxContextHits">
+                <source>Max context hits</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.temperature" resname="be.diagnose.temperature">
+                <source>Temperature</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.pingProvider" resname="be.diagnose.pingProvider">
+                <source>Ping provider</source>
+            </trans-unit>
+            <trans-unit id="be.diagnose.noRag" resname="be.diagnose.noRag">
+                <source>No RAG provider configured for this site.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.meilisearchKnowledgeResources" resname="be.kr.meilisearchKnowledgeResources">
+                <source>Meilisearch — Knowledge Resources</source>
+            </trans-unit>
+            <trans-unit id="be.kr.currentState" resname="be.kr.currentState">
+                <source>Current state</source>
+            </trans-unit>
+            <trans-unit id="be.kr.totalRecords" resname="be.kr.totalRecords">
+                <source>total %s record(s)</source>
+            </trans-unit>
+            <trans-unit id="be.kr.language" resname="be.kr.language">
+                <source>Language</source>
+            </trans-unit>
+            <trans-unit id="be.kr.total" resname="be.kr.total">
+                <source>Total</source>
+            </trans-unit>
+            <trans-unit id="be.kr.withMedia" resname="be.kr.withMedia">
+                <source>With media</source>
+            </trans-unit>
+            <trans-unit id="be.kr.concept" resname="be.kr.concept">
+                <source>concept</source>
+            </trans-unit>
+            <trans-unit id="be.kr.task" resname="be.kr.task">
+                <source>task</source>
+            </trans-unit>
+            <trans-unit id="be.kr.reference" resname="be.kr.reference">
+                <source>reference</source>
+            </trans-unit>
+            <trans-unit id="be.kr.lastImported" resname="be.kr.lastImported">
+                <source>Last imported</source>
+            </trans-unit>
+            <trans-unit id="be.kr.noHelpDocsImportedYet" resname="be.kr.noHelpDocsImportedYet">
+                <source>No help docs imported yet.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.runAnImporter" resname="be.kr.runAnImporter">
+                <source>Run an importer</source>
+            </trans-unit>
+            <trans-unit id="be.kr.purgeByLanguage" resname="be.kr.purgeByLanguage">
+                <source>Purge by language</source>
+            </trans-unit>
+            <trans-unit id="be.kr.purge" resname="be.kr.purge">
+                <source>Purge</source>
+            </trans-unit>
+            <trans-unit id="be.kr.editorEdits" resname="be.kr.editorEdits">
+                <source>Editor edits</source>
+            </trans-unit>
+            <trans-unit id="be.kr.individualRecordsManaged" resname="be.kr.individualRecordsManaged">
+                <source>Individual records (boost field, hidden flag, manual overrides) are managed in the standard List module:</source>
+            </trans-unit>
+            <trans-unit id="be.kr.openKnowledgeResources" resname="be.kr.openKnowledgeResources">
+                <source>Open knowledge resources in the List module</source>
+            </trans-unit>
+            <trans-unit id="be.kr.run" resname="be.kr.run">
+                <source>Run</source>
+            </trans-unit>
+            <trans-unit id="be.kr.emptySiteDefault" resname="be.kr.emptySiteDefault">
+                <source>empty = site default</source>
+            </trans-unit>
+            <trans-unit id="be.kr.selectFolder" resname="be.kr.selectFolder">
+                <source>Select folder</source>
+            </trans-unit>
+            <trans-unit id="be.kr.browse" resname="be.kr.browse">
+                <source>Browse…</source>
+            </trans-unit>
+            <trans-unit id="be.overview.headline" resname="be.overview.headline">
+                <source>Meilisearch — Site Overview</source>
+            </trans-unit>
+            <trans-unit id="be.overview.lead" resname="be.overview.lead">
+                <source>One index per site, faceted by record type. The columns below reflect the live state of each Meilisearch index plus the configured embedder / RAG provider from the site settings.</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.site" resname="be.overview.column.site">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.index" resname="be.overview.column.index">
+                <source>Index</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.documents" resname="be.overview.column.documents">
+                <source>Documents</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.embedder" resname="be.overview.column.embedder">
+                <source>Embedder</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.rag" resname="be.overview.column.rag">
+                <source>RAG</source>
+            </trans-unit>
+            <trans-unit id="be.overview.column.actions" resname="be.overview.column.actions">
+                <source>Actions</source>
+            </trans-unit>
+            <trans-unit id="be.overview.notConfigured" resname="be.overview.notConfigured">
+                <source>not configured</source>
+            </trans-unit>
+            <trans-unit id="be.overview.error" resname="be.overview.error">
+                <source>error</source>
+            </trans-unit>
+            <trans-unit id="be.overview.active" resname="be.overview.active">
+                <source>active</source>
+            </trans-unit>
+            <trans-unit id="be.overview.notPushed" resname="be.overview.notPushed">
+                <source>not pushed</source>
+            </trans-unit>
+            <trans-unit id="be.overview.keywordOnly" resname="be.overview.keywordOnly">
+                <source>keyword only</source>
+            </trans-unit>
+            <trans-unit id="be.overview.disabled" resname="be.overview.disabled">
+                <source>disabled</source>
+            </trans-unit>
+            <trans-unit id="be.overview.reindex" resname="be.overview.reindex">
+                <source>Reindex</source>
+            </trans-unit>
+            <trans-unit id="be.overview.rebuild" resname="be.overview.rebuild">
+                <source>Rebuild</source>
+            </trans-unit>
+            <trans-unit id="be.overview.confirmRebuild" resname="be.overview.confirmRebuild">
+                <source>Drop and recreate the %s index? Search is unavailable during the rebuild.</source>
+            </trans-unit>
+            <trans-unit id="be.overview.registeredLlmProviders" resname="be.overview.registeredLlmProviders">
+                <source>Registered LLM providers</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.pageTitle" resname="be.dashboard.pageTitle">
+                <source>Meilisearch — Dashboard</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.lead" resname="be.dashboard.lead">
+                <source>Live status of each site index directly from the engine (uncached): documents, indexing status, distribution by type, task queue including latest errors, and a settings snapshot.</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.indexing" resname="be.dashboard.indexing">
+                <source>indexing…</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.engineError" resname="be.dashboard.engineError">
+                <source>Engine error:</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.documents" resname="be.dashboard.documents">
+                <source>Documents</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.yes" resname="be.dashboard.yes">
+                <source>yes</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.no" resname="be.dashboard.no">
+                <source>no</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.isIndexing" resname="be.dashboard.isIndexing">
+                <source>isIndexing</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.enqueued" resname="be.dashboard.enqueued">
+                <source>enqueued</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.processing" resname="be.dashboard.processing">
+                <source>processing</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.failed" resname="be.dashboard.failed">
+                <source>failed</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.documentsPerType" resname="be.dashboard.documentsPerType">
+                <source>Documents per type</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.lastFailedTasks" resname="be.dashboard.lastFailedTasks">
+                <source>Last failed tasks</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.uid" resname="be.dashboard.uid">
+                <source>uid</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.type" resname="be.dashboard.type">
+                <source>Type</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.error" resname="be.dashboard.error">
+                <source>Error</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.finishedAt" resname="be.dashboard.finishedAt">
+                <source>finishedAt</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.settingsSnapshot" resname="be.dashboard.settingsSnapshot">
+                <source>Settings snapshot</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.searchableAttributes" resname="be.dashboard.searchableAttributes">
+                <source>searchableAttributes</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.rankingRules" resname="be.dashboard.rankingRules">
+                <source>rankingRules</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.embedders" resname="be.dashboard.embedders">
+                <source>embedders</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.none" resname="be.dashboard.none">
+                <source>none</source>
+            </trans-unit>
+            <trans-unit id="ragtest.title" resname="ragtest.title">
+                <source>RAG test</source>
+            </trans-unit>
+            <trans-unit id="ragtest.palette.lastrun" resname="ragtest.palette.lastrun">
+                <source>Last run</source>
+            </trans-unit>
+            <trans-unit id="ragtest.tab.config" resname="ragtest.tab.config">
+                <source>Test</source>
+            </trans-unit>
+            <trans-unit id="ragtest.tab.lastrun" resname="ragtest.tab.lastrun">
+                <source>Last run</source>
+            </trans-unit>
+            <trans-unit id="ragtest.title.label" resname="ragtest.title.label">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="ragtest.title.description" resname="ragtest.title.description">
+                <source>Short name of the test, shown in the test list.</source>
+            </trans-unit>
+            <trans-unit id="ragtest.question" resname="ragtest.question">
+                <source>Question</source>
+            </trans-unit>
+            <trans-unit id="ragtest.question.description" resname="ragtest.question.description">
+                <source>Asked exactly like a visitor in the chat would ask it.</source>
+            </trans-unit>
+            <trans-unit id="ragtest.expected_answer" resname="ragtest.expected_answer">
+                <source>Expected answer</source>
+            </trans-unit>
+            <trans-unit id="ragtest.expected_answer.description" resname="ragtest.expected_answer.description">
+                <source>Reference answer. The actual answer is compared with it by meaning (embedding similarity), not word for word.</source>
+            </trans-unit>
+            <trans-unit id="ragtest.threshold" resname="ragtest.threshold">
+                <source>Similarity threshold</source>
+            </trans-unit>
+            <trans-unit id="ragtest.threshold.description" resname="ragtest.threshold.description">
+                <source>Minimum similarity (0–1) for the test to pass. 0.85 suits most questions; lower it for questions that can be answered in many wordings.</source>
+            </trans-unit>
+            <trans-unit id="ragtest.site" resname="ragtest.site">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="ragtest.site.description" resname="ragtest.site.description">
+                <source>Identifier of the site whose index and assistant the test runs against.</source>
+            </trans-unit>
+            <trans-unit id="ragtest.last_status" resname="ragtest.last_status">
+                <source>Last status</source>
+            </trans-unit>
+            <trans-unit id="ragtest.last_score" resname="ragtest.last_score">
+                <source>Last score</source>
+            </trans-unit>
+            <trans-unit id="ragtest.last_run_at" resname="ragtest.last_run_at">
+                <source>Last run at</source>
+            </trans-unit>
+            <trans-unit id="ragtest.last_actual_answer" resname="ragtest.last_actual_answer">
+                <source>Last actual answer</source>
+            </trans-unit>
+            <trans-unit id="ragtest.last_error" resname="ragtest.last_error">
+                <source>Last error</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.title" resname="knowledgeResource.title">
+                <source>Knowledge resource</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.identifier" resname="knowledgeResource.identifier">
+                <source>Identifier</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.heading" resname="knowledgeResource.heading">
+                <source>Heading</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.abstract" resname="knowledgeResource.abstract">
+                <source>Abstract</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.body" resname="knowledgeResource.body">
+                <source>Content</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.resourceType" resname="knowledgeResource.resourceType">
+                <source>Topic type</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.parentIdentifier" resname="knowledgeResource.parentIdentifier">
+                <source>Parent topic</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.sourcePath" resname="knowledgeResource.sourcePath">
+                <source>Source path</source>
+            </trans-unit>
+            <trans-unit id="knowledgeResource.media" resname="knowledgeResource.media">
+                <source>Media</source>
+            </trans-unit>
+            <trans-unit id="task.ragTests.title" resname="task.ragTests.title">
+                <source>Meilisearch: Run RAG tests</source>
+            </trans-unit>
+            <trans-unit id="task.ragTests.description" resname="task.ragTests.description">
+                <source>Runs all enabled RAG tests of a site and stores score and actual answer, so changes of model, prompt or index show up as regressions.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.reindexHint" resname="be.kr.reindexHint">
+                <source>Reindex is NOT triggered automatically — run &lt;code&gt;ws_meilisearch:reindex&lt;/code&gt; (or use the Overview tab) afterwards to push the imported documents to Meilisearch.</source>
+            </trans-unit>
+            <trans-unit id="be.dashboard.noMeiliConfig" resname="be.dashboard.noMeiliConfig">
+                <source>No Meilisearch is configured for this site (&lt;code&gt;meilisearch.url&lt;/code&gt; is empty).</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.intro" resname="be.analytics.intro">
+                <source>Aggregated FE search queries from &lt;code&gt;tx_wsmeilisearch_search_log&lt;/code&gt;. Opt-in per site via &lt;code&gt;meilisearch.analytics.enabled = true&lt;/code&gt;. Only {query, result count, site, language, source, timestamp} are stored — no IPs, no user IDs.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.notEnabled" resname="be.analytics.notEnabled">
+                <source>Analytics is currently not enabled on any site. Set &lt;code&gt;meilisearch.analytics.enabled: true&lt;/code&gt; in the site settings so that future search requests are logged.</source>
+            </trans-unit>
+            <trans-unit id="be.analytics.ragIntro" resname="be.analytics.ragIntro">
+                <source>For each answered RAG request one row with &lt;code&gt;source='rag'&lt;/code&gt; is stored ({question, status, number of context hits, number of cited sources, hybrid, time}) — no answer text.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.intro" resname="be.kr.intro">
+                <source>Help topics live in &lt;code&gt;tx_wsmeilisearch_knowledge_resource&lt;/code&gt; and are pushed to Meilisearch as a separate document type (&lt;code&gt;type=help&lt;/code&gt;). Individual records can be adjusted in the &lt;a href="%s"&gt;List module&lt;/a&gt; — boost, hidden flag or abstract overrides survive the next import only if the identifier stays unchanged.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.importerCardsIntro" resname="be.kr.importerCardsIntro">
+                <source>One card per registered &lt;code&gt;KnowledgeResourceSourceImporter&lt;/code&gt;. New importers added in PHP appear here automatically — no template change needed.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.purgeIntro" resname="be.kr.purgeIntro">
+                <source>Hard-deletes every knowledge resource row in the chosen language together with its FAL references. Meilisearch keeps the now orphaned &lt;code&gt;help-&amp;lt;uid&amp;gt;&lt;/code&gt; document IDs until the next reindex.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.confirmPurge" resname="be.kr.confirmPurge">
+                <source>I understand that this deletes &lt;strong&gt;all&lt;/strong&gt; knowledge resource rows of the selected language.</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.intro" resname="be.ragtests.intro">
+                <source>Quality-assurance harness for the RAG pipeline. Each row in &lt;code&gt;tx_wsmeilisearch_ragtest&lt;/code&gt; is a triple of question, expected answer and threshold; “Run” asks the RAG provider the question and scores the actual answer against the expected one via embedding cosine similarity. A score below the threshold means the model, prompt or corpus has drifted away from the expected answer — a real quality regression. The &lt;a href="https://github.com/WapplerSystems/t3-meilisearch" rel="noopener"&gt;scheduler task&lt;/a&gt; runs the same engine on a schedule; this tab is for ad-hoc triage.</source>
+            </trans-unit>
+            <trans-unit id="be.ragtests.noTests" resname="be.ragtests.noTests">
+                <source>No regression tests defined yet. Click &lt;a href="%s" class="alert-link"&gt;+ New test&lt;/a&gt; to add the first one (you need a question, the expected answer and a similarity threshold — 0.85 is a sensible default).</source>
+            </trans-unit>
+            <trans-unit id="be.test.ragDisabled" resname="be.test.ragDisabled">
+                <source>Set &lt;code&gt;meilisearch.rag.provider&lt;/code&gt; in this site's &lt;code&gt;settings.yaml&lt;/code&gt; to enable RAG.</source>
+            </trans-unit>
+            <trans-unit id="be.kr.unknownFieldTypeFor" resname="be.kr.unknownFieldTypeFor">
+                <source>Unknown field type &lt;code&gt;%s&lt;/code&gt; for &lt;code&gt;%s&lt;/code&gt;.</source>
+            </trans-unit>
     </body>
     </file>
 </xliff>

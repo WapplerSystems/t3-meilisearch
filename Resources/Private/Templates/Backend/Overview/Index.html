@@ -5,25 +5,23 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Site Overview</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.headline"/></h1>
     <f:variable name="active" value="index"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="lead">
-        One index per site, faceted by record type. The columns below reflect the live
-        state of each Meilisearch index plus the configured embedder / RAG provider
-        from the site settings.
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.lead"/>
     </p>
 
     <table class="table table-striped">
         <thead>
             <tr>
-                <th>Site</th>
-                <th>Index</th>
-                <th>Documents</th>
-                <th>Embedder</th>
-                <th>RAG</th>
-                <th class="text-end">Actions</th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.site"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.index"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.documents"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.embedder"/></th>
+                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.rag"/></th>
+                <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.column.actions"/></th>
             </tr>
         </thead>
         <tbody>
@@ -33,12 +31,12 @@
                     <td>
                         <f:if condition="{site.configured}">
                             <f:then><code>{site.indexName}</code></f:then>
-                            <f:else><span class="badge bg-secondary">not configured</span></f:else>
+                            <f:else><span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.notConfigured"/></span></f:else>
                         </f:if>
                     </td>
                     <td>
                         <f:if condition="{site.error}">
-                            <f:then><span class="text-danger" title="{site.error}">error</span></f:then>
+                            <f:then><span class="text-danger" title="{site.error}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.error"/></span></f:then>
                             <f:else>
                                 <f:if condition="{site.docCount}">
                                     <f:then>{site.docCount}</f:then>
@@ -52,29 +50,29 @@
                             <f:then>
                                 <code>{site.embedderSource}</code>
                                 <f:if condition="{site.embedderActive}">
-                                    <f:then><span class="badge bg-success ms-1">active</span></f:then>
-                                    <f:else><span class="badge bg-warning ms-1">not pushed</span></f:else>
+                                    <f:then><span class="badge bg-success ms-1"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.active"/></span></f:then>
+                                    <f:else><span class="badge bg-warning ms-1"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.notPushed"/></span></f:else>
                                 </f:if>
                             </f:then>
-                            <f:else><span class="text-muted">keyword only</span></f:else>
+                            <f:else><span class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.keywordOnly"/></span></f:else>
                         </f:if>
                     </td>
                     <td>
                         <f:if condition="{site.ragProvider}">
                             <f:then><code>{site.ragProvider}</code></f:then>
-                            <f:else><span class="text-muted">disabled</span></f:else>
+                            <f:else><span class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.disabled"/></span></f:else>
                         </f:if>
                     </td>
                     <td class="text-end">
                         <f:if condition="{site.configured}">
                             <form action="{reindexUrl}" method="post" class="d-inline">
                                 <input type="hidden" name="site" value="{site.identifier}" />
-                                <button type="submit" class="btn btn-sm btn-default">Reindex</button>
+                                <button type="submit" class="btn btn-sm btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.reindex"/></button>
                             </form>
                             <form action="{reindexUrl}" method="post" class="d-inline ms-1">
                                 <input type="hidden" name="site" value="{site.identifier}" />
                                 <input type="hidden" name="rebuild" value="1" />
-                                <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Drop and recreate the {site.identifier} index? Search is unavailable during the rebuild.');">Rebuild</button>
+                                <button type="submit" class="btn btn-sm btn-warning" data-confirm="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.confirmRebuild', arguments: {0: site.identifier})}" onclick="return confirm(this.dataset.confirm);"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.rebuild"/></button>
                             </form>
                         </f:if>
                     </td>
@@ -83,7 +81,7 @@
         </tbody>
     </table>
 
-    <h2 class="mt-4">Registered LLM providers</h2>
+    <h2 class="mt-4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.overview.registeredLlmProviders"/></h2>
     <p>
         <f:for each="{availableProviders}" as="p">
             <code class="me-2">{p}</code>

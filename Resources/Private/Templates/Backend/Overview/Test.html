@@ -5,17 +5,17 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Test Search &amp; RAG</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.testSearchRag"/></h1>
     <f:variable name="active" value="test"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     {f:render(partial: 'Backend/TestExamples', arguments: {examples: examples})}
 
     <div class="row g-3">
-        <!-- ===================== SEARCH CARD ===================== -->
+        <f:comment> ===================== SEARCH CARD ===================== </f:comment>
         <div class="col-md-7">
             <div class="card h-100">
-                <div class="card-header"><strong>Search</strong></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.search"/></strong></div>
                 <div class="card-body">
                     <form action="{testUrl}" method="get">
                         <input type="hidden" name="token" value="{token}" />
@@ -23,7 +23,7 @@
                         <input type="hidden" name="ask" value="{askQuery}" />
 
                         <div class="mb-2">
-                            <label class="form-label small text-muted">Site</label>
+                            <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.site"/></label>
                             <select name="site" class="form-select form-select-sm">
                                 <f:for each="{siteOptions}" as="opt">
                                     <option value="{opt}" {f:if(condition: '{opt} == {selectedSite}', then: 'selected="selected"')}>{opt}</option>
@@ -32,28 +32,28 @@
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label small text-muted">Query</label>
-                            <input type="text" name="q" value="{query}" class="form-control" placeholder="e.g. saskatchewan" autofocus="autofocus" />
+                            <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.query"/></label>
+                            <input type="text" name="q" value="{query}" class="form-control" placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.placeholderQuery')}" autofocus="autofocus" />
                         </div>
 
                         <div class="row g-2 mb-2">
                             <div class="col-md-6">
-                                <label class="form-label small text-muted">Sort</label>
+                                <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sort"/></label>
                                 <select name="sort" class="form-select form-select-sm">
-                                    <option value="" {f:if(condition: '{sort} == \'\'', then: 'selected="selected"')}>Relevance</option>
-                                    <option value="datetime:desc" {f:if(condition: '{sort} == \'datetime:desc\'', then: 'selected="selected"')}>Newest first</option>
-                                    <option value="datetime:asc" {f:if(condition: '{sort} == \'datetime:asc\'', then: 'selected="selected"')}>Oldest first</option>
-                                    <option value="fileSize:desc" {f:if(condition: '{sort} == \'fileSize:desc\'', then: 'selected="selected"')}>Largest file</option>
-                                    <option value="fileSize:asc" {f:if(condition: '{sort} == \'fileSize:asc\'', then: 'selected="selected"')}>Smallest file</option>
+                                    <option value="" {f:if(condition: '{sort} == \'\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sortRelevance"/></option>
+                                    <option value="datetime:desc" {f:if(condition: '{sort} == \'datetime:desc\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sortNewestFirst"/></option>
+                                    <option value="datetime:asc" {f:if(condition: '{sort} == \'datetime:asc\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sortOldestFirst"/></option>
+                                    <option value="fileSize:desc" {f:if(condition: '{sort} == \'fileSize:desc\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sortLargestFile"/></option>
+                                    <option value="fileSize:asc" {f:if(condition: '{sort} == \'fileSize:asc\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sortSmallestFile"/></option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small text-muted">Type filter</label>
+                                <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.typeFilter"/></label>
                                 <select name="filter[type]" class="form-select form-select-sm">
-                                    <option value="">All</option>
-                                    <option value="page" {f:if(condition: '{filters.type} == \'page\'', then: 'selected="selected"')}>Pages</option>
-                                    <option value="news" {f:if(condition: '{filters.type} == \'news\'', then: 'selected="selected"')}>News</option>
-                                    <option value="file" {f:if(condition: '{filters.type} == \'file\'', then: 'selected="selected"')}>Files</option>
+                                    <option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.filterAll"/></option>
+                                    <option value="page" {f:if(condition: '{filters.type} == \'page\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.filterPages"/></option>
+                                    <option value="news" {f:if(condition: '{filters.type} == \'news\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.filterNews"/></option>
+                                    <option value="file" {f:if(condition: '{filters.type} == \'file\'', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.filterFiles"/></option>
                                 </select>
                             </div>
                         </div>
@@ -61,19 +61,19 @@
                         <div class="d-flex align-items-center gap-3">
                             <div class="form-check">
                                 <input type="checkbox" name="hybrid" value="1" id="hybrid" class="form-check-input" {f:if(condition: hybrid, then: 'checked="checked"')} />
-                                <label for="hybrid" class="form-check-label">Hybrid (semantic + keyword)</label>
+                                <label for="hybrid" class="form-check-label"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.hybridSemanticKeyword"/></label>
                             </div>
-                            <button type="submit" class="btn btn-primary ms-auto">Run search</button>
+                            <button type="submit" class="btn btn-primary ms-auto"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.runSearch"/></button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- ===================== RAG CARD ===================== -->
+        <f:comment> ===================== RAG CARD ===================== </f:comment>
         <div class="col-md-5">
             <div class="card h-100">
-                <div class="card-header"><strong>RAG</strong> <span class="text-muted">(Ask the site)</span></div>
+                <div class="card-header"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.rag"/></strong> <span class="text-muted">(<f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.askTheSite"/>)</span></div>
                 <div class="card-body">
                     <form action="{testUrl}" method="get">
                         <input type="hidden" name="token" value="{token}" />
@@ -84,16 +84,15 @@
                         <f:if condition="{hybrid}"><input type="hidden" name="hybrid" value="1" /></f:if>
                         <f:if condition="{filters.type}"><input type="hidden" name="filter[type]" value="{filters.type}" /></f:if>
 
-                        <label class="form-label small text-muted">Question</label>
-                        <input type="text" name="ask" value="{askQuery}" class="form-control mb-2" placeholder="Ask the site assistant…" />
+                        <label class="form-label small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.question"/></label>
+                        <input type="text" name="ask" value="{askQuery}" class="form-control mb-2" placeholder="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.placeholderAsk')}" />
 
                         <div class="d-flex">
-                            <button type="submit" class="btn btn-success ms-auto">Ask</button>
+                            <button type="submit" class="btn btn-success ms-auto"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.ask"/></button>
                         </div>
 
                         <p class="text-muted small mt-3 mb-0">
-                            Submits to the same Test view; the answer renders below the
-                            search results.
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.ragSubmitHint"/>
                         </p>
                     </form>
                 </div>
@@ -101,14 +100,19 @@
         </div>
     </div>
 
-    <!-- ===================== SEARCH RESULTS ===================== -->
+    <f:comment> ===================== SEARCH RESULTS ===================== </f:comment>
     <f:if condition="{searchResult}">
         <section class="mt-4">
             <div class="d-flex align-items-center mb-2">
-                <h2 class="h4 mb-0">Search results</h2>
-                <span class="badge bg-secondary ms-2">{searchResult.totalHits} hit<f:if condition="{searchResult.totalHits} != 1">s</f:if></span>
+                <h2 class="h4 mb-0"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.searchResults"/></h2>
+                <span class="badge bg-secondary ms-2">
+                    <f:if condition="{searchResult.totalHits} != 1">
+                        <f:then><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.numHits" arguments="{0: searchResult.totalHits}"/></f:then>
+                        <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.numHit" arguments="{0: searchResult.totalHits}"/></f:else>
+                    </f:if>
+                </span>
                 <f:if condition="{searchResult.totalPages} > 1">
-                    <span class="text-muted ms-2 small">page {searchResult.page} / {searchResult.totalPages}</span>
+                    <span class="text-muted ms-2 small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.pageXOf" arguments="{0: searchResult.page, 1: searchResult.totalPages}"/></span>
                 </f:if>
             </div>
 
@@ -128,10 +132,10 @@
                     <table class="table table-sm table-striped">
                         <thead>
                             <tr>
-                                <th style="width: 8em;">ID</th>
-                                <th style="width: 5em;">Type</th>
-                                <th>Title</th>
-                                <th style="width: 6em;" class="text-end">Lang</th>
+                                <th style="width: 8em;"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.id"/></th>
+                                <th style="width: 5em;"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.type"/></th>
+                                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.title"/></th>
+                                <th style="width: 6em;" class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.language"/></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -160,21 +164,21 @@
                     </table>
                 </f:then>
                 <f:else>
-                    <div class="alert alert-light">No hits.</div>
+                    <div class="alert alert-light"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.noHits"/></div>
                 </f:else>
             </f:if>
 
             <f:if condition="{searchResult.totalPages} > 1">
                 <nav class="d-flex justify-content-between align-items-center mt-3">
-                    <span class="text-muted small">Page {searchResult.page} of {searchResult.totalPages}</span>
+                    <span class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.paginationPage" arguments="{0: searchResult.page, 1: searchResult.totalPages}"/></span>
                     <div class="btn-group btn-group-sm">
                         <f:if condition="{prevPageUrl}">
-                            <f:then><a href="{prevPageUrl}" class="btn btn-default">&laquo; Prev</a></f:then>
-                            <f:else><span class="btn btn-default disabled">&laquo; Prev</span></f:else>
+                            <f:then><a href="{prevPageUrl}" class="btn btn-default">&laquo; <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.prev"/></a></f:then>
+                            <f:else><span class="btn btn-default disabled">&laquo; <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.prev"/></span></f:else>
                         </f:if>
                         <f:if condition="{nextPageUrl}">
-                            <f:then><a href="{nextPageUrl}" class="btn btn-default">Next &raquo;</a></f:then>
-                            <f:else><span class="btn btn-default disabled">Next &raquo;</span></f:else>
+                            <f:then><a href="{nextPageUrl}" class="btn btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.next"/> &raquo;</a></f:then>
+                            <f:else><span class="btn btn-default disabled"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.next"/> &raquo;</span></f:else>
                         </f:if>
                     </div>
                 </nav>
@@ -182,10 +186,10 @@
         </section>
     </f:if>
 
-    <!-- ===================== RAG ANSWER ===================== -->
+    <f:comment> ===================== RAG ANSWER ===================== </f:comment>
     <f:if condition="{ragAnswer}">
         <section class="mt-4">
-            <h2 class="h4">RAG answer</h2>
+            <h2 class="h4"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.ragAnswer"/></h2>
             <f:switch expression="{ragAnswer.status}">
                 <f:case value="ok">
                     <div class="card mb-3">
@@ -193,25 +197,27 @@
                             <div style="white-space: pre-wrap;">{ragAnswer.answer}</div>
                         </div>
                     </div>
+                    <f:variable name="citedCount" value="{ragAnswer.citedIds -> f:count()}" />
+                    <f:variable name="contextCount" value="{ragSources -> f:count()}" />
                     <h3 class="h6 text-muted">
-                        Sources
-                        <span class="badge bg-success">{ragAnswer.citedIds -> f:count()} cited</span>
-                        <span class="badge bg-secondary">{ragSources -> f:count()} fed as context</span>
+                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.sources"/>
+                        <span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.numCited" arguments="{0: citedCount}"/></span>
+                        <span class="badge bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.numFedAsContext" arguments="{0: contextCount}"/></span>
                     </h3>
                     <table class="table table-sm">
                         <thead>
                             <tr>
                                 <th style="width: 2.5em;"></th>
-                                <th style="width: 8em;">ID</th>
-                                <th style="width: 5em;">Type</th>
-                                <th>Title</th>
+                                <th style="width: 8em;"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.id"/></th>
+                                <th style="width: 5em;"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.type"/></th>
+                                <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.title"/></th>
                             </tr>
                         </thead>
                         <tbody>
                             <f:for each="{ragSources}" as="src">
                                 <tr {f:if(condition: src.cited, then: 'class="table-success"')}>
                                     <td>
-                                        <f:if condition="{src.cited}"><strong title="cited">✓</strong></f:if>
+                                        <f:if condition="{src.cited}"><strong title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.cited')}">✓</strong></f:if>
                                     </td>
                                     <td><code>{src.id}</code></td>
                                     <td>{src.type}</td>
@@ -222,13 +228,13 @@
                     </table>
                 </f:case>
                 <f:case value="disabled">
-                    <div class="alert alert-info"><strong>Status: disabled.</strong> Set <code>meilisearch.rag.provider</code> in this site's <code>settings.yaml</code> to enable.</div>
+                    <div class="alert alert-info"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.statusDisabled"/></strong> <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.ragDisabled"/></f:format.raw></div>
                 </f:case>
                 <f:case value="no_context">
-                    <div class="alert alert-warning"><strong>Status: no_context.</strong> Retrieval returned no documents for this question — the LLM was not called.</div>
+                    <div class="alert alert-warning"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.statusNoContext"/></strong> <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.noContextDescription"/></div>
                 </f:case>
                 <f:case value="failed">
-                    <div class="alert alert-danger"><strong>Status: failed.</strong> {ragAnswer.error}</div>
+                    <div class="alert alert-danger"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.test.statusFailed"/></strong> {ragAnswer.error}</div>
                 </f:case>
             </f:switch>
         </section>

@@ -25,11 +25,11 @@
 
 <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <strong>{importer.label}</strong>
+        <strong><f:translate key="{importer.label}" default="{importer.label}"/></strong>
         <code class="text-muted small">{importer.name}</code>
     </div>
     <div class="card-body">
-        <p class="small text-muted mb-3">{importer.description}</p>
+        <p class="small text-muted mb-3"><f:translate key="{importer.description}" default="{importer.description}"/></p>
 
         <form action="{runImporterUrl}" method="post"
               {f:if(condition: hasFile, then: 'enctype="multipart/form-data"')}>
@@ -42,10 +42,10 @@
             </f:for>
 
             <button type="submit" class="btn btn-primary btn-sm">
-                Run <code class="text-light">{importer.name}</code>
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.run" /> <code class="text-light">{importer.name}</code>
             </button>
             <p class="text-muted small mt-2 mb-0">
-                Reindex is NOT triggered automatically — run <code>ws_meilisearch:reindex</code> (or the Overview tab) afterwards to push the imported docs to Meilisearch.
+                <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.kr.reindexHint"/></f:format.raw>
             </p>
         </form>
     </div>

@@ -4,44 +4,38 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — RAG regression tests</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.headline" /></h1>
     <f:variable name="active" value="ragtests"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="text-muted">
-        Quality-assurance harness for the RAG pipeline. Each row in <code>tx_wsmeilisearch_ragtest</code>
-        is a (question, expected answer, threshold) triple; "Run" asks the RAG provider the question
-        and scores the actual answer against the expected one via embedding cosine similarity. A
-        score below the threshold means the model / prompt / corpus has drifted away from the
-        expected answer — a real quality regression. The
-        <a href="https://github.com/WapplerSystems/t3-meilisearch" rel="noopener">scheduler task</a>
-        runs the same engine on cron; this tab is for ad-hoc triage.
+        <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.intro"/></f:format.raw>
     </p>
 
-    <!-- ============== SUMMARY + GLOBAL ACTIONS ============== -->
+    <f:comment> ============== SUMMARY + GLOBAL ACTIONS ============== </f:comment>
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center gap-3 flex-wrap">
-            <strong>Current state</strong>
+            <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.currentState" /></strong>
             <span class="badge text-bg-light">
-                {summary.total} total
+                <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryTotal" arguments="{0: summary.total}" />
                 <f:if condition="{summary.enabled} != {summary.total}">
-                    <span class="text-muted">({summary.enabled} enabled)</span>
+                    <span class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryEnabled" arguments="{0: summary.enabled}" /></span>
                 </f:if>
             </span>
-            <span class="badge text-bg-success">{summary.pass} pass</span>
-            <span class="badge text-bg-warning">{summary.fail} fail</span>
-            <span class="badge text-bg-secondary">{summary.error} error</span>
-            <span class="badge text-bg-light">{summary.never} never run</span>
+            <span class="badge text-bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryPass" arguments="{0: summary.pass}" /></span>
+            <span class="badge text-bg-warning"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryFail" arguments="{0: summary.fail}" /></span>
+            <span class="badge text-bg-secondary"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryError" arguments="{0: summary.error}" /></span>
+            <span class="badge text-bg-light"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.summaryNeverRun" arguments="{0: summary.never}" /></span>
 
             <div class="ms-auto d-flex gap-2">
-                <a href="{newTestUrl}" class="btn btn-sm btn-default">+ New test</a>
-                <a href="{listEditUrl}" class="btn btn-sm btn-default">Open in List module</a>
+                <a href="{newTestUrl}" class="btn btn-sm btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.newTest" /></a>
+                <a href="{listEditUrl}" class="btn btn-sm btn-default"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.openInListModule" /></a>
                 <f:if condition="{summary.enabled}">
                     <form action="{runAllUrl}" method="post" class="d-inline">
                         <input type="hidden" name="token" value="{token}" />
                         <button type="submit" class="btn btn-sm btn-primary"
                                 onclick="return confirm('Run all {summary.enabled} enabled test(s)? This calls the RAG provider once per test.');">
-                            Run all
+                            <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.runAll" />
                         </button>
                     </form>
                 </f:if>
@@ -49,7 +43,7 @@
         </div>
     </div>
 
-    <!-- ============== TEST LIST ============== -->
+    <f:comment> ============== TEST LIST ============== </f:comment>
     <f:if condition="{tests}">
         <f:then>
             <div class="table-responsive">
@@ -57,15 +51,15 @@
                     <thead>
                         <tr>
                             <th style="width: 1%"></th>
-                            <th>Title</th>
-                            <th>Question</th>
-                            <th>Site</th>
-                            <th class="text-end">Threshold</th>
-                            <th class="text-end">Last score</th>
-                            <th>Trend</th>
-                            <th>Status</th>
-                            <th>Last run</th>
-                            <th class="text-end">Actions</th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableTitle" /></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableQuestion" /></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableSite" /></th>
+                            <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableThreshold" /></th>
+                            <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableLastScore" /></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableTrend" /></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableStatus" /></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableLastRun" /></th>
+                            <th class="text-end"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.tableActions" /></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -75,32 +69,32 @@
                                 <td>
                                     <strong>{t.title -> f:format.htmlspecialchars()}</strong>
                                     <f:if condition="{t.hidden}">
-                                        <span class="badge text-bg-secondary ms-1">hidden</span>
+                                        <span class="badge text-bg-secondary ms-1"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.hidden" /></span>
                                     </f:if>
                                     <f:if condition="{t.last_actual_answer}">
-                                        <!--
+                                        <f:comment>
                                             Adopt-as-expected: the actual answer drifts ~0.05 cosine
                                             across reindex / model upgrades even when factually
                                             unchanged, which is enough to push a passing test under
                                             its threshold. Lowering the threshold globally would
                                             hide real regressions. Instead: let the operator
                                             promote a manually-OK'd actual to the new baseline.
-                                        -->
+                                        </f:comment>
                                         <details class="mt-2 small">
-                                            <summary class="text-muted" style="cursor:pointer;">Show last actual / adopt</summary>
+                                            <summary class="text-muted" style="cursor:pointer;"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.showLastActualAdopt" /></summary>
                                             <div class="ws-rag-adopt-panel mt-2 border rounded p-2 bg-light">
-                                                <div class="mb-1"><strong class="small text-muted">Expected (current baseline):</strong></div>
+                                                <div class="mb-1"><strong class="small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.expectedBaseline" /></strong></div>
                                                 <pre class="small bg-white p-2 border rounded mb-2" style="white-space: pre-wrap;">{t.expected_answer -> f:format.htmlspecialchars()}</pre>
-                                                <div class="mb-1"><strong class="small text-muted">Actual (last run):</strong></div>
+                                                <div class="mb-1"><strong class="small text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.actualLastRun" /></strong></div>
                                                 <pre class="small bg-white p-2 border rounded mb-2" style="white-space: pre-wrap;">{t.last_actual_answer -> f:format.htmlspecialchars()}</pre>
-                                                <form action="{adoptUrl}" method="post" class="d-inline ws-rag-adopt-form">
+                                                <form action="{adoptUrl}" method="post" class="d-inline ws-rag-adopt-form" data-confirm="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.confirmAdopt')}">
                                                     <input type="hidden" name="token" value="{token}" />
                                                     <input type="hidden" name="uid" value="{t.uid}" />
                                                     <button type="submit"
                                                             class="btn btn-sm btn-warning ws-rag-adopt-btn"
                                                             data-uid="{t.uid}"
-                                                            title="Replace the expected answer with the latest actual. Use only after manually verifying the actual is factually correct.">
-                                                        ↻ Adopt actual as expected
+                                                            title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.adoptTitle')}">
+                                                        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.adoptButton" />
                                                     </button>
                                                 </form>
                                             </div>
@@ -123,7 +117,7 @@
                                         <f:then>
                                             <svg viewBox="0 0 80 24" width="80" height="24" preserveAspectRatio="none"
                                                  style="display: block; overflow: visible;">
-                                                <title>{t.sparkline.count} runs — min {t.sparkline.min}, max {t.sparkline.max}, last {t.sparkline.lastScore}</title>
+                                                <title><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.sparklineTitle" arguments="{0: t.sparkline.count, 1: t.sparkline.min, 2: t.sparkline.max, 3: t.sparkline.lastScore}" /></title>
                                                 <polyline points="{t.sparkline.path}"
                                                           fill="none" stroke="currentColor" stroke-width="1.2"
                                                           stroke-linejoin="round" stroke-linecap="round"
@@ -137,14 +131,14 @@
                                 </td>
                                 <td>
                                     <f:switch expression="{t.last_status}">
-                                        <f:case value="pass"><span class="badge text-bg-success">PASS</span></f:case>
+                                        <f:case value="pass"><span class="badge text-bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.statusPass" /></span></f:case>
                                         <f:case value="fail">
-                                            <span class="badge text-bg-warning" title="{t.last_actual_answer -> f:format.crop(maxCharacters: 200)}">FAIL</span>
+                                            <span class="badge text-bg-warning" title="{t.last_actual_answer -> f:format.crop(maxCharacters: 200)}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.statusFail" /></span>
                                         </f:case>
                                         <f:case value="error">
-                                            <span class="badge text-bg-danger" title="{t.last_error -> f:format.crop(maxCharacters: 200)}">ERROR</span>
+                                            <span class="badge text-bg-danger" title="{t.last_error -> f:format.crop(maxCharacters: 200)}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.statusError" /></span>
                                         </f:case>
-                                        <f:defaultCase><span class="text-muted small">never run</span></f:defaultCase>
+                                        <f:defaultCase><span class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.neverRun" /></span></f:defaultCase>
                                     </f:switch>
                                 </td>
                                 <td class="text-muted small">
@@ -160,9 +154,9 @@
                                         <button type="submit"
                                                 class="btn btn-sm btn-primary ws-rag-run-btn"
                                                 data-uid="{t.uid}"
-                                                title="Run this test now (calls the RAG provider once).">
+                                                title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.runTitle')}">
                                             <span class="ws-rag-run-icon" aria-hidden="true">▶</span>
-                                            <span class="ws-rag-run-label">Run</span>
+                                            <span class="ws-rag-run-label"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.run" /></span>
                                             <span class="ws-rag-run-spinner spinner-border spinner-border-sm ms-1 d-none"
                                                   role="status" aria-hidden="true"></span>
                                         </button>
@@ -176,9 +170,7 @@
         </f:then>
         <f:else>
             <div class="alert alert-info">
-                No regression tests defined yet. Click <a href="{newTestUrl}" class="alert-link">+ New test</a>
-                to add the first one (you'll need a question, the expected answer, and a similarity
-                threshold — 0.85 is a sane default).
+                <f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.ragtests.noTests" arguments="{0: '{newTestUrl -> f:format.htmlspecialchars()}'}"/></f:format.raw>
             </div>
         </f:else>
     </f:if>

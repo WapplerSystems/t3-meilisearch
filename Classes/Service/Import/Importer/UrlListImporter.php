@@ -77,28 +77,28 @@ final class UrlListImporter implements KnowledgeResourceSourceImporter
 
     public function label(): string
     {
-        return 'URL list (HTTP fetch)';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.label';
     }
 
     public function description(): string
     {
-        return 'Fetch a list of URLs and create one knowledge resource per response — body via Tika, source kept in FAL.';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.description';
     }
 
     public function describeFields(): array
     {
         return [
-            ['name' => 'urls', 'label' => 'URLs', 'type' => 'textarea', 'required' => true,
-             'help' => 'One URL per line. Only http/https. Blank lines and lines starting with # are skipped.'],
-            ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
-             'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
-            ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where downloaded files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "urls/" subfolder is added automatically.'],
-            ['name' => 'timeout', 'label' => 'HTTP timeout (s)', 'type' => 'text', 'default' => (string)self::DEFAULT_TIMEOUT,
-             'help' => 'Per-URL fetch timeout. Slow servers fail individually without wedging the whole batch.'],
-            ['name' => 'maxSizeMb', 'label' => 'Max response size (MB)', 'type' => 'text', 'default' => (string)self::DEFAULT_MAX_SIZE_MB,
-             'help' => 'Responses larger than this are aborted and counted as skipped.'],
+            ['name' => 'urls', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.urls.label', 'type' => 'textarea', 'required' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.urls.help'],
+            ['name' => 'language', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetLanguage', 'type' => 'language', 'default' => 0],
+            ['name' => 'resource_type', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.documentKind', 'type' => 'select', 'default' => 'reference',
+             'options' => ['reference' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.reference', 'concept' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.concept', 'task' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.task', 'upload' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.upload']],
+            ['name' => 'targetFolder', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetFolder', 'type' => 'folder',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.targetFolder.help'],
+            ['name' => 'timeout', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.timeout.label', 'type' => 'text', 'default' => (string)self::DEFAULT_TIMEOUT,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.timeout.help'],
+            ['name' => 'maxSizeMb', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.maxSizeMb.label', 'type' => 'text', 'default' => (string)self::DEFAULT_MAX_SIZE_MB,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.urlList.maxSizeMb.help'],
         ];
     }
 

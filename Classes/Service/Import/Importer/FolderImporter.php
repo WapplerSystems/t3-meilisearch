@@ -41,28 +41,28 @@ final class FolderImporter implements KnowledgeResourceSourceImporter
 
     public function label(): string
     {
-        return 'FAL folder';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.label';
     }
 
     public function description(): string
     {
-        return 'Walk a fileadmin folder and create one knowledge resource per file. Reuses existing FAL records.';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.description';
     }
 
     public function describeFields(): array
     {
         return [
-            ['name' => 'folder', 'label' => 'Source folder', 'type' => 'folder', 'required' => true,
-             'help' => 'FAL folder containing the files to import. Existing sys_file records are reused; nothing is copied.'],
-            ['name' => 'recursive', 'label' => 'Include subfolders', 'type' => 'checkbox', 'default' => false,
-             'help' => 'Walk into subfolders recursively. Off by default — keeps re-runs predictable.'],
-            ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'pid', 'label' => 'Storage pid', 'type' => 'text', 'default' => '0',
-             'help' => 'Page id where the records live. 0 = site root.'],
-            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
-             'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
-            ['name' => 'titleFromFilename', 'label' => 'Use filename as title', 'type' => 'checkbox', 'default' => true,
-             'help' => 'When off, every knowledge resource starts with an empty title — only useful if you plan to edit them manually afterwards.'],
+            ['name' => 'folder', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.sourceFolder.label', 'type' => 'folder', 'required' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.sourceFolder.help'],
+            ['name' => 'recursive', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.recursive.label', 'type' => 'checkbox', 'default' => false,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.recursive.help'],
+            ['name' => 'language', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetLanguage', 'type' => 'language', 'default' => 0],
+            ['name' => 'pid', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.storagePid', 'type' => 'text', 'default' => '0',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.storagePidHelp'],
+            ['name' => 'resource_type', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.documentKind', 'type' => 'select', 'default' => 'reference',
+             'options' => ['reference' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.reference', 'concept' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.concept', 'task' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.task', 'upload' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.upload']],
+            ['name' => 'titleFromFilename', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.titleFromFilename', 'type' => 'checkbox', 'default' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.folder.titleFromFilenameHelp'],
         ];
     }
 

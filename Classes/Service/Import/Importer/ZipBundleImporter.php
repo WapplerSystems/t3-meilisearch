@@ -52,28 +52,28 @@ final class ZipBundleImporter implements KnowledgeResourceSourceImporter
 
     public function label(): string
     {
-        return 'ZIP bundle upload';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.label';
     }
 
     public function description(): string
     {
-        return 'Upload one .zip containing many documents — each entry becomes its own knowledge resource.';
+        return 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.description';
     }
 
     public function describeFields(): array
     {
         return [
-            ['name' => 'upload', 'label' => 'ZIP file', 'type' => 'file', 'required' => true,
-             'help' => 'A .zip archive containing the documents to import.'],
-            ['name' => 'language', 'label' => 'Target sys_language_uid', 'type' => 'language', 'default' => 0],
-            ['name' => 'resource_type', 'label' => 'Document kind', 'type' => 'select', 'default' => 'reference',
-             'options' => ['reference' => 'reference', 'concept' => 'concept', 'task' => 'task', 'upload' => 'upload']],
-            ['name' => 'targetFolder', 'label' => 'Target folder', 'type' => 'folder',
-             'help' => 'Where the extracted files land in fileadmin. Empty = site default (meilisearch.knowledgeResource.fileadminFolder). A "zips/" subfolder is added automatically.'],
-            ['name' => 'preserveSubfolders', 'label' => 'Preserve subfolders', 'type' => 'checkbox', 'default' => false,
-             'help' => 'Off (default) flattens the zip — every file lands directly in zips/. On mirrors the zip\'s directory structure.'],
-            ['name' => 'titleFromFilename', 'label' => 'Use filename as title', 'type' => 'checkbox', 'default' => true,
-             'help' => 'When off, every knowledge resource starts with an empty title.'],
+            ['name' => 'upload', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.file.label', 'type' => 'file', 'required' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.file.help'],
+            ['name' => 'language', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetLanguage', 'type' => 'language', 'default' => 0],
+            ['name' => 'resource_type', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.documentKind', 'type' => 'select', 'default' => 'reference',
+             'options' => ['reference' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.reference', 'concept' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.concept', 'task' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.task', 'upload' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.resourceType.upload']],
+            ['name' => 'targetFolder', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.targetFolder', 'type' => 'folder',
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.targetFolder.help'],
+            ['name' => 'preserveSubfolders', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.preserveSubfolders.label', 'type' => 'checkbox', 'default' => false,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.zipBundle.preserveSubfolders.help'],
+            ['name' => 'titleFromFilename', 'label' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.titleFromFilename', 'type' => 'checkbox', 'default' => true,
+             'help' => 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.importer.common.titleFromFilenameHelp'],
         ];
     }
 

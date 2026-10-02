@@ -34,8 +34,11 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.ws-rag-adopt-form').forEach(function (form) {
         form.addEventListener('submit', function (e) {
             const btn = form.querySelector('.ws-rag-adopt-btn');
+            // The text comes translated from the template (data-confirm);
+            // the English fallback only covers markup without the attribute.
             const ok = window.confirm(
-                'Replace the expected answer with the last actual answer for this test? '
+                form.dataset.confirm
+                || 'Replace the expected answer with the last actual answer for this test? '
                 + 'Make sure the actual is factually correct — this becomes the new regression baseline.',
             );
             if (!ok) {

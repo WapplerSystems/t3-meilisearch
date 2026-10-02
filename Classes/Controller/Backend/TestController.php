@@ -164,46 +164,46 @@ final class TestController
         $base = ['site' => $siteId];
         $examples = [
             [
-                'label' => 'Keyword search',
-                'description' => 'Plain typo-tolerant full-text search across pages, news, and indexed files.',
-                'feature' => 'phase 1',
+                'label' => $this->context->label('be.test.example.keyword.label'),
+                'description' => $this->context->label('be.test.example.keyword.description'),
+                'feature' => $this->context->label('be.test.feature.phase1'),
                 // Pick a word likely to hit on any docs site. Operator
                 // can edit the query after the example loads — the
                 // value here just seeds the input.
                 'params' => $base + ['q' => 'guide'],
             ],
             [
-                'label' => 'Filter: only files',
-                'description' => 'Same query restricted to `type=file` — handy for "find me the PDF".',
-                'feature' => 'phase 1 + facets',
+                'label' => $this->context->label('be.test.example.filterFiles.label'),
+                'description' => $this->context->label('be.test.example.filterFiles.description'),
+                'feature' => $this->context->label('be.test.feature.phase1Facets'),
                 'params' => $base + ['q' => '', 'filter' => ['type' => 'file']],
             ],
             [
-                'label' => 'Sort by file size',
-                'description' => 'Empty query + sort descending. Surfaces the biggest indexed binaries.',
-                'feature' => 'sort',
+                'label' => $this->context->label('be.test.example.sortBySize.label'),
+                'description' => $this->context->label('be.test.example.sortBySize.description'),
+                'feature' => $this->context->label('be.test.feature.sort'),
                 'params' => $base + ['q' => '', 'sort' => 'fileSize:desc'],
             ],
             [
-                'label' => 'Pagination',
-                'description' => 'Empty query → all docs, walk pages with Prev / Next at the bottom.',
-                'feature' => 'pagination',
+                'label' => $this->context->label('be.test.example.pagination.label'),
+                'description' => $this->context->label('be.test.example.pagination.description'),
+                'feature' => $this->context->label('be.test.feature.pagination'),
                 'params' => $base + ['q' => '', 'page' => 1],
             ],
             [
-                'label' => 'Hybrid (semantic + keyword)',
-                'description' => $hasEmbedder
-                    ? 'Vector + keyword blend — finds docs even when the wording is paraphrased.'
-                    : 'Needs an embedder configured. The toggle stays a no-op on sites without one.',
-                'feature' => 'phase 3' . ($hasEmbedder ? '' : ' (no embedder)'),
+                'label' => $this->context->label('be.test.example.hybrid.label'),
+                'description' => $this->context->label(
+                    $hasEmbedder ? 'be.test.example.hybrid.descriptionWithEmbedder' : 'be.test.example.hybrid.descriptionNoEmbedder'
+                ),
+                'feature' => $this->context->label($hasEmbedder ? 'be.test.feature.phase3' : 'be.test.feature.phase3NoEmbedder'),
                 'params' => $base + ['q' => 'how do I reset my password', 'hybrid' => 1],
             ],
             [
-                'label' => 'RAG: ask the site',
-                'description' => $hasRag
-                    ? 'LLM-grounded answer with cited sources, retrieval bias toward the question topic.'
-                    : 'Needs a RAG provider configured. Click anyway to see the "disabled" status.',
-                'feature' => 'phase 4' . ($hasRag ? '' : ' (no provider)'),
+                'label' => $this->context->label('be.test.example.rag.label'),
+                'description' => $this->context->label(
+                    $hasRag ? 'be.test.example.rag.descriptionWithProvider' : 'be.test.example.rag.descriptionNoProvider'
+                ),
+                'feature' => $this->context->label($hasRag ? 'be.test.feature.phase4' : 'be.test.feature.phase4NoProvider'),
                 'params' => $base + ['ask' => 'What is this site about?'],
             ],
         ];

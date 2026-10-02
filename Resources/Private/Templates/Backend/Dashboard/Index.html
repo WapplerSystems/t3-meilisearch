@@ -5,14 +5,12 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h1>Meilisearch — Dashboard</h1>
+    <h1><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.pageTitle"/></h1>
     <f:variable name="active" value="dashboard"/>
     <f:render partial="Backend/TabNav" arguments="{_all}" />
 
     <p class="lead">
-        Live-Status jedes Site-Index direkt aus der Engine (ungecacht): Dokumente,
-        Indexierungs-Status, Verteilung pro Typ, Task-Queue inkl. letzter Fehler und ein
-        Settings-Snapshot.
+        <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.lead"/>
     </p>
 
     <f:for each="{cards}" as="card">
@@ -21,7 +19,7 @@
                 <strong>{card.siteTitle}</strong>
                 <code>{card.indexName}</code>
                 <f:if condition="{card.isIndexing}">
-                    <span class="badge bg-info">indexing…</span>
+                    <span class="badge bg-info"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.indexing"/></span>
                 </f:if>
                 <span class="ms-auto text-muted small">{card.siteIdentifier}</span>
             </div>
@@ -29,50 +27,50 @@
 
                 <f:if condition="{card.configured} == 0">
                     <f:then>
-                        <div class="alert alert-secondary mb-0">Für diese Site ist kein Meilisearch konfiguriert (<code>meilisearch.url</code> leer).</div>
+                        <div class="alert alert-secondary mb-0"><f:format.raw><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.noMeiliConfig"/></f:format.raw></div>
                     </f:then>
                     <f:else>
                         <f:if condition="{card.error}">
-                            <div class="alert alert-danger"><strong>Engine-Fehler:</strong> {card.error}</div>
+                            <div class="alert alert-danger"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.engineError"/></strong> {card.error}</div>
                         </f:if>
 
                         <div class="row g-3 mb-3">
                             <div class="col-auto">
                                 <div class="border rounded p-2 text-center" style="min-width: 8rem;">
                                     <div class="h3 mb-0">{f:if(condition: '{card.docCount}', then: '{card.docCount}', else: '0')}</div>
-                                    <div class="text-muted small">Dokumente</div>
+                                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.documents"/></div>
                                 </div>
                             </div>
                             <div class="col-auto">
                                 <div class="border rounded p-2 text-center" style="min-width: 8rem;">
                                     <div class="h3 mb-0">
-                                        <f:if condition="{card.isIndexing}"><f:then><span class="text-info">ja</span></f:then><f:else><span class="text-muted">nein</span></f:else></f:if>
+                                        <f:if condition="{card.isIndexing}"><f:then><span class="text-info"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.yes"/></span></f:then><f:else><span class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.no"/></span></f:else></f:if>
                                     </div>
-                                    <div class="text-muted small">isIndexing</div>
+                                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.isIndexing"/></div>
                                 </div>
                             </div>
                             <div class="col-auto">
                                 <div class="border rounded p-2 text-center" style="min-width: 6rem;">
                                     <div class="h3 mb-0">{f:if(condition: '{card.tasks.enqueued}', then: '{card.tasks.enqueued}', else: '0')}</div>
-                                    <div class="text-muted small">enqueued</div>
+                                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.enqueued"/></div>
                                 </div>
                             </div>
                             <div class="col-auto">
                                 <div class="border rounded p-2 text-center" style="min-width: 6rem;">
                                     <div class="h3 mb-0">{f:if(condition: '{card.tasks.processing}', then: '{card.tasks.processing}', else: '0')}</div>
-                                    <div class="text-muted small">processing</div>
+                                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.processing"/></div>
                                 </div>
                             </div>
                             <div class="col-auto">
                                 <div class="border rounded p-2 text-center {f:if(condition: '{card.tasks.failed} > 0', then: 'border-danger')}" style="min-width: 6rem;">
                                     <div class="h3 mb-0 {f:if(condition: '{card.tasks.failed} > 0', then: 'text-danger')}">{f:if(condition: '{card.tasks.failed}', then: '{card.tasks.failed}', else: '0')}</div>
-                                    <div class="text-muted small">failed</div>
+                                    <div class="text-muted small"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.failed"/></div>
                                 </div>
                             </div>
                         </div>
 
                         <f:if condition="{card.typeDistribution}">
-                            <h4 class="h6">Dokumente pro Typ</h4>
+                            <h4 class="h6"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.documentsPerType"/></h4>
                             <p class="mb-3">
                                 <f:for each="{card.typeDistribution}" as="count" key="type">
                                     <span class="badge bg-light text-dark border me-1 mb-1">{type}: <strong>{count}</strong></span>
@@ -81,9 +79,9 @@
                         </f:if>
 
                         <f:if condition="{card.recentFailed}">
-                            <h4 class="h6 text-danger">Letzte fehlgeschlagene Tasks</h4>
+                            <h4 class="h6 text-danger"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.lastFailedTasks"/></h4>
                             <table class="table table-sm table-bordered mb-3">
-                                <thead><tr><th>uid</th><th>Typ</th><th>Fehler</th><th>finishedAt</th></tr></thead>
+                                <thead><tr><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.uid"/></th><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.type"/></th><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.error"/></th><th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.finishedAt"/></th></tr></thead>
                                 <tbody>
                                     <f:for each="{card.recentFailed}" as="t">
                                         <tr>
@@ -97,15 +95,15 @@
                             </table>
                         </f:if>
 
-                        <h4 class="h6">Settings-Snapshot</h4>
+                        <h4 class="h6"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.settingsSnapshot"/></h4>
                         <dl class="row mb-0 small">
-                            <dt class="col-sm-3">searchableAttributes</dt>
+                            <dt class="col-sm-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.searchableAttributes"/></dt>
                             <dd class="col-sm-9"><code>{card.searchableAttributes -> f:join(separator: ', ')}</code></dd>
-                            <dt class="col-sm-3">rankingRules</dt>
+                            <dt class="col-sm-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.rankingRules"/></dt>
                             <dd class="col-sm-9"><code>{card.rankingRules -> f:join(separator: ', ')}</code></dd>
-                            <dt class="col-sm-3">embedders</dt>
+                            <dt class="col-sm-3"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.embedders"/></dt>
                             <dd class="col-sm-9">
-                                <f:if condition="{card.embedders}"><f:then><code>{card.embedders -> f:join(separator: ', ')}</code></f:then><f:else><span class="text-muted">keiner</span></f:else></f:if>
+                                <f:if condition="{card.embedders}"><f:then><code>{card.embedders -> f:join(separator: ', ')}</code></f:then><f:else><span class="text-muted"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.dashboard.none"/></span></f:else></f:if>
                             </dd>
                         </dl>
                     </f:else>
