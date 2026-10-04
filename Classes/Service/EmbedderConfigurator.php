@@ -226,13 +226,22 @@ final class EmbedderConfigurator implements LoggerAwareInterface
      *
      * `$openAiCompatible` selects between the two dialects the same
      * server exposes: `/v1/embeddings` (OpenAI shape, used by
-     * EmbeddingPrecomputer) and `/api/embeddings` (native, the only one
-     * Meilisearch accepts for `source: ollama`).
+     * EmbeddingPrecomputer) and the native API Meilisearch requires for
+     * `source: ollama`.
+     *
+     * Native means `/api/embed`, not the legacy `/api/embeddings`: only the
+     * former truncates input to the model's context (`truncate` defaults to
+     * true). Meilisearch does not apply `documentTemplateMaxBytes` to what it
+     * sends, so a long PDF reaches Ollama in full — the legacy endpoint
+     * answers HTTP 500 "input length exceeds the context length",
+     * Meilisearch retries the batch with growing back-off, and the whole task
+     * queue stalls behind it (seen with Meilisearch 1.47 / Ollama 0.30 and
+     * nomic-embed-text, 2048-token context).
      *
      * A known endpoint suffix is stripped before the wanted one is
      * appended, so a reverse-proxy prefix such as
      * `https://ai.example.com/ollama/v1/embeddings` survives the
-     * rewrite as `https://ai.example.com/ollama/api/embeddings`.
+     * rewrite as `https://ai.example.com/ollama/api/embed`.
      */
     public static function normaliseOllamaUrl(string $url, bool $openAiCompatible): string
     {
@@ -255,7 +264,7 @@ final class EmbedderConfigurator implements LoggerAwareInterface
                 break;
             }
         }
-        return $base . $path . ($openAiCompatible ? '/v1/embeddings' : '/api/embeddings');
+        return $base . $path . ($openAiCompatible ? '/v1/embeddings' : '/api/embed');
     }
 
     /**

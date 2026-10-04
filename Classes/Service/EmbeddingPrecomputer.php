@@ -585,7 +585,7 @@ final class EmbeddingPrecomputer implements LoggerAwareInterface
             'scaleway' => 'https://api.scaleway.ai/v1/embeddings',
             // Ollama exposes both dialects; this class speaks the
             // OpenAI-compatible one, while the embedder pushed to
-            // Meilisearch needs the native /api/embeddings. See
+            // Meilisearch needs the native /api/embed. See
             // EmbedderConfigurator::normaliseOllamaUrl().
             'ollama' => EmbedderConfigurator::normaliseOllamaUrl(
                 trim((string)$settings->get('meilisearch.embedder.url', '')),
