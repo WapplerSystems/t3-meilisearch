@@ -91,6 +91,25 @@ final class IndexerService implements LoggerAwareInterface
      *  - true: draft index, swapped in atomically at the end. Search
      *    keeps serving the previous corpus until the swap second.
      */
+    /**
+     * A provider ships with the extension whether or not the project has its
+     * table — the whats-new provider reads LINEAR's tx_linearproducts table,
+     * the news provider EXT:news. Querying a table that does not exist aborts
+     * the whole reindex, so a provider only runs when its table is in TCA.
+     */
+    private function providerTableAvailable(SchemaProviderInterface $provider): bool
+    {
+        $table = $provider->getTable();
+        if (isset($GLOBALS['TCA'][$table])) {
+            return true;
+        }
+        $this->logger?->info(
+            'Reindex skips {provider}: table {table} is not available in this installation',
+            ['provider' => $provider::class, 'table' => $table],
+        );
+        return false;
+    }
+
     private function zeroDowntimeEnabled(Site $site): bool
     {
         return (bool)$site->getSettings()->get('meilisearch.indexing.zeroDowntime', false);
@@ -225,6 +244,9 @@ final class IndexerService implements LoggerAwareInterface
         );
 
         foreach ($this->schemaProviders as $provider) {
+            if (!$this->providerTableAvailable($provider)) {
+                continue;
+            }
             foreach ($provider->iterateDocuments($site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
