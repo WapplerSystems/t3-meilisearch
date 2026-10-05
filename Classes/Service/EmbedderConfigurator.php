@@ -357,7 +357,9 @@ final class EmbedderConfigurator implements LoggerAwareInterface
         }
         $embedder = [
             'source' => 'rest',
-            'url' => 'https://api.scaleway.ai/v1/embeddings',
+            'url' => \WapplerSystems\Meilisearch\Service\Llm\ScalewayProvider::baseUrlForProject(
+                (string)$settings->get('meilisearch.scaleway.projectId', ''),
+            ) . '/v1/embeddings',
             'apiKey' => $apiKey,
             // Single-text-per-request rather than the array+repeater
             // batch form — same rationale as Infomaniak: Meilisearch

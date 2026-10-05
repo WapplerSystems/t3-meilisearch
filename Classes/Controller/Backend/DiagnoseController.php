@@ -151,6 +151,7 @@ final class DiagnoseController
                     // configured. Generic providers ignore it. Mirrors
                     // the option set RagService::ask() passes.
                     'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
+                    'scalewayProjectId' => (string)$settings->get('meilisearch.scaleway.projectId', ''),
                     'temperature' => 0.0,
                     'maxTokens' => 16,
                 ],

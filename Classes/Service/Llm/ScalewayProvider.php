@@ -37,4 +37,27 @@ final class ScalewayProvider extends OpenAiProvider
     {
         return 'scaleway';
     }
+
+    /**
+     * Base URL for a Scaleway project. Without a project id Scaleway uses
+     * the organisation's default project, so a key scoped to a different
+     * project answers 403 — see meilisearch.scaleway.projectId.
+     */
+    public static function baseUrlForProject(string $projectId): string
+    {
+        $projectId = trim($projectId);
+        return self::DEFAULT_BASE_URL . ($projectId !== '' ? '/' . rawurlencode($projectId) : '');
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     */
+    protected function resolveBaseUrl(array $options): string
+    {
+        $url = trim((string)($options['url'] ?? ''));
+        if ($url !== '') {
+            return rtrim($url, '/');
+        }
+        return self::baseUrlForProject((string)($options['scalewayProjectId'] ?? ''));
+    }
 }

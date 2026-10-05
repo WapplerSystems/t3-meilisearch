@@ -495,6 +495,7 @@ final class RagService implements LoggerAwareInterface
             // Tenant id for vendor-specific providers (currently Infomaniak).
             // Generic providers ignore it.
             'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
+            'scalewayProjectId' => (string)$settings->get('meilisearch.scaleway.projectId', ''),
         ];
         $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
         if ($maxTokens > 0) {

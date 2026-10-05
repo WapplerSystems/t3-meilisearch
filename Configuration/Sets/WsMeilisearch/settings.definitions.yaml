@@ -546,6 +546,12 @@ settings:
     type: string
     default: ''
 
+  meilisearch.scaleway.projectId:
+    label: 'Scaleway project id'
+    description: 'Scaleway project the Generative APIs calls are billed to and authorised against. Without it Scaleway routes https://api.scaleway.ai/v1/… to the ORGANISATION default project — an API key scoped to another project then gets HTTP 403 "insufficient permissions". Set it whenever a site uses its own Scaleway project (separate billing, separate key). Used by the "scaleway" embedder preset, embedding precompute and the "scaleway" RAG provider.'
+    type: string
+    default: ''
+
   meilisearch.infomaniak.productId:
     label: 'Infomaniak AI product id'
     description: 'Numeric product id of your Infomaniak AI Tools subscription. Visible in the Manager URL when opening the product (e.g. /manager/.../ai-tools/PRODUCT_ID). Used by both the "infomaniak" embedder preset and the "infomaniak" RAG provider to derive the OpenAI-compatible endpoint URL automatically.'
