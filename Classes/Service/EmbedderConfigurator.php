@@ -332,7 +332,7 @@ final class EmbedderConfigurator implements LoggerAwareInterface
 
     /**
      * Scaleway Generative APIs preset. OpenAI-compatible embeddings
-     * endpoint at https://api.scaleway.ai/v1/embeddings, single global
+     * endpoint at https://api.scaleway.ai[/<projectId>]/v1/embeddings, single global
      * URL (no tenant interpolation needed — auth happens via the API
      * key in the bearer header).
      *

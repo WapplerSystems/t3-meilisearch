@@ -45,7 +45,7 @@ use WapplerSystems\Meilisearch\Service\Indexing\RetryableEmbeddingError;
  *   meilisearch.embedder.maxRetries         — attempts per request (429/5xx)
  *
  * Currently supports the same provider set as the REST embedder presets:
- *   - scaleway   → https://api.scaleway.ai/v1/embeddings
+ *   - scaleway   → https://api.scaleway.ai[/<projectId>]/v1/embeddings
  *   - infomaniak → derived from infomaniak.productId
  *   - openAi     → standard OpenAI /v1/embeddings (or `meilisearch.embedder.url`)
  */

@@ -9,7 +9,8 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 /**
  * Scaleway Generative APIs embeddings — OpenAI-compatible endpoint at
  * https://api.scaleway.ai/v1/embeddings. Reads meilisearch.embedder.model
- * + meilisearch.embedder.apiKey from site settings; URL is fixed (no
+ * + meilisearch.embedder.apiKey from site settings; URL is fixed apart from the
+ * optional meilisearch.scaleway.projectId (no
  * tenant interpolation — Scaleway authenticates via the bearer token).
  *
  * Selected when meilisearch.embedder.source === 'scaleway'. Used by the
@@ -19,8 +20,6 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  */
 final class ScalewayEmbeddingClient implements EmbeddingClientInterface
 {
-    private const URL = 'https://api.scaleway.ai/v1/embeddings';
-
     public function __construct(
         private readonly RequestFactory $requestFactory,
     ) {}
@@ -38,6 +37,11 @@ final class ScalewayEmbeddingClient implements EmbeddingClientInterface
         if ($model === '' || $apiKey === '') {
             throw new \RuntimeException('Scaleway embedder not configured (meilisearch.embedder.model / embedder.apiKey missing)');
         }
-        return extractOpenAiEmbedding($this->requestFactory, self::URL, $apiKey, $model, $text);
+        // Same project routing as the indexing side — without it a project-
+        // scoped key gets 403 and every query silently loses its vector.
+        $url = \WapplerSystems\Meilisearch\Service\Llm\ScalewayProvider::baseUrlForProject(
+            (string)$settings->get('meilisearch.scaleway.projectId', ''),
+        ) . '/v1/embeddings';
+        return extractOpenAiEmbedding($this->requestFactory, $url, $apiKey, $model, $text);
     }
 }
