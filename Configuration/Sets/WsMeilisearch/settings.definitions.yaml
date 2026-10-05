@@ -429,6 +429,12 @@ settings:
     type: string
     default: 'frequency'
 
+  meilisearch.search.hybridDefault:
+    label: 'Search: semantic search on by default'
+    description: 'Whether the frontend search combines keyword and semantic (vector) ranking when the visitor has not touched the "semantic search" switch — e.g. a search started from the header box. An explicit choice (switch on or off) always wins. Only takes effect with a configured embedder.'
+    type: bool
+    default: false
+
   meilisearch.search.matchingStrategy:
     label: 'FE search matching strategy'
     description: 'Meilisearch matchingStrategy used by frontend search. "all" requires every query token (strict AND) — matches user intent for short brand/product queries (e.g. a two-word brand) where a doc that only mentions one of the tokens should NOT appear. "last" (Meilisearch default) drops trailing tokens, behaving OR-like and surfacing partially-matching docs. Set to empty string to inherit the Meilisearch index default.'

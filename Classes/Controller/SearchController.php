@@ -111,8 +111,13 @@ final class SearchController extends ActionController
     /**
      * @param array<string,array<int,string>> $filters
      */
-    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = 0, string $sort = '', int $scope = -1): ResponseInterface
+    public function resultsAction(string $q = '', int $page = 1, array $filters = [], int $hybrid = -1, string $sort = '', int $scope = -1): ResponseInterface
     {
+        // -1 = the visitor never touched the switch (header box, shared link):
+        // the site decides. 0/1 = an explicit choice, which always wins.
+        if ($hybrid < 0) {
+            $hybrid = (bool)$this->resolveSite()?->getSettings()->get('meilisearch.search.hybridDefault', false) ? 1 : 0;
+        }
         if (strtoupper($this->request->getMethod()) === 'POST') {
             return $this->redirect('results', null, null, [
                 'q' => $q,

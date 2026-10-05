@@ -74,7 +74,11 @@ final class SearchFragmentEndpoint implements MiddlewareInterface
         $viewFilters = $filters;
         $scope = max(0, (int)($params['scope'] ?? 0));
         $sort = trim((string)($params['sort'] ?? ''));
-        $hybridRequested = (int)($params['hybrid'] ?? 0) === 1;
+        // Absent = the visitor never touched the switch: the site default
+        // decides, same as SearchController::resultsAction().
+        $hybridRequested = isset($params['hybrid'])
+            ? (int)$params['hybrid'] === 1
+            : (bool)$site->getSettings()->get('meilisearch.search.hybridDefault', false);
 
         $hybridAvailable = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
         $useHybrid = $hybridAvailable && $hybridRequested;
