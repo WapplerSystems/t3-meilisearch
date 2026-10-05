@@ -62,6 +62,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         private readonly SiteFinder $siteFinder,
         private readonly BoostCalculator $boostCalculator,
         private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
+        private readonly \WapplerSystems\Meilisearch\Service\FileAccessResolver $fileAccessResolver,
     ) {}
 
     public function getTable(): string
@@ -358,13 +359,14 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             'extension' => (string)$file->getExtension(),
             'fileSize' => (int)$file->getSize(),
             'publicUrl' => $publicUrl,
-            // FAL access control: sys_file_metadata.fe_groups (longtext,
-            // CSV of group ids) — empty/null → public, otherwise the
-            // visitor must carry one of those ids. Per-reference fe_group
-            // (sys_file_reference) is NOT honoured here because a single
-            // sys_file can be referenced from many records with differing
-            // restrictions; that lookup would need a separate index path.
-            'accessGroups' => self::parseFeGroups((string)($metadata['fe_groups'] ?? '')),
+            // FAL access control: sys_file_metadata.fe_groups AND the access of
+            // the records that link the file (content element, page, inherited
+            // page restrictions) — a download on a login-protected page must
+            // not surface to anonymous visitors. See FileAccessResolver.
+            'accessGroups' => $this->fileAccessResolver->resolve(
+                (int)$file->getUid(),
+                self::parseFeGroups((string)($metadata['fe_groups'] ?? '')),
+            ),
             // sys_file has no editor-curated boost TCA — type-level only.
             'boost' => $this->boostCalculator->compositeFor($site, 'file', null),
             // Detected content language (ISO 639-1). A file gets indexed
@@ -445,6 +447,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
      */
     public function clearMembershipCache(): void
     {
+        $this->fileAccessResolver->reset();
         $this->filesPerSite = null;
     }
 

@@ -72,6 +72,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly EmbeddingPrecomputer $embeddingPrecomputer,
         private readonly LanguageDetector $languageDetector,
         private readonly HtmlToText $htmlToText,
+        private readonly \WapplerSystems\Meilisearch\Service\FileAccessResolver $fileAccessResolver,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -463,13 +464,15 @@ final class IndexEventListener implements LoggerAwareInterface
             return [];
         }
         $raw = trim((string)($row['fe_groups'] ?? ''));
-        if ($raw === '' || $raw === '0') {
-            return [];
+        $metadataGroups = [];
+        if ($raw !== '' && $raw !== '0') {
+            $ids = array_map(
+                static fn (string $g): int => (int) trim($g),
+                explode(',', $raw),
+            );
+            $metadataGroups = array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
         }
-        $ids = array_map(
-            static fn (string $g): int => (int) trim($g),
-            explode(',', $raw),
-        );
-        return array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
+        // Same rule as FileSchemaProvider: the linking records' access counts too.
+        return $this->fileAccessResolver->resolve($fileUid, $metadataGroups);
     }
 }
