@@ -116,7 +116,14 @@ final class Conversation
      */
     public function lastTurnIsClarification(): bool
     {
-        $last = $this->turns[array_key_last($this->turns)] ?? null;
+        // array_key_last() is null on an empty history, and null as an array
+        // offset is deprecated since PHP 8.5 — TYPO3 turns that into an
+        // exception, which killed every first question of a conversation.
+        $lastKey = array_key_last($this->turns);
+        if ($lastKey === null) {
+            return false;
+        }
+        $last = $this->turns[$lastKey];
         return $last instanceof Turn && $last->isClarification();
     }
 
