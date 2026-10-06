@@ -474,7 +474,8 @@
                     refs[text] = {
                         number: order.length + 1,
                         text: text,
-                        uri: (hit.src.uri || hit.src.publicUrl || '').toString()
+                        uri: (hit.src.uri || hit.src.publicUrl || '').toString(),
+                        note: (hit.src.citationNote || '').toString().trim()
                     };
                     order.push(refs[text]);
                 }
@@ -514,7 +515,8 @@
 
     // Explains the numbers, listing only what the answer actually cited. An
     // <ol> so the browser numbers the rows — references were handed out in
-    // appearance order, so the two line up.
+    // appearance order, so the two line up. Notes follow, each distinct note
+    // once (mirrors CitationRenderer::legend()).
     function citationLegend(order) {
         if (order.length === 0) { return ''; }
         const rows = order.map(function (ref) {
@@ -523,8 +525,12 @@
                 ? '<li>' + text + '</li>'
                 : '<li><a href="' + escapeAttr(ref.uri) + '" rel="noopener">' + text + '</a></li>';
         }).join('');
+        const notes = order.map(function (ref) { return ref.note || ''; })
+            .filter(function (note, i, all) { return note !== '' && all.indexOf(note) === i; })
+            .map(function (note) { return '<p class="ws-meilisearch-rag-citation-note">' + escapeText(note) + '</p>'; })
+            .join('');
 
-        return '<ol class="ws-meilisearch-rag-citations">' + rows + '</ol>';
+        return '<ol class="ws-meilisearch-rag-citations">' + rows + '</ol>' + notes;
     }
 
     function renderMarkdownLight(text) {

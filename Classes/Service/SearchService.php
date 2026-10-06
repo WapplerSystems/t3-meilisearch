@@ -60,6 +60,13 @@ final class SearchService implements LoggerAwareInterface
      */
     public function search(Site $site, string $query, array $options = []): SearchResult
     {
+        // Types this site keeps out of the visitor-facing search on top of the
+        // internal knowledge resources — read once here so every query below
+        // (main, facet side queries, recovery) applies the same exclusion.
+        $options['__excludedTypes'] = array_values(array_filter(array_map(
+            'strval',
+            (array)$site->getSettings()->get('meilisearch.search.excludedTypes', []),
+        )));
         $before = new BeforeSearchEvent($query, $options, $site);
         $this->eventDispatcher->dispatch($before);
 
@@ -535,7 +542,11 @@ final class SearchService implements LoggerAwareInterface
         if ($options['includeKnowledgeResources'] ?? false) {
             return $filter;
         }
-        $exclude = 'type != "knowledge_resource"';
+        $types = array_unique(array_merge(['knowledge_resource'], (array)($options['__excludedTypes'] ?? [])));
+        $exclude = implode(' AND ', array_map(
+            static fn (string $type): string => 'type != "' . addcslashes($type, '"\\') . '"',
+            $types,
+        ));
         return $filter !== '' ? '(' . $filter . ') AND ' . $exclude : $exclude;
     }
 

@@ -11,6 +11,7 @@ use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
 use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
+use WapplerSystems\Meilisearch\Event\RagClarificationEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
@@ -85,6 +86,7 @@ final class RagService implements LoggerAwareInterface
         private readonly SuggestionGenerator $suggestionGenerator,
         private readonly QueryClassifier $queryClassifier,
         private readonly EscalationResolver $escalationResolver,
+        private readonly Reranker $reranker,
         private readonly NeighbourSuggestions $neighbourSuggestions,
     ) {}
 
@@ -111,15 +113,25 @@ final class RagService implements LoggerAwareInterface
         array $searchOptions,
         int $maxHits,
         bool $collapseIdentical = true,
+        bool $rerank = false,
     ): array {
         $collapseByTitle = $this->collapsesReleaseCopies($site);
+        // Reranking needs a wider candidate set than the context it keeps:
+        // the point is to promote a document retrieval ranked sixth or tenth.
+        $rerankCandidates = $rerank ? $this->rerankCandidates($site, $maxHits) : 0;
+        if ($rerankCandidates > 0) {
+            $searchOptions['perPage'] = max((int)($searchOptions['perPage'] ?? 0), $rerankCandidates);
+        }
         if ($collapseIdentical || $collapseByTitle) {
             // Ask for more than we need: the collapse below can only promote a
             // spare if one was fetched. Without the over-fetch a question whose
             // top five hits are five copies of one topic would end up with a
             // one-document context — worse than the duplication it fixes.
             $factor = $collapseByTitle ? self::TITLE_COLLAPSE_OVERFETCH : self::COLLAPSE_OVERFETCH;
-            $searchOptions['perPage'] = min($maxHits * $factor, self::COLLAPSE_MAX_FETCH);
+            $searchOptions['perPage'] = max(
+                (int)($searchOptions['perPage'] ?? 0),
+                min($maxHits * $factor, self::COLLAPSE_MAX_FETCH),
+            );
         }
 
         // Version preference for the collapse comes from the visitor's own
@@ -129,11 +141,11 @@ final class RagService implements LoggerAwareInterface
         $askedAs = trim((string)($searchOptions['vectorQuery'] ?? '')) ?: $query;
 
         $searchResult = $this->searchService->search($site, $query, $searchOptions);
-        $hits = array_values(array_slice(
-            $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle),
-            0,
-            $maxHits,
-        ));
+        $collapsed = $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle);
+        if ($rerankCandidates > 0) {
+            $collapsed = $this->rerankHits($site, $askedAs, array_values(array_slice($collapsed, 0, $rerankCandidates)));
+        }
+        $hits = array_values(array_slice($collapsed, 0, $maxHits));
         if ($hits === []) {
             $hits = array_values(array_slice(
                 $this->collapseContext(
@@ -196,6 +208,9 @@ final class RagService implements LoggerAwareInterface
             if ($id !== '' && isset($labels[$id])) {
                 $hits[$index]['citationLabel'] = $labels[$id]['label'];
                 $hits[$index]['citationQualifier'] = $labels[$id]['qualifier'];
+                if ($labels[$id]['note'] !== '') {
+                    $hits[$index]['citationNote'] = $labels[$id]['note'];
+                }
             }
         }
 
@@ -433,7 +448,7 @@ final class RagService implements LoggerAwareInterface
         $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
             $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
             $options,
-        ));
+        ), $site);
         $this->eventDispatcher->dispatch($event);
 
         $query = $event->question;
@@ -458,6 +473,7 @@ final class RagService implements LoggerAwareInterface
             $this->withVectorQuery($event->options, $event->question),
             $maxHits,
             $this->collapsesIdentical($settings),
+            true,
         );
     }
 
@@ -539,7 +555,7 @@ final class RagService implements LoggerAwareInterface
         $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
             $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
             $options,
-        ));
+        ), $site);
         $this->eventDispatcher->dispatch($event);
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
@@ -558,6 +574,7 @@ final class RagService implements LoggerAwareInterface
             $this->withVectorQuery($event->options, $event->question),
             $maxHits,
             $this->collapsesIdentical($settings),
+            true,
         );
         if ($hits === []) {
             $answer = RagAnswer::noContext();
@@ -568,14 +585,16 @@ final class RagService implements LoggerAwareInterface
         // Triage before generating: if the question is too ambiguous /
         // underspecified to answer from these hits, ask one clarifying
         // question back instead of guessing. Skips the answer call entirely.
-        $clarification = $this->queryClassifier->classify(
-            $provider,
-            $settings,
-            $conversation,
-            $event->question,
-            $hits,
-            $llmOptions,
-        );
+        $clarification = $this->clarificationAllowed($site, $event->question, $conversation, $hits)
+            ? $this->queryClassifier->classify(
+                $provider,
+                $settings,
+                $conversation,
+                $event->question,
+                $hits,
+                $llmOptions,
+            )
+            : Clarification::answerable();
         if ($clarification->needed) {
             $answer = RagAnswer::clarification(
                 $clarification->question,
@@ -709,7 +728,7 @@ final class RagService implements LoggerAwareInterface
         $event = new BeforeRagQueryEvent($question, $this->mergeRetrievalOptions(
             $this->buildRetrievalOptions($site, $settings, $useHybrid, $maxHits),
             $options,
-        ));
+        ), $site);
         $this->eventDispatcher->dispatch($event);
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
@@ -729,6 +748,7 @@ final class RagService implements LoggerAwareInterface
             $this->withVectorQuery($event->options, $event->question),
             $maxHits,
             $this->collapsesIdentical($settings),
+            true,
         );
         if ($hits === []) {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
@@ -748,14 +768,16 @@ final class RagService implements LoggerAwareInterface
         // question gets one clarifying question back instead of a guessed
         // answer. Emitted before the `sources` frame so the UI never shows a
         // "found N documents" preview it then has to pivot away from.
-        $clarification = $this->queryClassifier->classify(
-            $provider,
-            $settings,
-            $conversation,
-            $event->question,
-            $hits,
-            $llmOptions,
-        );
+        $clarification = $this->clarificationAllowed($site, $event->question, $conversation, $hits)
+            ? $this->queryClassifier->classify(
+                $provider,
+                $settings,
+                $conversation,
+                $event->question,
+                $hits,
+                $llmOptions,
+            )
+            : Clarification::answerable();
         if ($clarification->needed) {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'clarify', [])) {
                 yield $chunk;
@@ -1159,6 +1181,54 @@ final class RagService implements LoggerAwareInterface
         $languageId = $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
+    /**
+     * Candidates handed to the reranker, 0 when reranking is off. Never fewer
+     * than the context keeps, capped so the rerank prompt stays short.
+     */
+    private function rerankCandidates(Site $site, int $maxHits): int
+    {
+        $settings = $site->getSettings();
+        if (!(bool)$settings->get('meilisearch.rag.rerank.enabled', false)) {
+            return 0;
+        }
+
+        return min(40, max($maxHits, (int)$settings->get('meilisearch.rag.rerank.candidates', 20)));
+    }
+
+    /**
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function rerankHits(Site $site, string $question, array $hits): array
+    {
+        $settings = $site->getSettings();
+        $provider = $this->providerRegistry->get(trim((string)$settings->get('meilisearch.rag.provider', '')));
+        if ($provider === null) {
+            return $hits;
+        }
+        $model = trim((string)$settings->get('meilisearch.rag.rerank.model', ''));
+
+        return $this->reranker->rerank(
+            $provider,
+            $this->buildLlmOptions($settings, $model !== '' ? ['model' => $model] : []),
+            $question,
+            $hits,
+        );
+    }
+
+    /**
+     * Whether the clarify step may run for this turn — see RagClarificationEvent.
+     *
+     * @param list<array<string,mixed>> $hits
+     */
+    private function clarificationAllowed(Site $site, string $question, Conversation $conversation, array $hits): bool
+    {
+        $event = new RagClarificationEvent($site, $question, $conversation, $hits);
+        $this->eventDispatcher->dispatch($event);
+
+        return $event->allowed;
     }
 
     /**

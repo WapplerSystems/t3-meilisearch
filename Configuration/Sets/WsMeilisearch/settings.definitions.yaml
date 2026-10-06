@@ -714,6 +714,30 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.search.excludedTypes:
+    label: 'Search: document types hidden from the site search'
+    description: 'Document types (the index field "type") that the visitor-facing search, its facets and suggestions leave out, in addition to knowledge_resource. They stay available to the chat assistant. Example: ["elearning"] keeps course excerpts in the chat only.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.rerank.enabled:
+    label: 'RAG: rerank the retrieved documents'
+    description: 'When true, the retrieval fetches meilisearch.rag.rerank.candidates documents and one short LLM call orders them by how directly they answer the question before the context is cut to meilisearch.rag.maxContextHits. Helps when many documents of one topic compete (courses next to the knowledge base). Any failure keeps the retrieval order. Costs one extra LLM call per question. Default: disabled.'
+    type: bool
+    default: false
+
+  meilisearch.rag.rerank.candidates:
+    label: 'RAG: rerank candidates'
+    description: 'How many retrieved documents the reranker sees (at most 40). Default 20.'
+    type: int
+    default: 20
+
+  meilisearch.rag.rerank.model:
+    label: 'RAG: rerank model'
+    description: 'Model for the rerank call, e.g. a smaller, faster one than the answer model. Empty = meilisearch.rag.model.'
+    type: string
+    default: ''
+
   meilisearch.rag.manualKnowledge.bypassRetrievalFilters:
     label: 'RAG: hand-written knowledge ignores the retrieval filters'
     description: 'When true (default), entries from the backend module "Chatbot-Wissen" (resourceType = "manual") are retrieved even when meilisearch.rag.retrievalFilters narrows the corpus, e.g. to the pages of a knowledge base. Language and access restrictions still apply.'

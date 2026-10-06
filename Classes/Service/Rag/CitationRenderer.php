@@ -50,7 +50,7 @@ final class CitationRenderer
             return self::markdownLight($escaped);
         }
 
-        /** @var array<string,array{number:int,text:string,uri:string}> $refs keyed by display text */
+        /** @var array<string,array{number:int,text:string,uri:string,note:string}> $refs keyed by display text */
         $refs = [];
         // Eat an optional leading space so replacing a citation that follows a
         // word does not leave a double space behind.
@@ -77,6 +77,7 @@ final class CitationRenderer
                             'number' => count($refs) + 1,
                             'text' => $text,
                             'uri' => (string)($src['uri'] ?? ''),
+                            'note' => trim((string)($src['citationNote'] ?? '')),
                         ];
                     }
                     $numbers[$refs[$text]['number']] = $refs[$text];
@@ -169,6 +170,7 @@ final class CitationRenderer
                 'title' => (string)($src['title'] ?? ''),
                 'citationLabel' => (string)($src['citationLabel'] ?? ''),
                 'citationQualifier' => (string)($src['citationQualifier'] ?? ''),
+                'citationNote' => (string)($src['citationNote'] ?? ''),
             ];
         }
 
@@ -217,7 +219,11 @@ final class CitationRenderer
      * <ol> so the browser numbers the rows — references were handed out in
      * appearance order, so the two line up.
      *
-     * @param array<string,array{number:int,text:string,uri:string}> $refs
+     * Notes (RagCitationLabelsEvent::setLabel) follow the list, each distinct
+     * note once: they qualify a kind of source, and three cited lessons of the
+     * same course must not repeat the same sentence three times.
+     *
+     * @param array<string,array{number:int,text:string,uri:string,note?:string}> $refs
      */
     private static function legend(array $refs): string
     {
@@ -237,7 +243,15 @@ final class CitationRenderer
                 );
         }
 
-        return '<ol class="ws-meilisearch-rag-citations">' . $rows . '</ol>';
+        $notes = '';
+        foreach (array_unique(array_filter(array_map(static fn (array $ref): string => (string)($ref['note'] ?? ''), $refs))) as $note) {
+            $notes .= sprintf(
+                '<p class="ws-meilisearch-rag-citation-note">%s</p>',
+                htmlspecialchars($note, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            );
+        }
+
+        return '<ol class="ws-meilisearch-rag-citations">' . $rows . '</ol>' . $notes;
     }
 
     /**

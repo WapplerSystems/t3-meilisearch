@@ -25,6 +25,7 @@ read top-to-bottom and then either pasted into a site's
 | [`13-sort-pagination.md`](13-sort-pagination.md) | Sort dropdown + Prev/Next pagination in the FE plugin. |
 | [`14-rag-escalation-protocol.md`](14-rag-escalation-protocol.md) | "Ask a human" card per language via `RagEscalationEvent`, chat protocol + backend tab, conversation id for contact forms, hand-written knowledge module. |
 | [`15-mcp-endpoint.md`](15-mcp-endpoint.md) | MCP endpoint for Claude & other AI clients: ask, search, chat protocol, knowledge CRUD; tokens, scopes, security model. |
+| [`16-retrieval-hooks.md`](16-retrieval-hooks.md) | LLM reranking of the context, types hidden from the site search, clarification and citation-note hooks. |
 
 Every example is self-contained; pick one and ignore the rest if you
 already have the rest of the stack wired.

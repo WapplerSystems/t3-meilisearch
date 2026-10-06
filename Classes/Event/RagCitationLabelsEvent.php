@@ -24,7 +24,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 final class RagCitationLabelsEvent
 {
     /**
-     * @var array<string,array{label:string,qualifier:string}>
+     * @var array<string,array{label:string,qualifier:string,note:string}>
      */
     private array $labels = [];
 
@@ -60,17 +60,24 @@ final class RagCitationLabelsEvent
      * Blank ids and blank labels are ignored, so a listener can compute
      * unconditionally and let the documents it has nothing to say about fall
      * through to the plain title.
+     *
+     * $note is a sentence the reader needs next to the source rather than in
+     * the answer — "In newer releases the interface may differ", "The courses
+     * are free after registration". It is rendered once below the list of
+     * sources however many cited documents carry the same note, so a listener
+     * can attach it to every document of a kind without the answer repeating
+     * it. Unlike anything the model writes, it cannot be dropped or reworded.
      */
-    public function setLabel(string $documentId, string $label, string $qualifier = ''): void
+    public function setLabel(string $documentId, string $label, string $qualifier = '', string $note = ''): void
     {
         $label = trim($label);
         if ($documentId !== '' && $label !== '') {
-            $this->labels[$documentId] = ['label' => $label, 'qualifier' => trim($qualifier)];
+            $this->labels[$documentId] = ['label' => $label, 'qualifier' => trim($qualifier), 'note' => trim($note)];
         }
     }
 
     /**
-     * @return array<string,array{label:string,qualifier:string}>
+     * @return array<string,array{label:string,qualifier:string,note:string}>
      */
     public function getLabels(): array
     {
