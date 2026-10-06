@@ -720,6 +720,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.retrievalLanes:
+    label: 'RAG: retrieval lanes'
+    description: 'Fill the context from several separate retrievals instead of one ranked list, each entry "<hits>:<filter expression>", e.g. ["3:type = \"page\"", "3:type = \"elearning\""]. Every lane adds its filter to meilisearch.rag.retrievalFilters and contributes its best hits; the context is their round-robin merge (maxContextHits does not apply). Use it when one corpus is much larger than another and would otherwise crowd it out of the context. Empty = one list (default).'
+    type: stringlist
+    default: []
+
   meilisearch.rag.rerank.enabled:
     label: 'RAG: rerank the retrieved documents'
     description: 'When true, the retrieval fetches meilisearch.rag.rerank.candidates documents and one short LLM call orders them by how directly they answer the question before the context is cut to meilisearch.rag.maxContextHits. Helps when many documents of one topic compete (courses next to the knowledge base). Any failure keeps the retrieval order. Costs one extra LLM call per question. Default: disabled.'

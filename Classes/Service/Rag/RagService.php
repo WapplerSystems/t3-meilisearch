@@ -140,12 +140,22 @@ final class RagService implements LoggerAwareInterface
         // silently be answered from the current one.
         $askedAs = trim((string)($searchOptions['vectorQuery'] ?? '')) ?: $query;
 
-        $searchResult = $this->searchService->search($site, $query, $searchOptions);
-        $collapsed = $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle);
-        if ($rerankCandidates > 0) {
-            $collapsed = $this->rerankHits($site, $askedAs, array_values(array_slice($collapsed, 0, $rerankCandidates)));
+        $lanes = $this->retrievalLanes($site);
+        if ($lanes !== []) {
+            $hits = $this->searchLanes($site, $query, $searchOptions, $askedAs, $lanes, $collapseIdentical, $collapseByTitle);
+            if ($hits !== [] && $rerankCandidates > 0) {
+                // Lanes fix how much of each kind reaches the context; the
+                // reranker only decides the order the model reads them in.
+                $hits = $this->rerankHits($site, $askedAs, $hits);
+            }
+        } else {
+            $searchResult = $this->searchService->search($site, $query, $searchOptions);
+            $collapsed = $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle);
+            if ($rerankCandidates > 0) {
+                $collapsed = $this->rerankHits($site, $askedAs, array_values(array_slice($collapsed, 0, $rerankCandidates)));
+            }
+            $hits = array_values(array_slice($collapsed, 0, $maxHits));
         }
-        $hits = array_values(array_slice($collapsed, 0, $maxHits));
         if ($hits === []) {
             $hits = array_values(array_slice(
                 $this->collapseContext(
@@ -1181,6 +1191,84 @@ final class RagService implements LoggerAwareInterface
         $languageId = $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
+    }
+
+    /**
+     * meilisearch.rag.retrievalLanes as [filter, hits] pairs, empty when unset.
+     * Entries read "<hits>:<filter expression>", e.g. '3:type = "elearning"'.
+     *
+     * @return list<array{0:string,1:int}>
+     */
+    private function retrievalLanes(Site $site): array
+    {
+        $raw = $site->getSettings()->get('meilisearch.rag.retrievalLanes', []);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $lanes = [];
+        foreach ($raw as $entry) {
+            if (preg_match('/^\s*(\d+)\s*:\s*(.+)$/s', (string)$entry, $m) === 1 && (int)$m[1] > 0) {
+                $lanes[] = [trim($m[2]), min(20, (int)$m[1])];
+            }
+        }
+
+        return $lanes;
+    }
+
+    /**
+     * One retrieval per lane, each with its own filter on top of the
+     * configured ones, merged round-robin (best of every lane first).
+     *
+     * Exists because one ranked list cannot mix corpora of very different
+     * size: a knowledge base that holds every topic once per release and
+     * product outranks a few hundred course lessons on almost any question,
+     * and the lesson that answers it lands at rank 30 or 50 — out of reach
+     * for the context and for a reranker alike. Measured on LINEAR's
+     * corpus: the expected lesson within the top three for 23 of 24 test
+     * questions when searched on its own, 12 of 24 in the joint list.
+     *
+     * @param array<string,mixed> $searchOptions
+     * @param list<array{0:string,1:int}> $lanes
+     * @return list<array<string,mixed>>
+     */
+    private function searchLanes(
+        Site $site,
+        string $query,
+        array $searchOptions,
+        string $askedAs,
+        array $lanes,
+        bool $collapseIdentical,
+        bool $collapseByTitle,
+    ): array {
+        $perLane = [];
+        foreach ($lanes as [$filter, $count]) {
+            $laneOptions = $searchOptions;
+            $existing = $laneOptions['filters']['__rawFilters'] ?? [];
+            $laneOptions['filters']['__rawFilters'] = array_merge(is_array($existing) ? $existing : [], [$filter]);
+            $factor = $collapseByTitle ? self::TITLE_COLLAPSE_OVERFETCH : self::COLLAPSE_OVERFETCH;
+            $laneOptions['perPage'] = min($count * $factor, self::COLLAPSE_MAX_FETCH);
+            $result = $this->searchService->search($site, $query, $laneOptions);
+            $perLane[] = array_values(array_slice(
+                $this->collapseContext($result->hits, $askedAs, $collapseIdentical, $collapseByTitle),
+                0,
+                $count,
+            ));
+        }
+
+        $merged = [];
+        $seen = [];
+        for ($rank = 0, $max = max(array_map('count', $perLane)); $rank < $max; $rank++) {
+            foreach ($perLane as $laneHits) {
+                $hit = $laneHits[$rank] ?? null;
+                $id = (string)($hit['id'] ?? '');
+                if ($hit !== null && $id !== '' && !isset($seen[$id])) {
+                    $seen[$id] = true;
+                    $merged[] = $hit;
+                }
+            }
+        }
+
+        return $merged;
     }
 
     /**
