@@ -104,7 +104,9 @@ final class SimilarDocumentsService implements LoggerAwareInterface
             $clauses = $applied['__rawFilters'] ?? $clauses;
         }
         $filter = $clauses === [] ? null : implode(' AND ', array_map(
-            static fn (string $c): string => str_starts_with(trim($c), '(') ? $c : '(' . $c . ')',
+            // Always wrap: "((a)) OR b" starts with a parenthesis but is not
+            // one group, and AND binds tighter than OR.
+            static fn (string $c): string => '(' . $c . ')',
             $clauses,
         ));
 

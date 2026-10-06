@@ -564,15 +564,18 @@ final class SearchService implements LoggerAwareInterface
         // Reserved key: AccessControlFilter (and any future caller that
         // needs a compound expression like `accessGroups IS EMPTY OR
         // accessGroups IN […]`) stores raw Meilisearch filter strings
-        // under `__rawFilters`. They're emitted verbatim, AND-conjoined
-        // with the regular field=value filters and with each other.
+        // under `__rawFilters`. They're AND-conjoined with the regular
+        // field=value filters and with each other, each one parenthesised:
+        // AND binds tighter than OR, so an unwrapped `a OR b` next to an
+        // access expression would read `a OR (b AND access)` and let every
+        // `a` document past the access check.
         $rawFilters = $filters['__rawFilters'] ?? null;
         unset($filters['__rawFilters']);
         if (is_array($rawFilters)) {
             foreach ($rawFilters as $expression) {
                 $expression = trim((string)$expression);
                 if ($expression !== '') {
-                    $parts[] = $expression;
+                    $parts[] = '(' . $expression . ')';
                 }
             }
         }
