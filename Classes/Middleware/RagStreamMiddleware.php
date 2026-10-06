@@ -255,6 +255,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
                     Turn::KIND_ANSWER,
                     CitationRenderer::citationsFor($sources, $citedIds),
                     $suggestions,
+                    array_values(array_map('strval', (array)($finalChunk->data['notes'] ?? []))),
                 );
             }
             $conversation = $conversation->withTurn($turn, $maxTurns);

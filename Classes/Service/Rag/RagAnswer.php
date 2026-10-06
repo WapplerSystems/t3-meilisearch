@@ -22,6 +22,8 @@ final class RagAnswer
         public readonly ?string $error = null,
         /** @var list<array{type:string,label:string,value:string}> */
         public readonly array $suggestions = [],
+        /** @var list<string> fixed notes under the answer, see RagAnswerNotesEvent */
+        public readonly array $notes = [],
     ) {}
 
     /**
@@ -40,6 +42,25 @@ final class RagAnswer
             $this->status,
             $this->error,
             $suggestions,
+            $this->notes,
+        );
+    }
+
+    /**
+     * Immutable copy with notes attached (see RagAnswerNotesEvent).
+     *
+     * @param list<string> $notes
+     */
+    public function withNotes(array $notes): self
+    {
+        return new self(
+            $this->answer,
+            $this->sources,
+            $this->citedIds,
+            $this->status,
+            $this->error,
+            $this->suggestions,
+            $notes,
         );
     }
 
@@ -117,6 +138,7 @@ final class RagAnswer
      */
     public function getAnswerHtml(): string
     {
-        return CitationRenderer::render($this->answer, $this->sources);
+        return CitationRenderer::render($this->answer, $this->sources)
+            . CitationRenderer::notes($this->notes);
     }
 }

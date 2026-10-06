@@ -69,10 +69,11 @@ final class RagStreamChunk
 
     /**
      * @param list<string> $citedIds
+     * @param list<string> $notes fixed notes under the answer, see RagAnswerNotesEvent
      */
-    public static function done(string $answer, array $citedIds): self
+    public static function done(string $answer, array $citedIds, array $notes = []): self
     {
-        return new self(self::TYPE_DONE, ['answer' => $answer, 'citedIds' => $citedIds]);
+        return new self(self::TYPE_DONE, ['answer' => $answer, 'citedIds' => $citedIds, 'notes' => $notes]);
     }
 
     /**

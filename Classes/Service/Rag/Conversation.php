@@ -104,6 +104,7 @@ final class Conversation
                 'citations' => $t->citations,
                 // The buttons offered under the answer, so a reload keeps them.
                 'suggestions' => $t->suggestions,
+                'notes' => $t->notes,
             ], $this->turns),
         ];
     }
@@ -159,6 +160,10 @@ final class Conversation
                 suggestions: array_values(array_filter(
                     (array)($row['suggestions'] ?? []),
                     static fn ($c): bool => is_array($c),
+                )),
+                notes: array_values(array_filter(
+                    array_map('strval', (array)($row['notes'] ?? [])),
+                    static fn (string $n): bool => $n !== '',
                 )),
             );
         }

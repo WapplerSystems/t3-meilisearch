@@ -12,6 +12,7 @@ use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Event\RagClarificationEvent;
+use WapplerSystems\Meilisearch\Event\RagAnswerNotesEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
@@ -656,6 +657,7 @@ final class RagService implements LoggerAwareInterface
         $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($after);
         $final = $after->answer;
+        $final = $final->withNotes($this->answerNotes($site, $event->question, $final->answer, $hits, $final->citedIds, $options));
         // Decision-support suggestions (followup / refine / recommend),
         // rendered as buttons under the answer. Generated from the final
         // answer + sources; returns [] when disabled or on any error, so it
@@ -839,12 +841,14 @@ final class RagService implements LoggerAwareInterface
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
                 yield $chunk;
             }
-            yield RagStreamChunk::done($before->response, $citedIds);
+            $notes = $this->answerNotes($site, $event->question, $before->response, $hits, $citedIds, $options);
+            yield RagStreamChunk::done($before->response, $citedIds, $notes);
             $cachedAnswer = new RagAnswer(
                 answer: trim($before->response),
                 sources: $hits,
                 citedIds: $citedIds,
                 status: 'ok',
+                notes: $notes,
             );
             $cachedSuggestions = $this->withScopeOptions(
                 $this->withRelatedTopics(
@@ -912,13 +916,15 @@ final class RagService implements LoggerAwareInterface
         if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
             yield $chunk;
         }
-        yield RagStreamChunk::done(trim($accumulated), $citedIds);
+        $notes = $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
+        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes);
 
         $answer = new RagAnswer(
             answer: trim($accumulated),
             sources: $hits,
             citedIds: $citedIds,
             status: 'ok',
+            notes: $notes,
         );
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
@@ -1542,6 +1548,32 @@ final class RagService implements LoggerAwareInterface
         }
 
         return false;
+    }
+
+    /**
+     * Fixed notes for under the answer, from RagAnswerNotesEvent listeners.
+     * A failing listener costs the notes, never the answer.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param list<string> $citedIds
+     * @param array<string,mixed> $options
+     * @return list<string>
+     */
+    private function answerNotes(Site $site, string $question, string $answer, array $hits, array $citedIds, array $options): array
+    {
+        if (trim($answer) === '') {
+            return [];
+        }
+        try {
+            $event = new RagAnswerNotesEvent($site, $question, $answer, $hits, array_values(array_map('strval', $citedIds)), $this->resolveLanguageId($options));
+            $this->eventDispatcher->dispatch($event);
+
+            return $event->getNotes();
+        } catch (\Throwable $e) {
+            $this->logger?->error('RAG answer notes failed: {message}', ['message' => $e->getMessage(), 'exception' => $e]);
+
+            return [];
+        }
     }
 
     /**

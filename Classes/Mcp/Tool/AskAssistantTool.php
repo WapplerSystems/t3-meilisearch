@@ -146,6 +146,10 @@ final class AskAssistantTool implements McpToolInterface
             'status' => $answer->status,
             'answer' => $answer->answer,
         ];
+        // Fixed notes the site shows under this answer (RagAnswerNotesEvent).
+        if ($answer->notes !== []) {
+            $result['answerNotes'] = $answer->notes;
+        }
 
         if ($answer->status === 'clarify') {
             $clarifyingOptions = [];

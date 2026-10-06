@@ -173,6 +173,7 @@ final class RagController extends ActionController
                 CitationRenderer::citationsFor($answer->sources, $answer->citedIds),
                 // Same for the buttons under the answer.
                 $answer->suggestions,
+                $answer->notes,
             );
             $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
             $conversation = $conversation->withTurn($turn, $maxTurns);

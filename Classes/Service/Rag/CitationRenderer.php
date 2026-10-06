@@ -255,6 +255,28 @@ final class CitationRenderer
     }
 
     /**
+     * The notes a RagAnswerNotesEvent listener attached, below the source
+     * list. Same markup as RagStream.js renderNotes().
+     *
+     * @param list<string> $notes
+     */
+    public static function notes(array $notes): string
+    {
+        $html = '';
+        foreach ($notes as $note) {
+            $note = trim((string)$note);
+            if ($note !== '') {
+                $html .= sprintf(
+                    '<p class="ws-meilisearch-rag-answer-note">%s</p>',
+                    htmlspecialchars($note, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                );
+            }
+        }
+
+        return $html;
+    }
+
+    /**
      * Markdown-light. The model writes markdown whether asked to or not, and
      * anything not translated here reaches the reader as literal syntax —
      * "### Voraussetzungen" with the hashes, "*Hinweis:*" with the asterisks,

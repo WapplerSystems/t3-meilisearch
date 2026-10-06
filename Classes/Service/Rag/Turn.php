@@ -43,6 +43,8 @@ final class Turn
         public readonly string $kind = self::KIND_ANSWER,
         public readonly array $citations = [],
         public readonly array $suggestions = [],
+        /** @var list<string> fixed notes under the answer, see RagAnswerNotesEvent */
+        public readonly array $notes = [],
     ) {}
 
     public function isClarification(): bool
@@ -61,8 +63,9 @@ final class Turn
      */
     public function getDisplayAnswerHtml(): string
     {
-        return $this->citations === []
+        return ($this->citations === []
             ? CitationRenderer::withoutCitations($this->answer, $this->citedIds)
-            : CitationRenderer::render($this->answer, $this->citations);
+            : CitationRenderer::render($this->answer, $this->citations))
+            . CitationRenderer::notes($this->notes);
     }
 }

@@ -235,7 +235,8 @@
                 try {
                     const p = JSON.parse(ev.data);
                     const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : acc;
-                    turn.answerEl.innerHTML = renderAnswerHtml(finalText, turn.sources);
+                    turn.answerEl.innerHTML = renderAnswerHtml(finalText, turn.sources)
+                        + renderNotes(Array.isArray(p.notes) ? p.notes : []);
                 } catch (_) { /* ignore */ }
                 closeTimer = setTimeout(finish, 15000);
             });
@@ -531,6 +532,16 @@
             .join('');
 
         return '<ol class="ws-meilisearch-rag-citations">' + rows + '</ol>' + notes;
+    }
+
+    // Fixed notes a RagAnswerNotesEvent listener attached to the answer,
+    // below the source list (mirrors CitationRenderer::notes()).
+    function renderNotes(notes) {
+        return notes
+            .map(function (note) { return (note || '').toString().trim(); })
+            .filter(function (note) { return note !== ''; })
+            .map(function (note) { return '<p class="ws-meilisearch-rag-answer-note">' + escapeText(note) + '</p>'; })
+            .join('');
     }
 
     function renderMarkdownLight(text) {
