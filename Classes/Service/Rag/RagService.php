@@ -682,6 +682,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $event->question,
             $hits,
+            $final->citedIds,
         ));
     }
 
@@ -867,6 +868,7 @@ final class RagService implements LoggerAwareInterface
                 $site,
                 $event->question,
                 $hits,
+                $citedIds,
             );
             if ($cachedSuggestions !== []) {
                 yield RagStreamChunk::suggestions($cachedSuggestions);
@@ -943,6 +945,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $event->question,
             $hits,
+            $citedIds,
         );
         if ($suggestions !== []) {
             yield RagStreamChunk::suggestions($suggestions);
@@ -1554,14 +1557,15 @@ final class RagService implements LoggerAwareInterface
      *
      * @param list<array<string,mixed>> $suggestions
      * @param list<array<string,mixed>> $hits
+     * @param list<string> $citedIds
      * @return list<array<string,mixed>>
      */
-    private function withScopeOptions(array $suggestions, Site $site, string $question, array $hits): array
+    private function withScopeOptions(array $suggestions, Site $site, string $question, array $hits, array $citedIds = []): array
     {
         if ($hits === []) {
             return $suggestions;
         }
-        $event = new RagScopeOptionsEvent($site, $question, $hits);
+        $event = new RagScopeOptionsEvent($site, $question, $hits, array_values(array_map('strval', $citedIds)));
         $this->eventDispatcher->dispatch($event);
         $options = $event->getOptions();
         if ($options === []) {

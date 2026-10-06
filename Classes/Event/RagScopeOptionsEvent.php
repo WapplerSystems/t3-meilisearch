@@ -36,11 +36,13 @@ final class RagScopeOptionsEvent
 
     /**
      * @param list<array<string,mixed>> $sources documents the answer was built from
+     * @param list<string> $citedIds ids of the sources the answer actually cites
      */
     public function __construct(
         private readonly Site $site,
         private readonly string $question,
         private readonly array $sources,
+        private readonly array $citedIds = [],
     ) {}
 
     public function getSite(): Site
@@ -63,6 +65,18 @@ final class RagScopeOptionsEvent
     public function getSources(): array
     {
         return $this->sources;
+    }
+
+    /**
+     * Ids of the sources the answer cites — a subset of getSources(). Lets a
+     * listener judge the scope by what the answer rests on rather than by
+     * everything that was retrieved alongside it.
+     *
+     * @return list<string>
+     */
+    public function getCitedIds(): array
+    {
+        return $this->citedIds;
     }
 
     /**
