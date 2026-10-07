@@ -211,7 +211,8 @@ final class RagService implements LoggerAwareInterface
         $event = new RagCitationLabelsEvent($site, $hits);
         $this->eventDispatcher->dispatch($event);
         $labels = $event->getLabels();
-        if ($labels === []) {
+        $media = $event->getMedia();
+        if ($labels === [] && $media === []) {
             return $hits;
         }
         foreach ($hits as $index => $hit) {
@@ -222,6 +223,9 @@ final class RagService implements LoggerAwareInterface
                 if ($labels[$id]['note'] !== '') {
                     $hits[$index]['citationNote'] = $labels[$id]['note'];
                 }
+            }
+            if ($id !== '' && isset($media[$id])) {
+                $hits[$index]['citationMedia'] = $media[$id];
             }
         }
 

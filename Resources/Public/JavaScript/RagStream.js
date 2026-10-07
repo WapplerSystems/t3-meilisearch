@@ -462,6 +462,13 @@
     function renderAnswerHtml(text, sources) {
         const refs = Object.create(null);
         const order = [];
+        const rank = Object.create(null);
+        (sources || []).forEach(function (src, i) {
+            const id = (src && src.id ? src.id : '').toString();
+            if (id !== '' && !(id in rank)) { rank[id] = i; }
+        });
+        // Media sources are numbered on their own (mirrors CitationRenderer).
+        const counters = { doc: 0, media: 0 };
         const linked = rewriteCitations(escapeText(text), sources, function (matched) {
             // Numbers are handed out in order of first appearance and reused,
             // so a document cited five times stays reference 1. Sources that
@@ -472,26 +479,98 @@
             matched.forEach(function (hit) {
                 const text = citationText(hit.src, hit.id);
                 if (!refs[text]) {
+                    const media = citationMedia(hit.src);
+                    const kind = media ? 'media' : 'doc';
+                    counters[kind]++;
                     refs[text] = {
-                        number: order.length + 1,
+                        number: counters[kind],
                         text: text,
-                        uri: (hit.src.uri || hit.src.publicUrl || '').toString(),
-                        note: (hit.src.citationNote || '').toString().trim()
+                        uri: media && media.url ? media.url : (hit.src.uri || hit.src.publicUrl || '').toString(),
+                        note: (hit.src.citationNote || '').toString().trim(),
+                        media: media,
+                        rank: hit.id in rank ? rank[hit.id] : Number.MAX_SAFE_INTEGER
                     };
                     order.push(refs[text]);
                 }
                 if (numbers.indexOf(refs[text]) === -1) { numbers.push(refs[text]); }
             });
-            numbers.sort(function (a, b) { return a.number - b.number; });
+            numbers.sort(function (a, b) {
+                return (a.media ? 1 : 0) - (b.media ? 1 : 0) || a.number - b.number;
+            });
             return numbers.map(function (ref) {
-                return '[' + citationAnchor(ref, String(ref.number)) + ']';
+                return ref.media ? mediaAnchor(ref) : '[' + citationAnchor(ref, String(ref.number)) + ']';
             }).join('');
         });
         // Markdown last, exactly as the server does: escaping left the
         // markers alone and the citation texts must not be re-scanned.
         const bold = markdownLight(linked);
 
-        return bold + citationLegend(order);
+        return bold
+            + mediaBlock(order.filter(function (ref) { return ref.media; }))
+            + citationLegend(order.filter(function (ref) { return !ref.media; }));
+    }
+
+    const MAX_MEDIA_CARDS = 3;
+
+    // The media payload a RagCitationLabelsEvent listener attached, or null
+    // for an ordinary document (mirrors CitationRenderer::media()).
+    function citationMedia(src) {
+        const media = src && src.citationMedia;
+        if (!media || typeof media !== 'object' || !(media.title || '').toString().trim()) { return null; }
+        const out = {};
+        Object.keys(media).forEach(function (key) { out[key] = (media[key] || '').toString().trim(); });
+        return out;
+    }
+
+    // Inline reference to a media source, with a play mark.
+    function mediaAnchor(ref) {
+        const label = '<span class="ws-meilisearch-rag-citation__play" aria-hidden="true"></span>' + ref.number;
+        if (ref.uri === '') {
+            return '<abbr class="ws-meilisearch-rag-citation ws-meilisearch-rag-citation--media" title="' + escapeAttr(ref.text) + '">' + label + '</abbr>';
+        }
+        return '<a href="' + escapeAttr(ref.uri) + '" title="' + escapeAttr(ref.text)
+            + '" target="_blank" rel="noopener" class="ws-meilisearch-rag-citation ws-meilisearch-rag-citation--media">' + label + '</a>';
+    }
+
+    // The media cards between the answer and the source list (mirrors
+    // CitationRenderer::mediaBlock(); no whitespace between tags, the answer
+    // sits in a white-space: pre-wrap element).
+    function mediaBlock(refs) {
+        if (!refs.length) { return ''; }
+        refs = refs.slice().sort(function (a, b) { return a.rank - b.rank || a.number - b.number; })
+            .slice(0, MAX_MEDIA_CARDS);
+        const first = refs[0].media || {};
+        let html = '<div class="ws-meilisearch-rag-media">';
+        if (first.heading) { html += '<p class="ws-meilisearch-rag-media__heading">' + escapeText(first.heading) + '</p>'; }
+        if (first.intro) { html += '<p class="ws-meilisearch-rag-media__intro">' + escapeText(first.intro) + '</p>'; }
+        refs.forEach(function (ref, index) {
+            if (index === 1 && first.more) { html += '<p class="ws-meilisearch-rag-media__more">' + escapeText(first.more) + '</p>'; }
+            if (index === 1) { html += '<div class="ws-meilisearch-rag-media__list">'; }
+            html += mediaCard(ref, index === 0);
+        });
+        if (refs.length > 1) { html += '</div>'; }
+        refs.map(function (ref) { return ref.note || ''; })
+            .filter(function (note, i, all) { return note !== '' && all.indexOf(note) === i; })
+            .forEach(function (note) { html += '<p class="ws-meilisearch-rag-media__note">' + escapeText(note) + '</p>'; });
+
+        return html + '</div>';
+    }
+
+    function mediaCard(ref, primary) {
+        const m = ref.media || {};
+        const cls = 'ws-meilisearch-rag-media__card' + (primary ? ' ws-meilisearch-rag-media__card--primary' : '');
+        const inner = '<span class="ws-meilisearch-rag-media__thumb" aria-hidden="true">'
+            + '<span class="ws-meilisearch-rag-media__play"></span>'
+            + (m.start ? '<span class="ws-meilisearch-rag-media__start">' + escapeText(m.start) + '</span>' : '')
+            + '</span>'
+            + '<span class="ws-meilisearch-rag-media__body">'
+            + '<span class="ws-meilisearch-rag-media__title"><span class="ws-meilisearch-rag-media__number">' + ref.number + '</span>' + escapeText(m.title || '') + '</span>'
+            + (m.context ? '<span class="ws-meilisearch-rag-media__context">' + escapeText(m.context) + '</span>' : '')
+            + (primary && m.meta ? '<span class="ws-meilisearch-rag-media__meta">' + escapeText(m.meta) + '</span>' : '')
+            + (primary && m.cta ? '<span class="ws-meilisearch-rag-media__cta">' + escapeText(m.cta) + '</span>' : '')
+            + '</span>';
+        if (ref.uri === '') { return '<div class="' + cls + '">' + inner + '</div>'; }
+        return '<a class="' + cls + '" href="' + escapeAttr(ref.uri) + '" target="_blank" rel="noopener">' + inner + '</a>';
     }
 
     // What a citation is called: the label a RagCitationLabelsEvent listener

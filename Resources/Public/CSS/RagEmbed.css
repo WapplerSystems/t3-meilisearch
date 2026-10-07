@@ -11,6 +11,7 @@
     --wsm-border: #d7dbe0;
     --wsm-muted: #5b6570;
     --wsm-bg-soft: #f5f7f9;
+    --wsm-media-accent: var(--wsm-accent);
     margin: 0;
     padding: 1rem;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

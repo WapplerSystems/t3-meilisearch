@@ -145,6 +145,206 @@
     margin-top: .15rem;
 }
 
+/* Media sources (RagCitationLabelsEvent::setMedia): an inline reference with a
+ * play mark, and a block of cards between the answer and the source list. The
+ * answer element is white-space: pre-wrap, so the block resets it. Colours
+ * follow the site's primary colour; --wsm-media-accent overrides it. */
+.ws-meilisearch-rag-citation--media {
+    display: inline-flex;
+    align-items: center;
+    gap: .2em;
+    margin-left: .15em;
+    padding: 0 .45em;
+    border-radius: 1em;
+    background: color-mix(in srgb, var(--wsm-media-accent, var(--bs-primary, #1a5fb4)) 12%, #fff);
+    color: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+    font-weight: 600;
+    line-height: 1.5;
+    vertical-align: .05em;
+}
+
+.ws-meilisearch-rag-citation__play {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: .3em 0 .3em .5em;
+    border-color: transparent transparent transparent currentColor;
+}
+
+.ws-meilisearch-rag-media {
+    container-type: inline-size;
+    white-space: normal;
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, .1);
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+}
+
+.ws-meilisearch-rag-media p {
+    margin: 0;
+}
+
+.ws-meilisearch-rag-media__heading {
+    font-size: .8em;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+}
+
+.ws-meilisearch-rag-media__more {
+    margin-top: .35rem !important;
+    font-size: .9em;
+}
+
+.ws-meilisearch-rag-media__note {
+    font-size: .82em;
+    opacity: .8;
+}
+
+.ws-meilisearch-rag-media__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: .65rem;
+}
+
+.ws-meilisearch-rag-media__card {
+    display: flex;
+    gap: .8rem;
+    align-items: stretch;
+    padding: .6rem;
+    border: 1px solid rgba(0, 0, 0, .14);
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+}
+
+.ws-meilisearch-rag-media__card:hover,
+.ws-meilisearch-rag-media__card:focus-visible {
+    border-color: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+    color: inherit;
+}
+
+.ws-meilisearch-rag-media__card--primary {
+    gap: 1rem;
+    padding: .75rem;
+    background: color-mix(in srgb, var(--wsm-media-accent, var(--bs-primary, #1a5fb4)) 5%, #fff);
+    border-color: color-mix(in srgb, var(--wsm-media-accent, var(--bs-primary, #1a5fb4)) 30%, #fff);
+}
+
+.ws-meilisearch-rag-media__thumb {
+    position: relative;
+    flex: 0 0 5.5rem;
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+}
+
+.ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__thumb {
+    flex-basis: 10rem;
+    height: 6rem;
+}
+
+.ws-meilisearch-rag-media__play {
+    width: 2.2em;
+    height: 2.2em;
+    border-radius: 50%;
+    background: #fff;
+    position: relative;
+}
+
+.ws-meilisearch-rag-media__play::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin: -.4em 0 0 -.22em;
+    border-style: solid;
+    border-width: .4em 0 .4em .65em;
+    border-color: transparent transparent transparent var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+}
+
+.ws-meilisearch-rag-media__card:not(.ws-meilisearch-rag-media__card--primary) .ws-meilisearch-rag-media__play {
+    width: 1.6em;
+    height: 1.6em;
+}
+
+.ws-meilisearch-rag-media__start {
+    position: absolute;
+    right: .3rem;
+    bottom: .3rem;
+    padding: 0 .3em;
+    background: rgba(0, 0, 0, .75);
+    color: #fff;
+    font-size: .75em;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.ws-meilisearch-rag-media__body {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    min-width: 0;
+    font-size: .9em;
+}
+
+.ws-meilisearch-rag-media__title {
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__title {
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.ws-meilisearch-rag-media__number {
+    display: inline-block;
+    margin-right: .4em;
+    padding: 0 .4em;
+    border-radius: 1em;
+    background: color-mix(in srgb, var(--wsm-media-accent, var(--bs-primary, #1a5fb4)) 12%, #fff);
+    color: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+    font-size: .8em;
+    font-weight: 600;
+    vertical-align: .1em;
+}
+
+.ws-meilisearch-rag-media__context,
+.ws-meilisearch-rag-media__meta {
+    font-size: .9em;
+    opacity: .8;
+}
+
+.ws-meilisearch-rag-media__cta {
+    margin-top: auto;
+    padding-top: .25rem;
+    font-weight: 600;
+    color: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
+}
+
+.ws-meilisearch-rag-media__cta::after {
+    content: " \2197";
+}
+
+/* The chat panel is narrow on a wide screen too, so the block's own width
+ * decides, not the viewport's. */
+@container (max-width: 30rem) {
+    .ws-meilisearch-rag-media__card--primary {
+        flex-direction: column;
+    }
+
+    .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__thumb {
+        flex-basis: auto;
+        height: 7rem;
+    }
+}
+
 /* Question field and its button, same height.
  *
  * Bootstrap 5 input groups are flex containers and stretch their children to

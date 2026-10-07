@@ -29,6 +29,11 @@ final class RagCitationLabelsEvent
     private array $labels = [];
 
     /**
+     * @var array<string,array<string,string>>
+     */
+    private array $media = [];
+
+    /**
      * @param list<array<string,mixed>> $sources documents about to be cited
      */
     public function __construct(
@@ -82,5 +87,52 @@ final class RagCitationLabelsEvent
     public function getLabels(): array
     {
         return $this->labels;
+    }
+
+    /**
+     * Marks a document as a media source (a video lesson, a recording) so it
+     * is shown as a card in its own block under the answer instead of a line
+     * in the numbered source list, and its inline reference carries a play
+     * mark. Everything the card says comes from here — this extension adds no
+     * wording of its own, so the texts stay in the listener's language:
+     *
+     *   title      what the reader sees in it ("Import the Excel room book")
+     *   context    where it lives ("Course „Room book“ · Lesson 2.1")
+     *   meta       one quiet line ("Excerpt 1:07–2:50 (1:43 min) · LINEAR Building")
+     *   start      the position badge on the preview ("1:07"), optional
+     *   url        the link of the card
+     *   cta        the link text ("Watch from 1:07")
+     *   intro      a sentence above the card when it is the first one shown
+     *   heading    the heading of the block
+     *   more       the line above the further cards
+     *
+     * The first card is the best-ranked cited media document; at most three
+     * are shown. Unknown keys are ignored, missing ones render as nothing.
+     *
+     * @param array<string,string> $media
+     */
+    public function setMedia(string $documentId, array $media): void
+    {
+        if ($documentId === '') {
+            return;
+        }
+        $clean = [];
+        foreach (['title', 'context', 'meta', 'start', 'url', 'cta', 'intro', 'heading', 'more'] as $key) {
+            $value = trim((string)($media[$key] ?? ''));
+            if ($value !== '') {
+                $clean[$key] = $value;
+            }
+        }
+        if (isset($clean['title'])) {
+            $this->media[$documentId] = $clean;
+        }
+    }
+
+    /**
+     * @return array<string,array<string,string>>
+     */
+    public function getMedia(): array
+    {
+        return $this->media;
     }
 }

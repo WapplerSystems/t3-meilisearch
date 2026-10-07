@@ -19,6 +19,9 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  */
 final class CitationRenderer
 {
+    /** At most this many media cards under one answer, the best-ranked first. */
+    private const MAX_MEDIA_CARDS = 3;
+
     /**
      * Numbers are handed out in order of first appearance and reused, so a
      * document cited five times stays reference 1. Sources that would read
@@ -40,23 +43,29 @@ final class CitationRenderer
             return self::markdownLight($escaped);
         }
         $byId = [];
+        $rank = [];
         foreach ($sources as $src) {
             $id = (string)($src['id'] ?? '');
             if ($id !== '') {
                 $byId[$id] = $src;
+                $rank[$id] ??= count($rank);
             }
         }
         if ($byId === []) {
             return self::markdownLight($escaped);
         }
 
-        /** @var array<string,array{number:int,text:string,uri:string,note:string}> $refs keyed by display text */
+        /** @var array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null,rank:int}> $refs keyed by display text */
         $refs = [];
+        // Media sources (RagCitationLabelsEvent::setMedia) are numbered on
+        // their own, so the plain source list below the answer reads 1, 2, 3
+        // without gaps where the videos went.
+        $counters = ['doc' => 0, 'media' => 0];
         // Eat an optional leading space so replacing a citation that follows a
         // word does not leave a double space behind.
         $rewritten = (string)preg_replace_callback(
             '/(\s*)\[([^\[\]]+)\]/',
-            static function (array $block) use ($byId, &$refs): string {
+            static function (array $block) use ($byId, $rank, &$refs, &$counters): string {
                 if (!preg_match_all('/[A-Za-z0-9_:.\-]+/', $block[2], $tokens) || !isset($tokens[0])) {
                     return $block[0];
                 }
@@ -73,14 +82,18 @@ final class CitationRenderer
                     }
                     $text = self::citationText($src, $token);
                     if (!isset($refs[$text])) {
+                        $media = self::media($src);
+                        $kind = $media === null ? 'doc' : 'media';
                         $refs[$text] = [
-                            'number' => count($refs) + 1,
+                            'number' => ++$counters[$kind],
                             'text' => $text,
-                            'uri' => (string)($src['uri'] ?? ''),
+                            'uri' => $media['url'] ?? (string)($src['uri'] ?? ''),
                             'note' => trim((string)($src['citationNote'] ?? '')),
+                            'media' => $media,
+                            'rank' => $rank[$token] ?? PHP_INT_MAX,
                         ];
                     }
-                    $numbers[$refs[$text]['number']] = $refs[$text];
+                    $numbers[($refs[$text]['media'] === null ? 'd' : 'm') . str_pad((string)$refs[$text]['number'], 4, '0', STR_PAD_LEFT)] = $refs[$text];
                 }
                 if ($numbers === [] && $knowledgeResourceMatches > 0) {
                     return '';
@@ -91,7 +104,9 @@ final class CitationRenderer
                 ksort($numbers);
                 $out = $block[1];
                 foreach ($numbers as $ref) {
-                    $out .= '[' . self::anchor($ref, (string)$ref['number']) . ']';
+                    $out .= $ref['media'] === null
+                        ? '[' . self::anchor($ref, (string)$ref['number']) . ']'
+                        : self::mediaAnchor($ref);
                 }
 
                 return $out;
@@ -99,7 +114,122 @@ final class CitationRenderer
             $escaped,
         );
 
-        return self::markdownLight($rewritten) . self::legend($refs);
+        $media = array_filter($refs, static fn (array $ref): bool => $ref['media'] !== null);
+        $docs = array_filter($refs, static fn (array $ref): bool => $ref['media'] === null);
+
+        return self::markdownLight($rewritten) . self::mediaBlock($media) . self::legend($docs);
+    }
+
+    /**
+     * The media payload a RagCitationLabelsEvent listener attached, or null
+     * for an ordinary document.
+     *
+     * @param array<string,mixed> $src
+     * @return array<string,string>|null
+     */
+    private static function media(array $src): ?array
+    {
+        $media = $src['citationMedia'] ?? null;
+        if (!is_array($media) || trim((string)($media['title'] ?? '')) === '') {
+            return null;
+        }
+
+        return array_map(static fn ($value): string => trim((string)$value), $media);
+    }
+
+    /**
+     * Inline reference to a media source: the number with a play mark, so the
+     * reader sees in the text where a video shows the step.
+     *
+     * @param array{number:int,text:string,uri:string} $ref
+     */
+    private static function mediaAnchor(array $ref): string
+    {
+        $label = '<span class="ws-meilisearch-rag-citation__play" aria-hidden="true"></span>' . $ref['number'];
+        $tooltip = htmlspecialchars($ref['text'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($ref['uri'] === '') {
+            return sprintf('<abbr class="ws-meilisearch-rag-citation ws-meilisearch-rag-citation--media" title="%s">%s</abbr>', $tooltip, $label);
+        }
+
+        return sprintf(
+            '<a href="%s" title="%s" target="_blank" rel="noopener" class="ws-meilisearch-rag-citation ws-meilisearch-rag-citation--media">%s</a>',
+            htmlspecialchars($ref['uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            $tooltip,
+            $label,
+        );
+    }
+
+    /**
+     * The block of media cards between the answer and the source list. The
+     * best-ranked cited media source becomes the large card with the intro
+     * sentence above it, up to two more follow as small cards. Every text
+     * comes from the listener; the notes of media sources (free courses, the
+     * interface may differ) close the block instead of the source list.
+     *
+     * Same markup as RagStream.js mediaBlock(); no whitespace between tags,
+     * because the answer sits in a white-space: pre-wrap element.
+     *
+     * @param array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null,rank:int}> $refs
+     */
+    private static function mediaBlock(array $refs): string
+    {
+        if ($refs === []) {
+            return '';
+        }
+        usort($refs, static fn (array $a, array $b): int => [$a['rank'], $a['number']] <=> [$b['rank'], $b['number']]);
+        $refs = array_slice($refs, 0, self::MAX_MEDIA_CARDS);
+        $e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $first = $refs[0]['media'] ?? [];
+
+        $html = '<div class="ws-meilisearch-rag-media">';
+        if (($first['heading'] ?? '') !== '') {
+            $html .= '<p class="ws-meilisearch-rag-media__heading">' . $e($first['heading']) . '</p>';
+        }
+        if (($first['intro'] ?? '') !== '') {
+            $html .= '<p class="ws-meilisearch-rag-media__intro">' . $e($first['intro']) . '</p>';
+        }
+        foreach ($refs as $index => $ref) {
+            if ($index === 1 && (($first['more'] ?? '') !== '')) {
+                $html .= '<p class="ws-meilisearch-rag-media__more">' . $e($first['more']) . '</p>';
+            }
+            if ($index === 1) {
+                $html .= '<div class="ws-meilisearch-rag-media__list">';
+            }
+            $html .= self::mediaCard($ref, $index === 0);
+        }
+        if (count($refs) > 1) {
+            $html .= '</div>';
+        }
+        foreach (array_unique(array_filter(array_map(static fn (array $ref): string => $ref['note'], $refs))) as $note) {
+            $html .= '<p class="ws-meilisearch-rag-media__note">' . $e($note) . '</p>';
+        }
+
+        return $html . '</div>';
+    }
+
+    /**
+     * @param array{number:int,uri:string,media:array<string,string>|null} $ref
+     */
+    private static function mediaCard(array $ref, bool $primary): string
+    {
+        $media = $ref['media'] ?? [];
+        $e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $class = 'ws-meilisearch-rag-media__card' . ($primary ? ' ws-meilisearch-rag-media__card--primary' : '');
+        $inner = '<span class="ws-meilisearch-rag-media__thumb" aria-hidden="true">'
+            . '<span class="ws-meilisearch-rag-media__play"></span>'
+            . (($media['start'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__start">' . $e($media['start']) . '</span>' : '')
+            . '</span>'
+            . '<span class="ws-meilisearch-rag-media__body">'
+            . '<span class="ws-meilisearch-rag-media__title"><span class="ws-meilisearch-rag-media__number">' . $ref['number'] . '</span>' . $e($media['title'] ?? '') . '</span>'
+            . (($media['context'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__context">' . $e($media['context']) . '</span>' : '')
+            . ($primary && ($media['meta'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__meta">' . $e($media['meta']) . '</span>' : '')
+            . ($primary && ($media['cta'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__cta">' . $e($media['cta']) . '</span>' : '')
+            . '</span>';
+        if ($ref['uri'] === '') {
+            return '<div class="' . $class . '">' . $inner . '</div>';
+        }
+
+        return '<a class="' . $class . '" href="' . $e($ref['uri']) . '" target="_blank" rel="noopener">' . $inner . '</a>';
     }
 
     /**
@@ -152,7 +282,7 @@ final class CitationRenderer
      *
      * @param list<array<string,mixed>> $sources
      * @param list<string> $citedIds
-     * @return list<array<string,string>>
+     * @return list<array<string,mixed>>
      */
     public static function citationsFor(array $sources, array $citedIds): array
     {
@@ -171,6 +301,7 @@ final class CitationRenderer
                 'citationLabel' => (string)($src['citationLabel'] ?? ''),
                 'citationQualifier' => (string)($src['citationQualifier'] ?? ''),
                 'citationNote' => (string)($src['citationNote'] ?? ''),
+                'citationMedia' => is_array($src['citationMedia'] ?? null) ? $src['citationMedia'] : [],
             ];
         }
 
