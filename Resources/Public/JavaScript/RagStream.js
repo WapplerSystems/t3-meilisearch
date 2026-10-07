@@ -462,11 +462,6 @@
     function renderAnswerHtml(text, sources) {
         const refs = Object.create(null);
         const order = [];
-        const rank = Object.create(null);
-        (sources || []).forEach(function (src, i) {
-            const id = (src && src.id ? src.id : '').toString();
-            if (id !== '' && !(id in rank)) { rank[id] = i; }
-        });
         // Media sources are numbered on their own (mirrors CitationRenderer).
         const counters = { doc: 0, media: 0 };
         const linked = rewriteCitations(escapeText(text), sources, function (matched) {
@@ -487,8 +482,7 @@
                         text: text,
                         uri: media && media.url ? media.url : (hit.src.uri || hit.src.publicUrl || '').toString(),
                         note: (hit.src.citationNote || '').toString().trim(),
-                        media: media,
-                        rank: hit.id in rank ? rank[hit.id] : Number.MAX_SAFE_INTEGER
+                        media: media
                     };
                     order.push(refs[text]);
                 }
@@ -532,12 +526,13 @@
             + '" target="_blank" rel="noopener" class="ws-meilisearch-rag-citation ws-meilisearch-rag-citation--media">' + label + '</a>';
     }
 
-    // The media cards between the answer and the source list (mirrors
+    // The media cards between the answer and the source list, first-cited
+    // first (mirrors
     // CitationRenderer::mediaBlock(); no whitespace between tags, the answer
     // sits in a white-space: pre-wrap element).
     function mediaBlock(refs) {
         if (!refs.length) { return ''; }
-        refs = refs.slice().sort(function (a, b) { return a.rank - b.rank || a.number - b.number; })
+        refs = refs.slice().sort(function (a, b) { return a.number - b.number; })
             .slice(0, MAX_MEDIA_CARDS);
         const first = refs[0].media || {};
         let html = '<div class="ws-meilisearch-rag-media">';

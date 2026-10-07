@@ -19,7 +19,7 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
  */
 final class CitationRenderer
 {
-    /** At most this many media cards under one answer, the best-ranked first. */
+    /** At most this many media cards under one answer, in the order the answer cites them. */
     private const MAX_MEDIA_CARDS = 3;
 
     /**
@@ -43,19 +43,17 @@ final class CitationRenderer
             return self::markdownLight($escaped);
         }
         $byId = [];
-        $rank = [];
         foreach ($sources as $src) {
             $id = (string)($src['id'] ?? '');
             if ($id !== '') {
                 $byId[$id] = $src;
-                $rank[$id] ??= count($rank);
             }
         }
         if ($byId === []) {
             return self::markdownLight($escaped);
         }
 
-        /** @var array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null,rank:int}> $refs keyed by display text */
+        /** @var array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null}> $refs keyed by display text */
         $refs = [];
         // Media sources (RagCitationLabelsEvent::setMedia) are numbered on
         // their own, so the plain source list below the answer reads 1, 2, 3
@@ -65,7 +63,7 @@ final class CitationRenderer
         // word does not leave a double space behind.
         $rewritten = (string)preg_replace_callback(
             '/(\s*)\[([^\[\]]+)\]/',
-            static function (array $block) use ($byId, $rank, &$refs, &$counters): string {
+            static function (array $block) use ($byId, &$refs, &$counters): string {
                 if (!preg_match_all('/[A-Za-z0-9_:.\-]+/', $block[2], $tokens) || !isset($tokens[0])) {
                     return $block[0];
                 }
@@ -90,7 +88,6 @@ final class CitationRenderer
                             'uri' => $media['url'] ?? (string)($src['uri'] ?? ''),
                             'note' => trim((string)($src['citationNote'] ?? '')),
                             'media' => $media,
-                            'rank' => $rank[$token] ?? PHP_INT_MAX,
                         ];
                     }
                     $numbers[($refs[$text]['media'] === null ? 'd' : 'm') . str_pad((string)$refs[$text]['number'], 4, '0', STR_PAD_LEFT)] = $refs[$text];
@@ -161,22 +158,25 @@ final class CitationRenderer
 
     /**
      * The block of media cards between the answer and the source list. The
-     * best-ranked cited media source becomes the large card with the intro
-     * sentence above it, up to two more follow as small cards. Every text
+     * media source the answer cites first becomes the large card with the
+     * intro sentence above it, up to two more follow as small cards. Citation
+     * order, not retrieval rank: the answer walks through the steps, and its
+     * first video belongs to the first step — the best-ranked one was, in the
+     * first live test, the export at the end of a question about creating. Every text
      * comes from the listener; the notes of media sources (free courses, the
      * interface may differ) close the block instead of the source list.
      *
      * Same markup as RagStream.js mediaBlock(); no whitespace between tags,
      * because the answer sits in a white-space: pre-wrap element.
      *
-     * @param array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null,rank:int}> $refs
+     * @param array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null}> $refs
      */
     private static function mediaBlock(array $refs): string
     {
         if ($refs === []) {
             return '';
         }
-        usort($refs, static fn (array $a, array $b): int => [$a['rank'], $a['number']] <=> [$b['rank'], $b['number']]);
+        usort($refs, static fn (array $a, array $b): int => $a['number'] <=> $b['number']);
         $refs = array_slice($refs, 0, self::MAX_MEDIA_CARDS);
         $e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $first = $refs[0]['media'] ?? [];
