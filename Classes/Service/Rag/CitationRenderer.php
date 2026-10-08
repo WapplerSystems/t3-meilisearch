@@ -216,6 +216,7 @@ final class CitationRenderer
         $e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $class = 'ws-meilisearch-rag-media__card' . ($primary ? ' ws-meilisearch-rag-media__card--primary' : '');
         $inner = '<span class="ws-meilisearch-rag-media__thumb" aria-hidden="true">'
+            . (($media['image'] ?? '') !== '' ? '<img class="ws-meilisearch-rag-media__image" src="' . $e($media['image']) . '" alt="" loading="lazy">' : '')
             . '<span class="ws-meilisearch-rag-media__play"></span>'
             . (($media['start'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__start">' . $e($media['start']) . '</span>' : '')
             . '</span>'

@@ -241,12 +241,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     background: var(--wsm-media-accent, var(--bs-primary, #1a5fb4));
 }
 
 .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__thumb {
     flex-basis: 10rem;
     height: 6rem;
+}
+
+/* Still of the clip: fills the preview, the play mark and the start badge
+ * stay on top (both are positioned and come later in the markup). */
+.ws-meilisearch-rag-media__image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ws-meilisearch-rag-media__thumb:has(.ws-meilisearch-rag-media__image) .ws-meilisearch-rag-media__play {
+    background: rgba(255, 255, 255, .9);
+    box-shadow: 0 0 .5em rgba(0, 0, 0, .35);
 }
 
 .ws-meilisearch-rag-media__play {

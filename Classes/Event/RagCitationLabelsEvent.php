@@ -100,6 +100,8 @@ final class RagCitationLabelsEvent
      *   context    where it lives ("Course „Room book“ · Lesson 2.1")
      *   meta       one quiet line ("Excerpt 1:07–2:50 (1:43 min) · LINEAR Building")
      *   start      the position badge on the preview ("1:07"), optional
+     *   image      URL of a still for the preview, optional; without one the
+     *              preview stays a coloured area with the play mark
      *   url        the link of the card
      *   cta        the link text ("Watch from 1:07")
      *   intro      a sentence above the card when it is the first one shown
@@ -117,7 +119,7 @@ final class RagCitationLabelsEvent
             return;
         }
         $clean = [];
-        foreach (['title', 'context', 'meta', 'start', 'url', 'cta', 'intro', 'heading', 'more'] as $key) {
+        foreach (['title', 'context', 'meta', 'start', 'image', 'url', 'cta', 'intro', 'heading', 'more'] as $key) {
             $value = trim((string)($media[$key] ?? ''));
             if ($value !== '') {
                 $clean[$key] = $value;

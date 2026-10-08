@@ -555,6 +555,7 @@
         const m = ref.media || {};
         const cls = 'ws-meilisearch-rag-media__card' + (primary ? ' ws-meilisearch-rag-media__card--primary' : '');
         const inner = '<span class="ws-meilisearch-rag-media__thumb" aria-hidden="true">'
+            + (m.image ? '<img class="ws-meilisearch-rag-media__image" src="' + escapeAttr(m.image) + '" alt="" loading="lazy">' : '')
             + '<span class="ws-meilisearch-rag-media__play"></span>'
             + (m.start ? '<span class="ws-meilisearch-rag-media__start">' + escapeText(m.start) + '</span>' : '')
             + '</span>'
