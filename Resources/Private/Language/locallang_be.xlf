@@ -735,6 +735,9 @@
             <trans-unit id="be.protocol.status.aborted" resname="be.protocol.status.aborted">
                 <source>aborted by the visitor</source>
             </trans-unit>
+            <trans-unit id="be.protocol.status.off_topic" resname="be.protocol.status.off_topic">
+                <source>off topic</source>
+            </trans-unit>
             <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
                 <source>assistant disabled</source>
             </trans-unit>

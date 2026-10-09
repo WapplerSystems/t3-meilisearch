@@ -98,7 +98,7 @@ final class AskAssistantTool implements McpToolInterface
                     continue;
                 }
 
-                if (!in_array($entry->status, ['ok', 'clarify'], true)) {
+                if (!in_array($entry->status, ['ok', 'clarify', ChatProtocolRecorder::STATUS_OFF_TOPIC], true)) {
                     continue;
                 }
 
@@ -134,7 +134,7 @@ final class AskAssistantTool implements McpToolInterface
             conversationId: $conversation->id,
             question: $question,
             answer: $answer->answer,
-            status: $answer->status,
+            status: $answer->outOfScope ? ChatProtocolRecorder::STATUS_OFF_TOPIC : $answer->status,
             citedIds: $answer->citedIds,
             hits: $answer->sources,
             escalated: false,
@@ -143,7 +143,7 @@ final class AskAssistantTool implements McpToolInterface
 
         $result = [
             'conversationId' => $conversation->id,
-            'status' => $answer->status,
+            'status' => $answer->outOfScope ? ChatProtocolRecorder::STATUS_OFF_TOPIC : $answer->status,
             'answer' => $answer->answer,
         ];
         // Fixed notes the site shows under this answer (RagAnswerNotesEvent).

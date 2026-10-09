@@ -42,6 +42,7 @@
                                     <f:else><span class="badge bg-success"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.ok"/></span></f:else>
                                 </f:if>
                             </f:then>
+                            <f:else if="{entry.status} == 'off_topic'"><span class="badge bg-secondary" title="{entry.status}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.status.off_topic"/></span></f:else>
                             <f:else><span class="badge bg-danger" title="{entry.status}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.status.{entry.status}" default="{entry.status}"/></span></f:else>
                         </f:if>
                         <f:if condition="{entry.escalated}">

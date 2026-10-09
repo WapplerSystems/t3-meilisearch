@@ -21,6 +21,7 @@ use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
 use WapplerSystems\Meilisearch\Service\HtmlToText;
+use WapplerSystems\Meilisearch\Service\PageIndexEligibility;
 use WapplerSystems\Meilisearch\Service\LanguageDetector;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
@@ -73,6 +74,7 @@ final class IndexEventListener implements LoggerAwareInterface
         private readonly LanguageDetector $languageDetector,
         private readonly HtmlToText $htmlToText,
         private readonly \WapplerSystems\Meilisearch\Service\FileAccessResolver $fileAccessResolver,
+        private readonly PageIndexEligibility $pageIndexEligibility,
     ) {}
 
     #[AsEventListener('ws-meilisearch-ext-index-page')]
@@ -83,6 +85,17 @@ final class IndexEventListener implements LoggerAwareInterface
             return;
         }
         $indexName = $this->engineFactory->getIndexName($event->site);
+        $docId = 'pages-' . $event->pageUid
+            . ($event->language > 0 ? '-l' . $event->language : '');
+
+        // EXT:index has no notion of page trees that stay out of the index
+        // (meilisearch.index.excludedPageTrees); without this check a page
+        // the prune command removed would come back with the next run.
+        $this->pageIndexEligibility->forgetCache();
+        if ($this->pageIndexEligibility->ineligibleReason($event->pageUid, 0, $event->site) === PageIndexEligibility::REASON_EXCLUDED_TREE) {
+            $engine->deleteDocument($indexName, $docId);
+            return;
+        }
 
         // Enrich with SEO meta straight from the pages row. The IndexPageEvent
         // only carries title + rendered content; subtitle/description/abstract/
@@ -97,8 +110,6 @@ final class IndexEventListener implements LoggerAwareInterface
         // FileSchemaProvider convention: lang 0 keeps the legacy
         // `pages-{uid}` form for backward compatibility, lang N gets
         // `pages-{uid}-l{N}`.
-        $docId = 'pages-' . $event->pageUid
-            . ($event->language > 0 ? '-l' . $event->language : '');
         $document = [
             'id' => $docId,
             'type' => 'page',

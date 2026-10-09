@@ -25,7 +25,9 @@ use WapplerSystems\Meilisearch\Event\RagEscalationEvent;
  *   always     — under every answer
  *   onlyEmpty  — only when the model could not ground its answer, i.e.
  *                status is not ok (no_context / failed / disabled / clarify)
- *                OR it answered without citing a single source
+ *                OR it answered without citing a single source; never for
+ *                an off-topic question (status off_topic): a recipe or a
+ *                jailbreak is not a case for the support team
  *   never      — disabled
  * The default card is built from meilisearch.rag.fallback.{contactName,email,
  * phone,ticketUrl}. Both the rule and the card can be overridden per turn by
@@ -44,6 +46,8 @@ final class EscalationResolver
     public const CONTEXT_STREAM = 'stream';
     /** The shell before any question; shows only in `always` mode. */
     public const CONTEXT_STATIC = 'static';
+    /** Answer status of a question outside the assistant's subject. */
+    public const STATUS_OFF_TOPIC = 'off_topic';
 
     private const LLL = 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:';
 
@@ -111,7 +115,7 @@ final class EscalationResolver
         return match ($mode) {
             'always' => true,
             'never' => false,
-            default => $status !== 'ok' || $citedIds === [],
+            default => $status !== self::STATUS_OFF_TOPIC && ($status !== 'ok' || $citedIds === []),
         };
     }
 

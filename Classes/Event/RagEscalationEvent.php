@@ -28,7 +28,7 @@ use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
  * the site router) can of course insert them itself.
  *
  * `$reason` explains why the default rule fired: the answer status
- * (`no_context`, `failed`, `disabled`, `clarify`), `uncited` for an answer
+ * (`no_context`, `failed`, `disabled`, `clarify`, `off_topic`), `uncited` for an answer
  * that cited no source, `answered` for a grounded answer, and `static` for the
  * always-visible card that is rendered before any question was asked.
  */
@@ -37,6 +37,8 @@ final class RagEscalationEvent
     public const REASON_UNCITED = 'uncited';
     public const REASON_ANSWERED = 'answered';
     public const REASON_STATIC = 'static';
+    /** The model declared the question outside the assistant's subject. */
+    public const REASON_OFF_TOPIC = 'off_topic';
 
     /**
      * @param list<string> $citedIds

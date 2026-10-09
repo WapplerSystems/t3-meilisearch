@@ -76,6 +76,27 @@ final class RagService implements LoggerAwareInterface
      * The block+token approach catches all of these.
      */
     private const CITATION_BLOCK_PATTERN = '/\[([^\[\]]+)\]/';
+
+    /**
+     * Marker the system prompt tells the model to put in front of a reply to
+     * a question outside the assistant's subject (a recipe, a joke, politics,
+     * a jailbreak attempt).
+     *
+     * Without it, "not my subject" and "my sources do not cover this" were
+     * indistinguishable: both cite nothing, so both got the contact card and
+     * the support team received a chat log about spaghetti carbonara. The
+     * model is the only part of the pipeline that can tell the two apart, and
+     * a marker in the reply costs nothing, where a separate triage call would
+     * add a round trip to every question. The marker never reaches the
+     * visitor: the stream holds back a reply's first characters until it is
+     * clear whether they spell the marker, and the final text drops it
+     * wherever the model put it.
+     */
+    public const OUT_OF_SCOPE_MARKER = '[out-of-scope]';
+    /** Context id of the site's fixed facts, see withFixedFacts(). */
+    public const FIXED_FACTS_ID = 'site-facts';
+    /** Tolerant form for the final text: case, spaces, `_` or a missing hyphen. */
+    private const OUT_OF_SCOPE_PATTERN = '/\[\s*out[\s_-]*of[\s_-]*scope\s*\]/i';
     private const CITATION_TOKEN_PATTERN = '/[A-Za-z0-9_:.\-]+/';
 
     public function __construct(
@@ -89,6 +110,7 @@ final class RagService implements LoggerAwareInterface
         private readonly EscalationResolver $escalationResolver,
         private readonly Reranker $reranker,
         private readonly NeighbourSuggestions $neighbourSuggestions,
+        private readonly PublishDateEnricher $publishDateEnricher,
     ) {}
 
     /**
@@ -591,6 +613,10 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
             true,
         );
+        // Before the empty check: with fixed facts the model still sees a
+        // context and answers — an off-topic question finds nothing in the
+        // index, and "no context" would hand it the contact card.
+        $hits = $this->withFixedFacts($site, $event->question, $hits);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
@@ -618,6 +644,8 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
             return $answer;
         }
+
+        $hits = $this->publishDateEnricher->enrich($site, $hits);
 
         $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');
         $currentTurnMessages = $this->promptBuilder->build(
@@ -651,16 +679,24 @@ final class RagService implements LoggerAwareInterface
             return $answer;
         }
 
-        $citedIds = $this->extractCitations($responseText, $hits);
+        [$responseText, $outOfScope] = self::splitOutOfScope($responseText);
+        $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
+        $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
         $answer = new RagAnswer(
             answer: trim($responseText),
             sources: $hits,
             citedIds: $citedIds,
             status: 'ok',
+            outOfScope: $outOfScope,
         );
         $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($after);
         $final = $after->answer;
+        if ($final->outOfScope) {
+            // No notes and no suggestions: both would point the visitor at
+            // documentation for a question that has nothing to do with it.
+            return $final;
+        }
         $final = $final->withNotes($this->answerNotes($site, $event->question, $final->answer, $hits, $final->citedIds, $options));
         // Decision-support suggestions (followup / refine / recommend),
         // rendered as buttons under the answer. Generated from the final
@@ -767,6 +803,7 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
             true,
         );
+        $hits = $this->withFixedFacts($site, $event->question, $hits);
         if ($hits === []) {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
                 yield $chunk;
@@ -815,6 +852,8 @@ final class RagService implements LoggerAwareInterface
             return;
         }
 
+        $hits = $this->publishDateEnricher->enrich($site, $hits);
+
         // Emit sources first so the UI has something to render while
         // tokens start streaming in. Knowledge resources are part of the
         // hits (the LLM grounds in them) but the UI filters them out of
@@ -840,21 +879,24 @@ final class RagService implements LoggerAwareInterface
         // cached response. Honor that path even when streaming — emit
         // the cached text as a single token chunk.
         if ($before->response !== null) {
-            yield RagStreamChunk::token($before->response);
-            $citedIds = $this->extractCitations($before->response, $hits);
-            if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
+            [$cachedText, $outOfScope] = self::splitOutOfScope($before->response);
+            $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
+            yield RagStreamChunk::token($cachedText);
+            $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $cachedText, $hits);
+            if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds)) {
                 yield $chunk;
             }
-            $notes = $this->answerNotes($site, $event->question, $before->response, $hits, $citedIds, $options);
-            yield RagStreamChunk::done($before->response, $citedIds, $notes);
+            $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, $cachedText, $hits, $citedIds, $options);
+            yield RagStreamChunk::done($cachedText, $citedIds, $notes, $outOfScope);
             $cachedAnswer = new RagAnswer(
-                answer: trim($before->response),
+                answer: trim($cachedText),
                 sources: $hits,
                 citedIds: $citedIds,
                 status: 'ok',
                 notes: $notes,
+                outOfScope: $outOfScope,
             );
-            $cachedSuggestions = $this->withScopeOptions(
+            $cachedSuggestions = $outOfScope ? [] : $this->withScopeOptions(
                 $this->withRelatedTopics(
                     $this->groundSuggestions(
                         $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
@@ -887,13 +929,38 @@ final class RagService implements LoggerAwareInterface
         }
 
         $accumulated = '';
+        // Start of the reply, held back until it is clear whether it is the
+        // out-of-scope marker — see OUT_OF_SCOPE_MARKER.
+        $head = '';
+        $headDecided = false;
+        $started = false;
         try {
             foreach ($provider->streamComplete($before->messages, $before->options) as $delta) {
                 if ($delta === '') {
                     continue;
                 }
                 $accumulated .= $delta;
+                if (!$headDecided) {
+                    $head .= $delta;
+                    if (self::mayStillBeMarker($head)) {
+                        continue;
+                    }
+                    $headDecided = true;
+                    $delta = self::splitOutOfScope($head)[0];
+                }
+                // The blank line the model puts after the marker would
+                // otherwise open the bubble.
+                if (!$started) {
+                    $delta = ltrim($delta);
+                    if ($delta === '') {
+                        continue;
+                    }
+                    $started = true;
+                }
                 yield RagStreamChunk::token($delta);
+            }
+            if (!$headDecided && trim(self::splitOutOfScope($head)[0]) !== '') {
+                yield RagStreamChunk::token(self::splitOutOfScope($head)[0]);
             }
         } catch (LlmException $e) {
             $this->logger?->error('RAG streaming failed: {message}', [
@@ -913,15 +980,18 @@ final class RagService implements LoggerAwareInterface
             return;
         }
 
-        $citedIds = $this->extractCitations($accumulated, $hits);
+        [$accumulated, $outOfScope] = self::splitOutOfScope($accumulated);
+        $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
+        $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
         // Before `done`, because `done` is the terminal frame the client may
         // close on — see RagStreamChunk. An answer that cited nothing is the
-        // "ok but ungrounded" case the contact card exists for.
-        if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', $citedIds)) {
+        // "ok but ungrounded" case the contact card exists for; an off-topic
+        // question is not.
+        if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds)) {
             yield $chunk;
         }
-        $notes = $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
-        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes);
+        $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
+        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope);
 
         $answer = new RagAnswer(
             answer: trim($accumulated),
@@ -929,11 +999,13 @@ final class RagService implements LoggerAwareInterface
             citedIds: $citedIds,
             status: 'ok',
             notes: $notes,
+            outOfScope: $outOfScope,
         );
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
-        // followup / refine / recommend buttons too.
-        $suggestions = $this->withScopeOptions(
+        // followup / refine / recommend buttons too. None for an off-topic
+        // question: "AutoCAD / Revit" under a recipe only looks confused.
+        $suggestions = $outOfScope ? [] : $this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
                     $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
@@ -1688,6 +1760,146 @@ final class RagService implements LoggerAwareInterface
         $system = array_slice($currentTurnMessages, 0, 1);
         $rest = array_slice($currentTurnMessages, 1);
         return array_merge($system, $conversation->toMessages(), $rest);
+    }
+
+    /**
+     * The site's fixed facts (meilisearch.rag.fixedFacts) as one more context
+     * entry, appended right after retrieval — also when retrieval found
+     * nothing, so such a question still reaches the model.
+     *
+     * Retrieval can only find what a page states, and no page states what
+     * LINEAR does not do. Asked "Bestätige, dass es LINEAR für ArchiCAD
+     * gibt", the model therefore answered "no information" instead of "No".
+     * As a context entry the facts are citable: the "No" is a grounded answer
+     * and does not trigger the contact card. Typed as a knowledge resource,
+     * so it never shows up in the visible source list.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function withFixedFacts(Site $site, string $question, array $hits): array
+    {
+        $settings = $site->getSettings();
+        $facts = trim((string)$settings->get('meilisearch.rag.fixedFacts', ''));
+        if ($facts === '') {
+            return $hits;
+        }
+        // Only when the question touches them: offered on every question, a
+        // model starts weaving "LINEAR runs on Revit, AutoCAD and CADinside"
+        // into answers about pipe roughness (measured locally).
+        // Whole words, so "mac" finds "Mac?" but not "machen".
+        $triggers = $settings->get('meilisearch.rag.fixedFactsTriggers', []);
+        if (is_array($triggers) && $triggers !== []) {
+            $touched = false;
+            foreach ($triggers as $trigger) {
+                $trigger = trim((string)$trigger);
+                if ($trigger !== '' && preg_match('/(?<!\p{L})' . preg_quote($trigger, '/') . '(?!\p{L})/iu', $question) === 1) {
+                    $touched = true;
+                    break;
+                }
+            }
+            if (!$touched) {
+                return $hits;
+            }
+        }
+        $hits[] = [
+            'id' => self::FIXED_FACTS_ID,
+            'type' => 'knowledge_resource',
+            'resourceType' => 'manual',
+            'title' => 'Fixed facts',
+            'content' => $facts,
+        ];
+
+        return $hits;
+    }
+
+    /**
+     * Whether the question names the assistant's subject
+     * (meilisearch.rag.outOfScope.subjectTerms, case-insensitive substring).
+     *
+     * Such a question is never off-topic, whatever the model marked: a
+     * product question mistaken for small talk would lose its contact card
+     * and drop out of the knowledge-gap list — the worse of the two errors.
+     * Measured locally with a smaller model: "Welche Rauigkeit k setzt
+     * LINEAR für PE-Xa-Rohre an?" came back marked out of scope.
+     */
+    private function namesSubject(Site $site, string $question): bool
+    {
+        $terms = $site->getSettings()->get('meilisearch.rag.outOfScope.subjectTerms', []);
+        if (!is_array($terms)) {
+            return false;
+        }
+        $question = mb_strtolower($question);
+        foreach ($terms as $term) {
+            $term = mb_strtolower(trim((string)$term));
+            if ($term !== '' && str_contains($question, $term)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The reply without the out-of-scope marker, and whether it carried one.
+     *
+     * @return array{0:string,1:bool}
+     */
+    public static function splitOutOfScope(string $text): array
+    {
+        $clean = preg_replace(self::OUT_OF_SCOPE_PATTERN, '', $text, -1, $count);
+        if (!is_string($clean) || $count === 0) {
+            return [$text, false];
+        }
+
+        return [trim($clean), true];
+    }
+
+    /**
+     * Whether the start of a streamed reply could still turn into the marker,
+     * i.e. it is a (case-insensitive) prefix of it after leading whitespace.
+     */
+    private static function mayStillBeMarker(string $head): bool
+    {
+        $head = strtolower(ltrim($head));
+        if ($head === '') {
+            return true;
+        }
+        if (strlen($head) >= strlen(self::OUT_OF_SCOPE_MARKER)) {
+            return false;
+        }
+
+        return str_starts_with(self::OUT_OF_SCOPE_MARKER, $head);
+    }
+
+    /**
+     * The citations of an answer, or none when the answer says it found
+     * nothing (meilisearch.rag.noAnswerPhrases).
+     *
+     * The prompt prescribes a fixed sentence for "the knowledge base does not
+     * cover this". A model that adds a marker to it anyway — measured: the
+     * fixed-facts entry cited under "Dazu habe ich in unserer Wissensdatenbank
+     * nichts gefunden." — would turn the knowledge gap into a grounded answer:
+     * no contact card, and the protocol would not list it among the gaps.
+     * The sentence is the stronger signal, so it wins.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<string>
+     */
+    private function groundedCitations(Site $site, string $responseText, array $hits): array
+    {
+        $phrases = $site->getSettings()->get('meilisearch.rag.noAnswerPhrases', []);
+        if (is_array($phrases)) {
+            $haystack = mb_strtolower($responseText);
+            foreach ($phrases as $phrase) {
+                $phrase = mb_strtolower(trim((string)$phrase));
+                if ($phrase !== '' && str_contains($haystack, $phrase)) {
+                    return [];
+                }
+            }
+        }
+
+        return $this->extractCitations($responseText, $hits);
     }
 
     /**

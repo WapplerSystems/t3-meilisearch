@@ -602,7 +602,7 @@ settings:
 
   meilisearch.rag.systemPrompt:
     label: 'System prompt'
-    description: 'System message that instructs the LLM how to answer. Reference {{language}} for the site language label.'
+    description: 'System message that instructs the LLM how to answer. Reference {{language}} for the site language label and {{today}} for the current date (YYYY-MM-DD).'
     type: text
     default: "You are a helpful site assistant. Answer the user's question strictly using the provided context excerpts. Do not use outside knowledge and never invent facts, names, numbers, or links. If the context does not contain enough information to answer, say so plainly rather than guessing. Cite each fact by appending [id] markers that match the IDs in the context. Respond in the user's language."
 
@@ -749,6 +749,42 @@ settings:
     description: 'When true (default), entries from the backend module "Chatbot-Wissen" (resourceType = "manual") are retrieved even when meilisearch.rag.retrievalFilters narrows the corpus, e.g. to the pages of a knowledge base. Language and access restrictions still apply.'
     type: bool
     default: true
+
+  meilisearch.index.excludedPageTrees:
+    label: 'Index: excluded page trees'
+    description: 'Page uids whose whole subtree stays out of the index, e.g. a folder of campaign landing pages. Pages there are not indexed, and ws_meilisearch:index-prune-pages removes documents already in the index.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.noAnswerPhrases:
+    label: 'RAG: sentences that mark an answer as "nothing found"'
+    description: 'Phrases the system prompt prescribes for "the knowledge base does not cover this" (case-insensitive substring). An answer containing one counts as unanswered whatever it cites: the contact card shows and the protocol lists it as a knowledge gap. List the phrase in every language the site answers in.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.outOfScope.subjectTerms:
+    label: 'RAG: terms that make a question on-topic'
+    description: 'A question containing one of these (case-insensitive) is never treated as off-topic, even when the model marks it [out-of-scope] — e.g. the brand and product names. Guards against a product question losing its contact card. Empty: the model alone decides.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.fixedFacts:
+    label: 'RAG: fixed facts in every answer context'
+    description: 'Facts the assistant must know on every question, regardless of what retrieval finds — typically what the product does NOT do (no macOS version, no ArchiCAD plugin), which no page states and which the model therefore can only answer with "I have no information". Added to the context of every answer as an invisible, citable entry, so a clear "No" is a grounded answer and does not trigger the contact card. Keep it short: it costs context tokens on every question.'
+    type: text
+    default: ''
+
+  meilisearch.rag.publishDate.doktypes:
+    label: 'RAG: page types that carry a publication date'
+    description: 'When meilisearch.rag.promptMetaFields lists "published", page hits of these doktypes get their publication date (pages.publish_date of EXT:blog, else crdate) in the context header, read at answer time. Use the system prompt placeholder {{today}} so the model can recognise outdated offers and announcements. Empty: every page.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.fixedFactsTriggers:
+    label: 'RAG: words that bring the fixed facts into the context'
+    description: 'Whole words, case-insensitive (e.g. "mac", "macos", "archicad", "browser"; plural forms need their own entry). When set, meilisearch.rag.fixedFacts is added only to questions containing one of them; empty: to every question.'
+    type: stringlist
+    default: []
 
   meilisearch.rag.promptMetaFields:
     label: 'RAG: document fields exposed in the prompt context'

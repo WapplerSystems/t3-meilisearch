@@ -965,6 +965,10 @@
                 <source>aborted by the visitor</source>
                 <target>vom Besucher abgebrochen</target>
             </trans-unit>
+            <trans-unit id="be.protocol.status.off_topic" resname="be.protocol.status.off_topic">
+                <source>off topic</source>
+                <target>außerhalb des Themas</target>
+            </trans-unit>
             <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
                 <source>assistant disabled</source>
                 <target>Assistent deaktiviert</target>

@@ -70,10 +70,16 @@ final class RagStreamChunk
     /**
      * @param list<string> $citedIds
      * @param list<string> $notes fixed notes under the answer, see RagAnswerNotesEvent
+     * @param bool $outOfScope the question was outside the assistant's subject
      */
-    public static function done(string $answer, array $citedIds, array $notes = []): self
+    public static function done(string $answer, array $citedIds, array $notes = [], bool $outOfScope = false): self
     {
-        return new self(self::TYPE_DONE, ['answer' => $answer, 'citedIds' => $citedIds, 'notes' => $notes]);
+        return new self(self::TYPE_DONE, [
+            'answer' => $answer,
+            'citedIds' => $citedIds,
+            'notes' => $notes,
+            'outOfScope' => $outOfScope,
+        ]);
     }
 
     /**

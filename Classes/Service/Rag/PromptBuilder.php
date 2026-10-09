@@ -107,9 +107,14 @@ final class PromptBuilder
         // pin is added once, so a prompt that already references
         // {{language}} doesn't double up.
         if (!str_contains($systemPrompt, '{{language}}')) {
-            $systemPrompt = rtrim($systemPrompt) . "\nAlways respond in {{language}}, regardless of the language used in the context excerpts.";
+            $systemPrompt = rtrim($systemPrompt) . "\nAlways respond in {{language}}, regardless of the language used in the knowledge base entries.";
         }
-        $resolvedSystem = strtr($systemPrompt, ['{{language}}' => $languageLabel]);
+        // {{today}} lets the prompt weigh dated entries (see
+        // PublishDateEnricher): a campaign from 2023 is not a current offer.
+        $resolvedSystem = strtr($systemPrompt, [
+            '{{language}}' => $languageLabel,
+            '{{today}}' => date('Y-m-d'),
+        ]);
 
         $contextBlocks = [];
         foreach ($hits as $hit) {
@@ -119,7 +124,10 @@ final class PromptBuilder
             ? '(no documents found)'
             : implode("\n\n---\n\n", $contextBlocks);
 
-        $userContent = "Context excerpts:\n\n" . $contextSection
+        // "Knowledge base", not "context excerpts": models echo the label they
+        // are given ("Die bereitgestellten Auszüge enthalten …"), and a
+        // visitor understands a knowledge base, not an excerpt.
+        $userContent = "Knowledge base entries:\n\n" . $contextSection
             . "\n\n---\n\nQuestion: " . trim($question);
 
         return [

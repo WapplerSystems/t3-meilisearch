@@ -7,6 +7,7 @@ use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
+use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
 
 /**
  * Writes every finished chat turn into the chat protocol — opt-in per site
@@ -28,6 +29,12 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
 
     /** Status for a streamed answer the visitor cancelled before it finished. */
     public const STATUS_ABORTED = 'aborted';
+    /**
+     * Answered, but the question was outside the assistant's subject. Kept
+     * apart from `ok` so a recipe or a jailbreak attempt neither counts as an
+     * answered product question nor shows up among the knowledge gaps.
+     */
+    public const STATUS_OFF_TOPIC = EscalationResolver::STATUS_OFF_TOPIC;
 
     /** A visitor in the chat on the site. */
     public const CHANNEL_WEB = 'web';

@@ -24,6 +24,14 @@ final class RagAnswer
         public readonly array $suggestions = [],
         /** @var list<string> fixed notes under the answer, see RagAnswerNotesEvent */
         public readonly array $notes = [],
+        /**
+         * The model declared the question outside the assistant's subject
+         * (see RagService::OUT_OF_SCOPE_MARKER). Status stays `ok` — the
+         * reply is a real answer and renders like one — but no contact card
+         * and no suggestions follow, and the protocol files it as off-topic
+         * instead of as a knowledge gap.
+         */
+        public readonly bool $outOfScope = false,
     ) {}
 
     /**
@@ -43,6 +51,7 @@ final class RagAnswer
             $this->error,
             $suggestions,
             $this->notes,
+            $this->outOfScope,
         );
     }
 
@@ -61,6 +70,7 @@ final class RagAnswer
             $this->error,
             $this->suggestions,
             $notes,
+            $this->outOfScope,
         );
     }
 
