@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Event;
 
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 
 /**
  * Dispatched once an answer is complete, to collect notes shown under it.
@@ -36,7 +37,17 @@ final class RagAnswerNotesEvent
         private readonly array $sources,
         private readonly array $citedIds,
         private readonly ?int $languageId = null,
+        private readonly ?Conversation $conversation = null,
     ) {}
+
+    /**
+     * The turns before this one, empty for the first question — e.g. to see
+     * what the visitor already said before asking them for it again.
+     */
+    public function getConversation(): Conversation
+    {
+        return $this->conversation ?? Conversation::empty();
+    }
 
     public function getSite(): Site
     {

@@ -1721,7 +1721,16 @@ final class RagService implements LoggerAwareInterface
             return [];
         }
         try {
-            $event = new RagAnswerNotesEvent($site, $question, $answer, $hits, array_values(array_map('strval', $citedIds)), $this->resolveLanguageId($options));
+            $conversation = $options['conversation'] ?? null;
+            $event = new RagAnswerNotesEvent(
+                $site,
+                $question,
+                $answer,
+                $hits,
+                array_values(array_map('strval', $citedIds)),
+                $this->resolveLanguageId($options),
+                $conversation instanceof Conversation ? $conversation : null,
+            );
             $this->eventDispatcher->dispatch($event);
 
             return $event->getNotes();
