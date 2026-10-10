@@ -33,7 +33,7 @@ final class PageIndexEligibility
     public const REASON_NO_SEARCH = 'no_search';
     public const REASON_DOKTYPE = 'not a content page';
     public const REASON_TRANSLATION = 'translation hidden or deleted';
-    public const REASON_PARENT_HIDDEN = 'hidden parent (extendToSubpages)';
+    public const REASON_PARENT_HIDDEN = 'hidden or timed parent (extendToSubpages)';
     public const REASON_EXCLUDED_TREE = 'excluded page tree';
 
     /**
@@ -121,7 +121,9 @@ final class PageIndexEligibility
             if ((int)$parent['deleted'] === 1) {
                 return self::REASON_DELETED;
             }
-            if ((int)$parent['hidden'] === 1 && (int)$parent['extendToSubpages'] === 1) {
+            // Hidden or timed with "extend to subpages" hides the subtree.
+            if ((int)$parent['extendToSubpages'] === 1
+                && in_array($this->rowReason($parent, false), [self::REASON_HIDDEN, self::REASON_TIME], true)) {
                 return self::REASON_PARENT_HIDDEN;
             }
             $pid = (int)$parent['pid'];

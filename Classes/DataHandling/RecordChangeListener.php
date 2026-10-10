@@ -9,6 +9,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use WapplerSystems\Meilisearch\Domain\Schema\FileSchemaProvider;
 use WapplerSystems\Meilisearch\Service\IndexerService;
+use WapplerSystems\Meilisearch\Service\PageIndexSync;
 
 /**
  * Hooks into DataHandler operations to keep Meilisearch documents in sync.
@@ -31,6 +32,7 @@ final class RecordChangeListener
         private readonly ConnectionPool $connectionPool,
         private readonly FileLifecycleHandler $fileLifecycle,
         private readonly FileSchemaProvider $fileSchemaProvider,
+        private readonly PageIndexSync $pageIndexSync,
     ) {}
 
     /**
@@ -74,9 +76,13 @@ final class RecordChangeListener
             return;
         }
         if ($table === 'pages') {
-            // Pages are indexed via the EXT:index integration. Live updates
-            // flow through EXT:index's own DataHandlerUpdateHook into the
-            // index queue, so we do nothing here.
+            // Adding and updating flows through EXT:index's own
+            // DataHandlerUpdateHook into its queue. Removing does not exist
+            // there: hiding, a start/end time or "not searchable" would leave
+            // the document in the index — PageIndexSync takes it out now.
+            // A changed pid is a move: the subtree may have left the site
+            // section it was searchable in.
+            $this->pageIndexSync->sync($uid, isset($fieldArray['pid']));
             return;
         }
 
@@ -130,7 +136,9 @@ final class RecordChangeListener
             return;
         }
         if ($table === 'pages') {
-            // Pages flow through EXT:index — see processDatamap.
+            // Delete takes the whole subtree with it, a move may carry it
+            // into an excluded tree; see processDatamap for the rest.
+            $this->pageIndexSync->sync($uid, in_array($command, ['delete', 'move', 'undelete'], true));
             return;
         }
 

@@ -88,11 +88,11 @@ final class IndexEventListener implements LoggerAwareInterface
         $docId = 'pages-' . $event->pageUid
             . ($event->language > 0 ? '-l' . $event->language : '');
 
-        // EXT:index has no notion of page trees that stay out of the index
-        // (meilisearch.index.excludedPageTrees); without this check a page
-        // the prune command removed would come back with the next run.
+        // The queue is processed asynchronously: a page an editor hid or
+        // deleted after it was queued would otherwise come right back. And
+        // EXT:index knows nothing of meilisearch.index.excludedPageTrees.
         $this->pageIndexEligibility->forgetCache();
-        if ($this->pageIndexEligibility->ineligibleReason($event->pageUid, 0, $event->site) === PageIndexEligibility::REASON_EXCLUDED_TREE) {
+        if ($this->pageIndexEligibility->ineligibleReason($event->pageUid, $event->language, $event->site) !== null) {
             $engine->deleteDocument($indexName, $docId);
             return;
         }

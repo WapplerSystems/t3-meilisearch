@@ -56,6 +56,11 @@ services:
       # value object, and the two exception classes are plain throwables.
       - '../Classes/Service/Indexing/*'
 
+  # EXT:index throws "Broken rootline" when a page is deleted (its
+  # cache-clear hook resolves the deleted page's rootline); see the class.
+  Lochmueller\Index\Domain\Repository\PagesRepository:
+    class: WapplerSystems\Meilisearch\Integration\ExtIndex\Repository\TolerantPagesRepository
+
   _instanceof:
     WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface:
       tags: ['ws_meilisearch.schema_provider']
