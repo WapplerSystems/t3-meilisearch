@@ -22,7 +22,7 @@ use WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientRegistry;
  * a vector. A hybrid search then runs with an embedder but without anything to
  * compare against, and the semantic half contributes nothing.
  *
- * Measured on the LINEAR corpus (2026-09-08, 12 paraphrase → expected-document
+ * Measured on a production corpus (2026-09-08, 12 paraphrase → expected-document
  * pairs): semanticRatio 0, 0.1, 0.3 and 0.5 returned byte-identical results —
  * 7 of 12 — while 1.0 returned nothing at all. The knob was disconnected, and
  * a paraphrase whose compound noun had been split ("Laufzeiten meiner

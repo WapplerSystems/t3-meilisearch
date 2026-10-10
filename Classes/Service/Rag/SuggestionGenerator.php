@@ -25,10 +25,10 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
  * parse/LLM error, so it never blocks or corrupts the answer.
  *
  * The `value` of a followup/refine is a RETRIEVAL query, not prose: clicking
- * re-asks it and the retriever has to find the topic again. Measured on the
- * LINEAR corpus, a paraphrase of a title is enough to lose it — "Lizenz-
+ * re-asks it and the retriever has to find the topic again. Measured on a
+ * production corpus, a paraphrase of a title is enough to lose it — "Lizenz-
  * laufzeiten überprüfen" puts the right document at rank 1, while "Wie prüfe
- * ich die Laufzeiten meiner LINEAR-Lizenzen?" does not reach the top five,
+ * ich die Laufzeiten meiner Lizenzen?" does not reach the top five,
  * because German compounds are not decompounded on either side. Hence the
  * wording rules in the prompt: domain terms character-for-character from the
  * Sources list, compounds never split, refine phrased like a title. The

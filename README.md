@@ -397,7 +397,6 @@ meilisearch:
       page: 2.0               # core content on top
       knowledge_resource: 1.5
       news: 1.2
-      whatsnew: 1.2
       file: 0.5               # damp FAL assets to a late fallback
 ```
 
@@ -417,7 +416,7 @@ relative weight; the indexer multiplies it onto the type default:
 Example: a *High* news article (`1.5`) of a type weighted `1.2` ends up
 at `boost = 1.8`. Honoring the editor field can be switched off with
 `meilisearch.boosts.recordOverrideEnabled: false` (type defaults still
-apply). Tables without the field (e.g. `sys_file`, `whatsnew`) use the
+apply). Tables without the field (e.g. `sys_file`, or a project's own record types) use the
 type default only.
 
 **Activation:** the `boost` field is always written, but only influences
@@ -514,6 +513,77 @@ A new `?action=reset` URL on the RAG plugin clears the stored state
 so a visitor can start over. Sources from past turns are not
 re-displayed; the controller only keeps `citedIds` for the template
 to show as "this answer cited X".
+
+### Steering the assistant
+
+All of the following is off until configured; a site that sets none of it
+behaves as before.
+
+**Off-topic questions.** Ask the model in the system prompt to start a reply
+to an off-topic question (recipes, jokes, politics, jailbreak attempts) with
+the tag `[out-of-scope]`. The tag is held back while the reply streams and
+removed from the final text; the turn gets no contact card, no suggestion
+buttons and the protocol status `off_topic`, so it is not counted as a
+knowledge gap. Terms that always make a question on-topic, whatever the model
+tagged (typically the brand and product names):
+
+```yaml
+meilisearch:
+  rag:
+    outOfScope:
+      subjectTerms: ['Acme', 'Acme Pro']
+```
+
+**"Nothing found".** Prescribe one fixed sentence for unanswered questions in
+the prompt and list it here. An answer that contains it counts as unanswered
+whatever it cites — contact card, knowledge-gap list:
+
+```yaml
+    noAnswerPhrases: ['in unserer Wissensdatenbank nichts gefunden', "couldn't find anything on this in our knowledge base"]
+```
+
+**Fixed facts.** What the product does *not* do appears on no page, so the
+model can only answer "no information". `fixedFacts` is added to the context
+as an invisible, citable entry (id `site-facts`) — a clear "No" is then a
+grounded answer. With `fixedFactsTriggers` it is added only to questions that
+contain one of the words (whole words), which keeps weaker models from
+mentioning it everywhere. It is also added when retrieval finds nothing.
+
+```yaml
+    fixedFacts: |
+      Acme runs on Windows only; there is no macOS or Linux version and no browser version.
+    fixedFactsTriggers: ['mac', 'macos', 'linux', 'browser']
+```
+
+**Topics and contact routing.** `[topic:<key>]` in front of a reply — or a
+word from `topicTerms` in the question — sets the turn's topic. A topic
+question skips the clarifying question, and `RagEscalationEvent::$topic`
+lets a listener point the contact card at the right team (and set
+`$event->show = true` to show it under answers with sources too):
+
+```yaml
+    topics: ['sales', 'training']
+    topicTerms: ['sales:price', 'sales:discount', 'training:seminar']   # "<topic>:<word beginning>"
+```
+
+**Dates.** List `published` in `promptMetaFields` and page hits carry their
+publication date (`pages.publish_date` of EXT:blog, else `crdate`), read at
+answer time — no reindex. `publishDate.doktypes` limits it to page types where
+a date matters. Use `{{today}}` in the prompt so the model can tell an old
+announcement from a current one:
+
+```yaml
+    promptMetaFields: ['published']
+    publishDate:
+      doktypes: ['137']   # blog posts
+```
+
+**Suggestion buttons.** `suggestions.requireCitation: true` shows no buttons
+under an answer that cites nothing. "Related topics" are filtered by the
+detected text language of the site language, not only by the page tree.
+
+The context reaches the model as "Knowledge base entries"; a prompt that
+calls them that keeps the model from telling visitors about "excerpts".
 
 ## Backend module (Phase 5)
 
@@ -869,6 +939,31 @@ final class MyProvider implements QuotaProviderInterface
 }
 ```
 
+## Page visibility in the index
+
+EXT:index adds and updates page documents but never removes one. ws_meilisearch
+takes care of that:
+
+- **Backend actions take effect at once.** Hiding, deleting, a start/end time
+  that excludes now, "Not searchable", or a move into an excluded tree removes
+  the page's documents (every language; on delete, move and "extend to
+  subpages" the whole subtree) while the editor saves. Un-hiding re-indexes
+  through EXT:index as before. A page hidden after it was queued is not
+  written back by the queue.
+- **Excluded page trees.** `meilisearch.index.excludedPageTrees: ['350']`
+  keeps whole subtrees out of search and chat (e.g. campaign landing pages).
+- **Time-based changes.** An end time passing or a start time being reached
+  involves no backend action. Schedule
+  `ws_meilisearch:index-prune-pages main --started-since=1200` every 15
+  minutes ("Execute console commands"): it removes documents of pages that may
+  no longer be found and queues pages whose start time was reached. `--dry-run
+  -v` lists what it would do.
+- Deleting a page no longer ends in EXT:index's "Broken rootline" exception
+  (its cache-clear hook resolved the deleted page's rootline).
+
+Facet values of a project's own document types can be labelled per language
+with an `LLL:` reference in the facet's `values:` map.
+
 ## Scheduler task (Phase 5)
 
 `FullReindexTask` registers under **Administration → Scheduler** as
@@ -949,7 +1044,7 @@ Page indexing is asynchronous: `index:queue` only *enqueues* work, and the
 bridge writes to Meilisearch when a worker consumes the message. Without a
 permanent consumer the queue silently grows and the page corpus goes stale
 without a single error anywhere — no failed task, no log entry, just an
-index that stops changing. On the LINEAR production host that went unnoticed
+index that stops changing. On one production host that went unnoticed
 for ten days and 8.675 messages.
 
 Do not schedule this with cron. Use a systemd template so a dead worker is
@@ -999,7 +1094,7 @@ Three points that are easy to get wrong:
 | Site Set | `wapplersystems/ws-meilisearch` with typed settings + TypoScript | `Configuration/Sets/WsMeilisearch/*` |
 | Indexing extension point | `SchemaProviderInterface` (auto-tagged via `_instanceof`) | `Classes/Domain/Schema/` |
 | Default providers | tx_news (gated on EXT:news) + sys_file (one doc per site language with sys_file_metadata overlay) + knowledge resources (`type: knowledge_resource`). Pages are indexed via the bundled `Integration/ExtIndex` on top of `lochmueller/index`. | `NewsSchemaProvider.php`, `FileSchemaProvider.php`, `KnowledgeResourceSchemaProvider.php`, `Classes/Integration/ExtIndex/EventListener/IndexEventListener.php` |
-| Project provider (LINEAR) | `tx_linearproducts_domain_model_whatsnew` → `type: whatsnew`. Multilingual *inline* (one row, `name_<x>`/`description_<x>`/`media_<x>` for de/en/tr/ru/nl/pl → one doc per filled language; fr/it skipped). No detail view: `uri` deep-links to the list page with `?…[whatsnew]=<uid>`. Type boost via `meilisearch.boosts.types.whatsnew`. | `WhatsnewSchemaProvider.php` |
+| Project providers | A site package adds its own record types by implementing `SchemaProviderInterface` and tagging the class `ws_meilisearch.schema_provider`; the indexer only runs a provider whose table is in TCA. |
 | Engine factory | Reads site settings, builds unified SEAL Engine + Index | `Classes/Service/SearchEngineFactory.php` |
 | Indexer | Iterates providers, dispatches lifecycle events, waits on Meilisearch async tasks | `Classes/Service/IndexerService.php` |
 | Search service | Builds SEAL query (search + filters + facets), maps result; hybrid path bypasses SEAL to use Meilisearch SDK directly | `Classes/Service/SearchService.php` |

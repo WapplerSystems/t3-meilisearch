@@ -667,7 +667,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
      *   minImageSizeKb            → `mimeType STARTS WITH "image/" AND fileSize < N`
      *
      * The extension and size rules were missing until 2026-08-24, which
-     * is why the LINEAR index still carried 96 documents — .exe
+     * is why a production index still carried 96 documents — .exe
      * installers, .form.yaml definitions and sub-10 KB logos — more than
      * two months after the switch from a blacklist to a whitelist had
      * made them ineligible.

@@ -37,7 +37,7 @@ Rules:
 - A broad or general question is ANSWERABLE. "What is X and what is it used for?" wants an overview, not a narrowing question.
 - A commercial or organisational question — prices, discounts, buying or extending licences, booking a training or seminar, contacting someone — is ANSWERABLE: it does not depend on the product or platform, and asking for one only delays the visitor.
 - A question about a topic the documentation does not cover at all is ANSWERABLE. Do NOT ask a clarifying question about an off-topic subject — that only makes the assistant look confused. Let the answering step decline it politely.
-- Missing detail that you could simply state conditionally ("in AutoCAD …, in Revit …") is not a reason to clarify.
+- Missing detail that you could simply state conditionally ("in edition A …, in edition B …") is not a reason to clarify.
 - When clarification is genuinely needed, ask ONE short, specific question in the same language as the user's latest message — not in the language of the document titles, which may differ (a Polish question about German documents gets a Polish question back). Prefer concrete options taken from the retrieved titles (e.g. product or edition names) over a generic "please be more specific".
 - Never ask the user merely to rephrase. Ask for the specific missing fact.
 
@@ -148,7 +148,7 @@ PROMPT;
             }
             $type = trim((string)($hit['type'] ?? ''));
             // The citation qualifier names release and product as the site
-            // words them ("LINEAR 26 · Revit"), which is exactly the material
+            // words them ("Product 26 · Edition B"), which is exactly the material
             // a choice between products should be built from.
             $qualifier = trim((string)($hit['citationQualifier'] ?? ''));
             $meta = implode(', ', array_filter([$type, $qualifier]));
@@ -205,7 +205,7 @@ PROMPT;
      *
      * Without this the model offers plausible-sounding buttons for products
      * that are not in the corpus at all: measured locally, a question about
-     * setting up a workstation produced "LINEAR Solutions Heizung",
+     * setting up a workstation produced "Product Solutions Heizung",
      * "… Trinkwasser" and "… Abwasser", none of which exist in the index. A
      * button that reliably leads to "no information found" is worse than no
      * button, because the visitor trusted it enough to click.
@@ -320,7 +320,7 @@ PROMPT;
      *
      * The triage prompt alone could not carry this. Told to weigh whether an
      * answer "would materially differ", the model still invented a conflict
-     * out of the brand name itself — asking whether "LINEAR" meant the
+     * out of the brand name itself — asking whether the brand meant the
      * software or a specific product for a licence question the pipeline
      * answers perfectly well (0.768 with the classifier switched off).
      *

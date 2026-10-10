@@ -320,7 +320,7 @@ final class QueryRecoveryService implements LoggerAwareInterface
     /**
      * A correction has to be a near-miss of what was typed, not merely a
      * word Meilisearch happened to highlight. Probing "lin_ww_flowrate"
-     * returns a document highlighting "LINEAR-Software" (the engine split
+     * returns a document highlighting "Linux-Software" (the engine split
      * the token and matched "lin"); offering that as "did you mean" would
      * be actively misleading.
      *

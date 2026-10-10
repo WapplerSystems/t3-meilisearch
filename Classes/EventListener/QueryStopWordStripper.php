@@ -14,11 +14,11 @@ use WapplerSystems\Meilisearch\Event\BeforeSearchEvent;
  * tokens that were ALREADY stop-words at the time a document was indexed
  * — adding stop-words later does not retroactively re-tokenise existing
  * docs, so natural-language questions ("Wie exportiere ich Daten für
- * DÄMMWERK?") still match on every "wie"/"ich"/"für" hit in the corpus
+ * den Energieausweis?") still match on every "wie"/"ich"/"für" hit in the corpus
  * and dilute the actual content match. Cheapest workaround: cut the
  * stop-words from the query CLIENT-SIDE before it reaches Meilisearch.
  * That gives the engine the same query a knowledgeable user would have
- * typed ("exportiere Daten DÄMMWERK") and the relevant doc wins.
+ * typed ("exportiere Daten Energieausweis") and the relevant doc wins.
  *
  * Stop-words come from the standard meilisearch.defaults.stopWords site
  * setting, so a single edit configures both the index-side filter (for
@@ -77,7 +77,7 @@ final class QueryStopWordStripper
             // Keep separators (whitespace + punctuation) untouched. The
             // explicit check on alphanumeric prefix avoids stripping
             // ", " between words which would fuse tokens like
-            // "DÄMMWERK,exportieren".
+            // "Energieausweis,exportieren".
             if (!preg_match('/^\p{L}|\p{N}/u', $token)) {
                 $kept[] = $token;
                 continue;

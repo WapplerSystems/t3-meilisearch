@@ -98,7 +98,7 @@ final class RagCitationLabelsEvent
      *
      *   title      what the reader sees in it ("Import the Excel room book")
      *   context    where it lives ("Course „Room book“ · Lesson 2.1")
-     *   meta       one quiet line ("Excerpt 1:07–2:50 (1:43 min) · LINEAR Building")
+     *   meta       one quiet line ("Excerpt 1:07–2:50 (1:43 min) · Product 26")
      *   start      the position badge on the preview ("1:07"), optional
      *   image      URL of a still for the preview, optional; without one the
      *              preview stays a coloured area with the play mark

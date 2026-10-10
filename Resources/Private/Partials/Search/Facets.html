@@ -72,12 +72,15 @@
 
                                  - attribute: kbProduct
                                    values:
-                                     ac: 'AutoCAD'
+                                     pe: 'Pro Edition'
 
                                This is the extension point for facets whose values
                                are opaque keys the extension cannot know about —
-                               a product code, a tenant id, a status flag. Site
-                               settings own the wording, no XLF override needed.
+                               a product code, a tenant id, a status flag, or a
+                               document type a site package adds. Site settings
+                               own the wording; an entry starting with "LLL:" is
+                               translated, so a package can ship the labels in
+                               every language (values: { event: 'LLL:EXT:…' }).
                             2. For attribute "language" the value is the numeric
                                language id — show the site-language title from the
                                controller-provided map.
@@ -88,7 +91,12 @@
                         <f:variable name="configuredLabel">{facetConfigs.{attribute}.extra.values.{value}}</f:variable>
                         <f:variable name="displayLabel">
                             <f:if condition="{configuredLabel}">
-                                <f:then>{configuredLabel}</f:then>
+                                <f:then>
+                                    <f:if condition="{configuredLabel -> f:format.crop(maxCharacters: 4, append: '')} == 'LLL:'">
+                                        <f:then><f:translate key="{configuredLabel}" default="{value}"/></f:then>
+                                        <f:else>{configuredLabel}</f:else>
+                                    </f:if>
+                                </f:then>
                                 <f:else>
                                     <f:if condition="{attribute} == 'language'">
                                         <f:then>

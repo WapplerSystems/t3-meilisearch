@@ -15,7 +15,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * Pages reach the index through EXT:index, which adds and updates documents
  * but never removes one: a page that is hidden, deleted or switched to "not
  * searchable" afterwards stays in the index — and the chat goes on citing it
- * as a source, link to a 404 included. Measured on linear.eu in 10/2026: a
+ * as a source, link to a 404 included. Seen on a production site in 10/2026: a
  * campaign page hidden two days earlier and an editor's test page, both still
  * answered from. This class is the single place that decides, used by the
  * prune command for what is already in the index and by the page listener for

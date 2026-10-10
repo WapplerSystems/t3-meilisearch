@@ -176,9 +176,9 @@ final class SuggestEndpoint implements MiddlewareInterface
             // Badges an AfterSearchEvent listener attached (release, product,
             // edition …). They ride along so rows that would otherwise read
             // alike stay distinguishable: a documentation set carrying one
-            // topic per product and release answers "Heizlast" with three
+            // topic per product and release answers "Installation" with three
             // different pages of that exact title, and a dropdown of five
-            // slots showing "Heizlast" three times helps nobody.
+            // slots showing "Installation" three times helps nobody.
             $badges = [];
             foreach ((array)($hit['badges'] ?? []) as $badge) {
                 if (!is_array($badge)) {

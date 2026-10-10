@@ -316,7 +316,7 @@
             '<span class="flex-grow-1 text-truncate">' + escapeText(hit.title || hit.id || '') + '</span>',
             // Badges an AfterSearchEvent listener set — release, product,
             // edition. Without them a documentation set that carries one topic
-            // per product answers "Heizlast" with three rows of that exact
+            // per product answers "Installation" with three rows of that exact
             // title and the reader cannot tell which is which.
             renderHitBadges(hit.badges),
             '</a>',

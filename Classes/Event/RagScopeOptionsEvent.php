@@ -80,7 +80,7 @@ final class RagScopeOptionsEvent
     }
 
     /**
-     * @param string $label  what the button reads, e.g. "AutoCAD"
+     * @param string $label  what the button reads, e.g. "Edition B"
      * @param string $choice what gets appended to the question when clicked;
      *                       defaults to the label, which is usually right
      */

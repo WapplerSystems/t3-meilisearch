@@ -23,7 +23,7 @@ use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
  * ---------------
  * Before this class, every indexing run pushed one document per HTTP
  * request and — with `precompute` on — fetched a fresh embedding for
- * every single one. A full reindex of the LINEAR corpus therefore meant
+ * every single one. A full reindex of a production corpus therefore meant
  * ~45.000 embedding calls and ~45.000 Meilisearch tasks, even when a
  * handful of pages had changed. Scaleway's *tokens per minute* quota
  * cannot absorb that: the run stalls in a silent 429 retry loop after a

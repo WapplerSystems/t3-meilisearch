@@ -20,9 +20,9 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
  *
  * On the FIRST turn there is no history to fold in, but the question still
  * needs work: a natural-language question makes a poor keyword query. The
- * stop-word filter alone does not get there — measured against the LINEAR
- * help corpus, "Wie gebe ich eine nicht mehr benötigte LINEAR Lizenz wieder
- * frei?" strips to "gebe benötigte LINEAR Lizenz frei" and retrieves
+ * stop-word filter alone does not get there — measured against a
+ * help corpus, "Wie gebe ich eine nicht mehr benötigte Lizenz wieder
+ * frei?" strips to "gebe benötigte Lizenz frei" and retrieves
  * NOTHING, after which the fallback ladder serves unrelated topics. The
  * same question as "Lizenz freigeben" puts the correct document at rank 1.
  * Reaching that form means turning "gebe … wieder frei" into the infinitive
@@ -54,7 +54,7 @@ final class QueryRewriter implements LoggerAwareInterface
      * NOT enough: the single German one-shot example anchored the output
      * language harder than the trailing instruction, so English questions came
      * back as German keyword queries — "How do I install software packages in
-     * LINEAR Revit?" became "Softwarepakete installieren Revit", which was then
+     * the Pro edition?" became "Softwarepakete installieren Pro", which was then
      * searched with `language = 1` and matched nothing. Measured against the
      * live corpus, every English question failed that way, while German always
      * worked. Naming the target language explicitly removes the guesswork; the

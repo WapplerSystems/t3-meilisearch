@@ -117,7 +117,7 @@ CREATE TABLE tx_wsmeilisearch_search_log (
     site_identifier VARCHAR(64) DEFAULT '' NOT NULL,
     language_id     INT(11) DEFAULT 0 NOT NULL,
     -- Lowercased + trimmed query — analytics aggregation is case-
-    -- insensitive, otherwise "Linear" and "linear" split the histogram.
+    -- insensitive, otherwise "Search" and "search" split the histogram.
     query           VARCHAR(255) DEFAULT '' NOT NULL,
     result_count    INT(11) UNSIGNED DEFAULT 0 NOT NULL,
     -- Discriminator so analytics can separate FE-search hits from

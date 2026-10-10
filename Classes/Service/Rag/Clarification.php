@@ -20,7 +20,7 @@ final class Clarification
 {
     /**
      * @param list<string> $options concrete choices the question offers, ready
-     *                              to be put on a button ("LINEAR Heizung").
+     *                              to be put on a button ("Product Heating").
      *                              Empty when the question is not a choice
      *                              between named alternatives.
      */

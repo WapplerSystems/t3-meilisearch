@@ -40,15 +40,15 @@ final class RagService implements LoggerAwareInterface
 {
     /**
      * How many extra hits to fetch when identical documents are collapsed.
-     * Four is the size of the largest reuse group observed in the LINEAR
+     * Four is the size of the largest reuse group observed in a production
      * knowledge base (one topic under four schema generators), so a context
      * of N still fills up when every hit has three twins.
      */
     private const COLLAPSE_OVERFETCH = 4;
 
     /**
-     * Over-fetch when release copies are collapsed by title. Measured on the
-     * LINEAR knowledge base: a question about the software protection returns
+     * Over-fetch when release copies are collapsed by title. Measured on a
+     * production knowledge base: a question about the software protection returns
      * 25 hits carrying five distinct titles — six copies of one topic, one per
      * documented release and product. Fetching four times the context size is
      * then not enough to fill it with five different documents.
@@ -84,7 +84,7 @@ final class RagService implements LoggerAwareInterface
      *
      * Without it, "not my subject" and "my sources do not cover this" were
      * indistinguishable: both cite nothing, so both got the contact card and
-     * the support team received a chat log about spaghetti carbonara. The
+     * the support team received chat logs about cooking recipes. The
      * model is the only part of the pipeline that can tell the two apart, and
      * a marker in the reply costs nothing, where a separate triage call would
      * add a round trip to every question. The marker never reaches the
@@ -419,9 +419,9 @@ final class RagService implements LoggerAwareInterface
      * better-ranked copy.
      *
      * The knowledge base is authored in DITA, where one topic is reused across
-     * several product areas. "Rohrnetzberechnung eines Strangschemas durchführen"
-     * exists as eight documents in one release — four Revit schema generators
-     * (Heizung, Trinkwasser, Abwasser, Gas) and the same four for AutoCAD — with
+     * several product areas. One topic exists as eight documents in one release
+     * — four modules of one product edition and the same four for a second
+     * edition — with
      * byte-identical text behind four different URLs. A question that matches it
      * fills the entire context with copies: the LLM answers from a single source
      * while the operator pays for eight, and nothing else fits alongside.
@@ -635,8 +635,8 @@ final class RagService implements LoggerAwareInterface
         // Triage before generating: if the question is too ambiguous /
         // underspecified to answer from these hits, ask one clarifying
         // question back instead of guessing. Skips the answer call entirely.
-        // A price or training question needs no product: asking "AutoCAD or
-        // Revit?" back only delays the visitor on the way to sales.
+        // A price or training question needs no product: asking "edition A
+        // or B?" back only delays the visitor on the way to sales.
         $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
             ? $this->queryClassifier->classify(
                 $provider,
@@ -839,8 +839,8 @@ final class RagService implements LoggerAwareInterface
         // question gets one clarifying question back instead of a guessed
         // answer. Emitted before the `sources` frame so the UI never shows a
         // "found N documents" preview it then has to pivot away from.
-        // A price or training question needs no product: asking "AutoCAD or
-        // Revit?" back only delays the visitor on the way to sales.
+        // A price or training question needs no product: asking "edition A
+        // or B?" back only delays the visitor on the way to sales.
         $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
             ? $this->queryClassifier->classify(
                 $provider,
@@ -1027,7 +1027,7 @@ final class RagService implements LoggerAwareInterface
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
         // followup / refine / recommend buttons too. None for an off-topic
-        // question: "AutoCAD / Revit" under a recipe only looks confused.
+        // question: product buttons under a recipe only looks confused.
         $suggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
@@ -1331,7 +1331,7 @@ final class RagService implements LoggerAwareInterface
      * size: a knowledge base that holds every topic once per release and
      * product outranks a few hundred course lessons on almost any question,
      * and the lesson that answers it lands at rank 30 or 50 — out of reach
-     * for the context and for a reranker alike. Measured on LINEAR's
+     * for the context and for a reranker alike. Measured on a production
      * corpus: the expected lesson within the top three for 23 of 24 test
      * questions when searched on its own, 12 of 24 in the joint list.
      *
@@ -1470,7 +1470,7 @@ final class RagService implements LoggerAwareInterface
      *
      *  1. NOTHING is retrieved. The suggestion paraphrased a title out of
      *     matchability — "Lizenzlaufzeiten überprüfen" ranks the right
-     *     document first, "Wie prüfe ich die Laufzeiten meiner LINEAR-
+     *     document first, "Wie prüfe ich die Laufzeiten meiner
      *     Lizenzen?" does not retrieve it at all.
      *  2. The SAME documents are retrieved. The suggestion asked something
      *     adjacent that the corpus does not cover ("… without the Admin
@@ -1637,9 +1637,9 @@ final class RagService implements LoggerAwareInterface
      * search plugin adds.
      *
      * The language filter alone matches the page tree, not the text: an
-     * English or Dutch blog post kept in the German tree passed it, and LINEAR
-     * found the English and Dutch versions of the V26.1 article offered as
-     * "related" under a German answer. Unknown language (detection declined)
+     * English or Dutch blog post kept in the German tree passed it, and a customer's
+     * test found the English and Dutch versions of a release article offered
+     * as "related" under a German answer. Unknown language (detection declined)
      * still passes.
      *
      * @param array<string,mixed> $searchOptions
@@ -1672,9 +1672,9 @@ final class RagService implements LoggerAwareInterface
      *
      * Never under an off-topic reply. With meilisearch.rag.suggestions.
      * requireCitation also never under an answer that cites nothing: buttons
-     * under "nothing found" lead from one dead end to the next — LINEAR's test
-     * found "AutoCAD; Revit" under a recipe and a Polish conference report
-     * under the macOS question.
+     * under "nothing found" lead from one dead end to the next — a customer's test
+     * found platform buttons under a recipe and a Polish conference report
+     * under a question about macOS.
      *
      * @param list<string> $citedIds
      */
@@ -1781,9 +1781,9 @@ final class RagService implements LoggerAwareInterface
      *
      * Sending the bare choice would leave it to the conversational rewriter to
      * reattach the topic, and that is not reliable enough to build a button
-     * on. Measured locally: "Wie starte ich die Rohrnetzberechnung?" followed
-     * by the choice "LINEAR 26 · Revit" came back with an answer about
-     * Heizlastberechnung — right product, wrong subject. Composing the value
+     * on. Measured locally: "How do I start the calculation?" followed
+     * by the choice "Product 26 · Edition B" came back with an answer about
+     * a different calculation — right product, wrong subject. Composing the value
      * here removes the guesswork and makes the transcript readable on its own.
      *
      * @param list<string> $options
@@ -1848,8 +1848,8 @@ final class RagService implements LoggerAwareInterface
      * nothing, so such a question still reaches the model.
      *
      * Retrieval can only find what a page states, and no page states what
-     * LINEAR does not do. Asked "Bestätige, dass es LINEAR für ArchiCAD
-     * gibt", the model therefore answered "no information" instead of "No".
+     * the product does not do. Asked to confirm a plugin for a platform the
+     * product does not support, the model therefore answered "no information" instead of "No".
      * As a context entry the facts are citable: the "No" is a grounded answer
      * and does not trigger the contact card. Typed as a knowledge resource,
      * so it never shows up in the visible source list.
@@ -1865,8 +1865,8 @@ final class RagService implements LoggerAwareInterface
             return $hits;
         }
         // Only when the question touches them: offered on every question, a
-        // model starts weaving "LINEAR runs on Revit, AutoCAD and CADinside"
-        // into answers about pipe roughness (measured locally).
+        // model starts weaving "the product runs on platforms A, B and C"
+        // into answers about unrelated settings (measured locally).
         // Whole words, so "mac" finds "Mac?" but not "machen".
         $triggers = $settings->get('meilisearch.rag.fixedFactsTriggers', []);
         if (is_array($triggers) && $triggers !== []) {
@@ -1900,8 +1900,9 @@ final class RagService implements LoggerAwareInterface
      * Such a question is never off-topic, whatever the model marked: a
      * product question mistaken for small talk would lose its contact card
      * and drop out of the knowledge-gap list — the worse of the two errors.
-     * Measured locally with a smaller model: "Welche Rauigkeit k setzt
-     * LINEAR für PE-Xa-Rohre an?" came back marked out of scope.
+     * Measured locally with a smaller model: a question
+     * about a default pipe roughness, naming the product, came back marked
+     * out of scope.
      */
     private function namesSubject(Site $site, string $question): bool
     {

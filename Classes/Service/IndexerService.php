@@ -93,8 +93,8 @@ final class IndexerService implements LoggerAwareInterface
      */
     /**
      * A provider ships with the extension whether or not the project has its
-     * table — the whats-new provider reads LINEAR's tx_linearproducts table,
-     * the news provider EXT:news. Querying a table that does not exist aborts
+     * table — the news provider needs EXT:news, a project's own provider its
+     * project table. Querying a table that does not exist aborts
      * the whole reindex, so a provider only runs when its table is in TCA.
      */
     private function providerTableAvailable(SchemaProviderInterface $provider): bool

@@ -146,7 +146,7 @@ final class ContainerChildrenListener implements LoggerAwareInterface
      * object to int yields 1, silently, for every child on the page. Every
      * child then landed under parent uid 1, the lookup for the real container
      * found nothing, and the whole feature was a no-op that logged nothing.
-     * On the LINEAR site that hid ~270k characters across 102 pages; the home
+     * On one production site that hid ~270k characters across 102 pages; the home
      * page reached the index with 49 of its 6053 characters.
      *
      * Unwrap the relation instead of casting it, and keep the scalar path for

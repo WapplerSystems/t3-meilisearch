@@ -101,7 +101,7 @@ final class IndexAuditCommand extends Command
         foreach ($this->schemaProviders as $provider) {
             // Fully qualified, not the short name: two packages can ship
             // a provider class with the SAME short name (a project
-            // package and the extension both had a WhatsnewSchemaProvider
+            // package and the extension both had a provider of the same name
             // registered, which made the duplicate report read as one
             // provider yielding twice instead of two providers colliding).
             $name = $provider::class;

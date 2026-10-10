@@ -25,8 +25,8 @@ use WapplerSystems\Meilisearch\Service\SearchService;
  * the children of one parent are the related tasks of one topic area — and
  * offers each one under its own title.
  *
- * The title is deliberately both the label and the value: measured on the
- * LINEAR corpus, a document's own title retrieves that document at rank 1
+ * The title is deliberately both the label and the value: measured on a
+ * production corpus, a document's own title retrieves that document at rank 1
  * ("Lizenzlaufzeiten überprüfen" → the topic of that name), while any
  * paraphrase of it can miss the top five entirely. A button built this way
  * cannot fail retrieval the way a generated one can — the same reason

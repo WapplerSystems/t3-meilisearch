@@ -26,7 +26,7 @@ use TYPO3\CMS\Core\Exception\Page\PageNotFoundException;
  * statistics, which reads like a refusal but means "nobody handles this".
  *
  * What existed instead: `index:queue`, which enqueues an entire configuration
- * (on the LINEAR install: 14,000+ pages), and saving the page in the backend,
+ * (on one production install: 14,000+ pages), and saving the page in the backend,
  * which needs a backend. Neither is what you want when one page's document has
  * gone stale — and one page going stale is a normal thing to happen, e.g. when
  * an earlier indexing attempt died on an embedding timeout.
