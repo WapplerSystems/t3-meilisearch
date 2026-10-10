@@ -70,6 +70,7 @@ final class EscalationResolver
         array $citedIds = [],
         string $question = '',
         string $conversationId = '',
+        string $topic = '',
     ): ?Escalation {
         if (!$site instanceof Site) {
             return null;
@@ -89,6 +90,7 @@ final class EscalationResolver
             conversationId: $conversationId,
             escalation: $this->defaultEscalation($site, $languageService, $question),
             show: $this->defaultShow($site, $context, $status, $citedIds),
+            topic: $topic,
         );
         $this->eventDispatcher->dispatch($event);
 

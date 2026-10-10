@@ -144,6 +144,7 @@ final class RagController extends ActionController
             $answer->citedIds,
             $q,
             $conversation->id,
+            $answer->topic,
         );
         $this->protocolRecorder->record(
             $site,

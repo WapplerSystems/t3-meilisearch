@@ -642,6 +642,12 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.suggestions.requireCitation:
+    label: 'RAG: buttons only under answers that cite a source'
+    description: 'When true, no suggestion buttons (follow-ups, related topics, scope options) appear under an answer that cites nothing — e.g. "nothing found in the knowledge base". Buttons there lead from one dead end to the next.'
+    type: bool
+    default: false
+
   meilisearch.rag.suggestions.max:
     label: 'RAG: max action suggestions'
     description: 'Upper bound on how many suggestion buttons are shown under an answer (1–8).'
@@ -765,6 +771,18 @@ settings:
   meilisearch.rag.outOfScope.subjectTerms:
     label: 'RAG: terms that make a question on-topic'
     description: 'A question containing one of these (case-insensitive) is never treated as off-topic, even when the model marks it [out-of-scope] — e.g. the brand and product names. Guards against a product question losing its contact card. Empty: the model alone decides.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.topics:
+    label: 'RAG: topic tags the model may put in front of a reply'
+    description: 'Keys like "sales" or "training". The system prompt tells the model when to start a reply with "[topic:<key>]"; the tag is stripped and handed to RagEscalationEvent::$topic, so a listener can point the contact card to the right team. Tags not listed here are stripped and ignored.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.topicTerms:
+    label: 'RAG: words that put a question into a topic'
+    description: 'Entries "<topic>:<word beginning>", e.g. "sales:preis", "sales:rabatt", "training:schulung"; the topic must be listed in meilisearch.rag.topics. A question containing the word gets that topic even when the model does not tag it, and skips the clarifying question.'
     type: stringlist
     default: []
 

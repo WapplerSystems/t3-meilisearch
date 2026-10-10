@@ -32,6 +32,8 @@ final class RagAnswer
          * instead of as a knowledge gap.
          */
         public readonly bool $outOfScope = false,
+        /** Topic tag of the reply, see RagService::TOPIC_TAG_FORMAT; '' for none. */
+        public readonly string $topic = '',
     ) {}
 
     /**
@@ -52,6 +54,7 @@ final class RagAnswer
             $suggestions,
             $this->notes,
             $this->outOfScope,
+            $this->topic,
         );
     }
 
@@ -71,6 +74,7 @@ final class RagAnswer
             $this->suggestions,
             $notes,
             $this->outOfScope,
+            $this->topic,
         );
     }
 

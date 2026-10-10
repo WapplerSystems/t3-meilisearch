@@ -53,5 +53,11 @@ final class RagEscalationEvent
         public readonly string $conversationId,
         public Escalation $escalation,
         public bool $show,
+        /**
+         * Topic the model tagged the reply with (meilisearch.rag.topics, e.g.
+         * "sales"), '' for none — lets a listener send a price question to
+         * sales instead of support.
+         */
+        public readonly string $topic = '',
     ) {}
 }

@@ -35,9 +35,10 @@ Rules:
 - Default to ANSWERABLE. Clarifying is the rare exception, not the safe choice.
 - Ask for clarification ONLY when BOTH hold: (a) the retrieved titles point to two or more mutually exclusive contexts (different products, editions or CAD platforms), AND (b) the correct answer would be materially different depending on which one the user means. If one answer covers all of them, it is ANSWERABLE.
 - A broad or general question is ANSWERABLE. "What is X and what is it used for?" wants an overview, not a narrowing question.
+- A commercial or organisational question — prices, discounts, buying or extending licences, booking a training or seminar, contacting someone — is ANSWERABLE: it does not depend on the product or platform, and asking for one only delays the visitor.
 - A question about a topic the documentation does not cover at all is ANSWERABLE. Do NOT ask a clarifying question about an off-topic subject — that only makes the assistant look confused. Let the answering step decline it politely.
 - Missing detail that you could simply state conditionally ("in AutoCAD …, in Revit …") is not a reason to clarify.
-- When clarification is genuinely needed, ask ONE short, specific question in the same language as the user's latest message. Prefer concrete options taken from the retrieved titles (e.g. product or edition names) over a generic "please be more specific".
+- When clarification is genuinely needed, ask ONE short, specific question in the same language as the user's latest message — not in the language of the document titles, which may differ (a Polish question about German documents gets a Polish question back). Prefer concrete options taken from the retrieved titles (e.g. product or edition names) over a generic "please be more specific".
 - Never ask the user merely to rephrase. Ask for the specific missing fact.
 
 - When your question offers the user a choice between named alternatives, list those alternatives in "options", each exactly as it should read on a button: short and without trailing punctuation. Take them VERBATIM from the retrieved titles or from the product names listed below — never invent a product, edition or module name, however plausible it sounds. An option that does not occur in that material is dropped, and a question whose options are all dropped ends up with no buttons at all. Two to five entries. Leave "options" out when the question asks for something that is not a choice between names — a version number, a file name, what the user actually wants to achieve.
@@ -92,6 +93,7 @@ PROMPT;
                 . "\n\nLatest question: " . $question
                 . "\n\nRetrieved document titles:\n" . $this->renderTitles($hits)
                 . $this->renderProductTerms($settings)
+                . "\n\nWrite any clarifying question and its options in the language of the latest question."
                 . "\n\nVerdict JSON:",
             ],
         ];

@@ -93,10 +93,18 @@ final class RagService implements LoggerAwareInterface
      * wherever the model put it.
      */
     public const OUT_OF_SCOPE_MARKER = '[out-of-scope]';
+    /**
+     * Topic tag the prompt may ask for in front of a reply, e.g. "[topic:sales]"
+     * for a question about prices. Only keys listed in meilisearch.rag.topics
+     * count; the contact card can then point to the right team
+     * (RagEscalationEvent::$topic). Stripped like the out-of-scope marker.
+     */
+    public const TOPIC_TAG_FORMAT = '[topic:%s]';
     /** Context id of the site's fixed facts, see withFixedFacts(). */
     public const FIXED_FACTS_ID = 'site-facts';
     /** Tolerant form for the final text: case, spaces, `_` or a missing hyphen. */
     private const OUT_OF_SCOPE_PATTERN = '/\[\s*out[\s_-]*of[\s_-]*scope\s*\]/i';
+    private const TOPIC_PATTERN = '/\[\s*topic\s*:\s*([a-z_-]+)\s*\]/i';
     private const CITATION_TOKEN_PATTERN = '/[A-Za-z0-9_:.\-]+/';
 
     public function __construct(
@@ -617,6 +625,7 @@ final class RagService implements LoggerAwareInterface
         // context and answers — an off-topic question finds nothing in the
         // index, and "no context" would hand it the contact card.
         $hits = $this->withFixedFacts($site, $event->question, $hits);
+        $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
@@ -626,7 +635,9 @@ final class RagService implements LoggerAwareInterface
         // Triage before generating: if the question is too ambiguous /
         // underspecified to answer from these hits, ask one clarifying
         // question back instead of guessing. Skips the answer call entirely.
-        $clarification = $this->clarificationAllowed($site, $event->question, $conversation, $hits)
+        // A price or training question needs no product: asking "AutoCAD or
+        // Revit?" back only delays the visitor on the way to sales.
+        $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
             ? $this->queryClassifier->classify(
                 $provider,
                 $settings,
@@ -679,7 +690,8 @@ final class RagService implements LoggerAwareInterface
             return $answer;
         }
 
-        [$responseText, $outOfScope] = self::splitOutOfScope($responseText);
+        [$responseText, $outOfScope, $topic] = self::splitReplyTags($responseText);
+        $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
         $answer = new RagAnswer(
@@ -688,6 +700,7 @@ final class RagService implements LoggerAwareInterface
             citedIds: $citedIds,
             status: 'ok',
             outOfScope: $outOfScope,
+            topic: $topic,
         );
         $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($after);
@@ -698,6 +711,9 @@ final class RagService implements LoggerAwareInterface
             return $final;
         }
         $final = $final->withNotes($this->answerNotes($site, $event->question, $final->answer, $hits, $final->citedIds, $options));
+        if (!$this->offersSuggestions($site, false, $final->citedIds)) {
+            return $final;
+        }
         // Decision-support suggestions (followup / refine / recommend),
         // rendered as buttons under the answer. Generated from the final
         // answer + sources; returns [] when disabled or on any error, so it
@@ -804,8 +820,9 @@ final class RagService implements LoggerAwareInterface
             true,
         );
         $hits = $this->withFixedFacts($site, $event->question, $hits);
+        $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
-            if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [], $questionTopic)) {
                 yield $chunk;
             }
             yield RagStreamChunk::noContext();
@@ -822,7 +839,9 @@ final class RagService implements LoggerAwareInterface
         // question gets one clarifying question back instead of a guessed
         // answer. Emitted before the `sources` frame so the UI never shows a
         // "found N documents" preview it then has to pivot away from.
-        $clarification = $this->clarificationAllowed($site, $event->question, $conversation, $hits)
+        // A price or training question needs no product: asking "AutoCAD or
+        // Revit?" back only delays the visitor on the way to sales.
+        $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
             ? $this->queryClassifier->classify(
                 $provider,
                 $settings,
@@ -879,15 +898,16 @@ final class RagService implements LoggerAwareInterface
         // cached response. Honor that path even when streaming — emit
         // the cached text as a single token chunk.
         if ($before->response !== null) {
-            [$cachedText, $outOfScope] = self::splitOutOfScope($before->response);
+            [$cachedText, $outOfScope, $topic] = self::splitReplyTags($before->response);
+            $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
             $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
             yield RagStreamChunk::token($cachedText);
             $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $cachedText, $hits);
-            if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds)) {
+            if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds, $topic)) {
                 yield $chunk;
             }
             $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, $cachedText, $hits, $citedIds, $options);
-            yield RagStreamChunk::done($cachedText, $citedIds, $notes, $outOfScope);
+            yield RagStreamChunk::done($cachedText, $citedIds, $notes, $outOfScope, $topic);
             $cachedAnswer = new RagAnswer(
                 answer: trim($cachedText),
                 sources: $hits,
@@ -895,8 +915,9 @@ final class RagService implements LoggerAwareInterface
                 status: 'ok',
                 notes: $notes,
                 outOfScope: $outOfScope,
+                topic: $topic,
             );
-            $cachedSuggestions = $outOfScope ? [] : $this->withScopeOptions(
+            $cachedSuggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
                 $this->withRelatedTopics(
                     $this->groundSuggestions(
                         $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
@@ -929,8 +950,8 @@ final class RagService implements LoggerAwareInterface
         }
 
         $accumulated = '';
-        // Start of the reply, held back until it is clear whether it is the
-        // out-of-scope marker — see OUT_OF_SCOPE_MARKER.
+        // Start of the reply, held back until it is clear whether it carries
+        // reply tags — see OUT_OF_SCOPE_MARKER and TOPIC_TAG_FORMAT.
         $head = '';
         $headDecided = false;
         $started = false;
@@ -942,11 +963,11 @@ final class RagService implements LoggerAwareInterface
                 $accumulated .= $delta;
                 if (!$headDecided) {
                     $head .= $delta;
-                    if (self::mayStillBeMarker($head)) {
+                    if (self::mayStillBeTags($head)) {
                         continue;
                     }
                     $headDecided = true;
-                    $delta = self::splitOutOfScope($head)[0];
+                    $delta = self::splitReplyTags($head)[0];
                 }
                 // The blank line the model puts after the marker would
                 // otherwise open the bubble.
@@ -959,8 +980,8 @@ final class RagService implements LoggerAwareInterface
                 }
                 yield RagStreamChunk::token($delta);
             }
-            if (!$headDecided && trim(self::splitOutOfScope($head)[0]) !== '') {
-                yield RagStreamChunk::token(self::splitOutOfScope($head)[0]);
+            if (!$headDecided && trim(self::splitReplyTags($head)[0]) !== '') {
+                yield RagStreamChunk::token(self::splitReplyTags($head)[0]);
             }
         } catch (LlmException $e) {
             $this->logger?->error('RAG streaming failed: {message}', [
@@ -980,18 +1001,19 @@ final class RagService implements LoggerAwareInterface
             return;
         }
 
-        [$accumulated, $outOfScope] = self::splitOutOfScope($accumulated);
+        [$accumulated, $outOfScope, $topic] = self::splitReplyTags($accumulated);
+        $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
         // Before `done`, because `done` is the terminal frame the client may
         // close on — see RagStreamChunk. An answer that cited nothing is the
         // "ok but ungrounded" case the contact card exists for; an off-topic
         // question is not.
-        if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds)) {
+        if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds, $topic)) {
             yield $chunk;
         }
         $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
-        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope);
+        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope, $topic);
 
         $answer = new RagAnswer(
             answer: trim($accumulated),
@@ -1000,12 +1022,13 @@ final class RagService implements LoggerAwareInterface
             status: 'ok',
             notes: $notes,
             outOfScope: $outOfScope,
+            topic: $topic,
         );
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
         // followup / refine / recommend buttons too. None for an off-topic
         // question: "AutoCAD / Revit" under a recipe only looks confused.
-        $suggestions = $outOfScope ? [] : $this->withScopeOptions(
+        $suggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
                     $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
@@ -1413,7 +1436,7 @@ final class RagService implements LoggerAwareInterface
      * @param array<string,mixed> $options
      * @param list<string> $citedIds
      */
-    private function fallbackChunk(Site $site, array $options, string $question, string $status, array $citedIds): ?RagStreamChunk
+    private function fallbackChunk(Site $site, array $options, string $question, string $status, array $citedIds, string $topic = ''): ?RagStreamChunk
     {
         $conversation = $options['conversation'] ?? null;
         $escalation = $this->escalationResolver->resolve(
@@ -1424,6 +1447,7 @@ final class RagService implements LoggerAwareInterface
             $citedIds,
             $question,
             $conversation instanceof Conversation ? $conversation->id : '',
+            $topic,
         );
 
         return $escalation instanceof Escalation ? RagStreamChunk::fallback($escalation) : null;
@@ -1602,9 +1626,65 @@ final class RagService implements LoggerAwareInterface
             $site,
             $hits,
             $citedIds,
-            $searchOptions,
+            $this->withContentLanguage($site, $searchOptions),
             $room,
         ));
+    }
+
+    /**
+     * The search options plus a filter on the detected text language of the
+     * site language the retrieval is restricted to — the same layer the
+     * search plugin adds.
+     *
+     * The language filter alone matches the page tree, not the text: an
+     * English or Dutch blog post kept in the German tree passed it, and LINEAR
+     * found the English and Dutch versions of the V26.1 article offered as
+     * "related" under a German answer. Unknown language (detection declined)
+     * still passes.
+     *
+     * @param array<string,mixed> $searchOptions
+     * @return array<string,mixed>
+     */
+    private function withContentLanguage(Site $site, array $searchOptions): array
+    {
+        $languageId = $searchOptions['filters']['language'][0] ?? null;
+        if (!is_int($languageId) && !(is_string($languageId) && ctype_digit($languageId))) {
+            return $searchOptions;
+        }
+        try {
+            $isoCode = $site->getLanguageById((int)$languageId)->getLocale()->getLanguageCode();
+        } catch (\Throwable) {
+            return $searchOptions;
+        }
+        if ($isoCode === '') {
+            return $searchOptions;
+        }
+        $searchOptions['filters']['__rawFilters'][] = sprintf(
+            '(contentLanguage = "%s" OR contentLanguage IS NULL OR contentLanguage IS EMPTY)',
+            str_replace('"', '\\"', $isoCode),
+        );
+
+        return $searchOptions;
+    }
+
+    /**
+     * Whether buttons go under this answer at all.
+     *
+     * Never under an off-topic reply. With meilisearch.rag.suggestions.
+     * requireCitation also never under an answer that cites nothing: buttons
+     * under "nothing found" lead from one dead end to the next — LINEAR's test
+     * found "AutoCAD; Revit" under a recipe and a Polish conference report
+     * under the macOS question.
+     *
+     * @param list<string> $citedIds
+     */
+    private function offersSuggestions(Site $site, bool $outOfScope, array $citedIds): bool
+    {
+        if ($outOfScope) {
+            return false;
+        }
+
+        return $citedIds !== [] || !(bool)$site->getSettings()->get('meilisearch.rag.suggestions.requireCitation', false);
     }
 
     /**
@@ -1841,35 +1921,79 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
-     * The reply without the out-of-scope marker, and whether it carried one.
+     * The reply without its tags, whether it was marked out of scope, and the
+     * topic it was tagged with ('' for none).
      *
-     * @return array{0:string,1:bool}
+     * @return array{0:string,1:bool,2:string}
      */
-    public static function splitOutOfScope(string $text): array
+    public static function splitReplyTags(string $text): array
     {
-        $clean = preg_replace(self::OUT_OF_SCOPE_PATTERN, '', $text, -1, $count);
+        $topic = '';
+        if (preg_match(self::TOPIC_PATTERN, $text, $match) === 1) {
+            $topic = strtolower($match[1]);
+        }
+        $clean = preg_replace([self::OUT_OF_SCOPE_PATTERN, self::TOPIC_PATTERN], '', $text, -1, $count);
         if (!is_string($clean) || $count === 0) {
-            return [$text, false];
+            return [$text, false, ''];
         }
 
-        return [trim($clean), true];
+        return [trim($clean), preg_match(self::OUT_OF_SCOPE_PATTERN, $text) === 1, $topic];
     }
 
     /**
-     * Whether the start of a streamed reply could still turn into the marker,
-     * i.e. it is a (case-insensitive) prefix of it after leading whitespace.
+     * Whether the start of a streamed reply could still turn into reply tags:
+     * nothing but bracketed lowercase words, colons and hyphens so far. A
+     * citation ("[pages-12]", "[id=…]") breaks the pattern at its digit or
+     * "=", so an answer that opens with one is held back by a few characters
+     * at most.
      */
-    private static function mayStillBeMarker(string $head): bool
+    private static function mayStillBeTags(string $head): bool
     {
-        $head = strtolower(ltrim($head));
-        if ($head === '') {
-            return true;
-        }
-        if (strlen($head) >= strlen(self::OUT_OF_SCOPE_MARKER)) {
+        if (strlen($head) > 80) {
             return false;
         }
 
-        return str_starts_with(self::OUT_OF_SCOPE_MARKER, $head);
+        return preg_match('/^\s*(?:\[[a-z:_\s-]*(?:\]\s*)?)*$/i', $head) === 1;
+    }
+
+    /**
+     * The topic of the first meilisearch.rag.topicTerms entry ("sales:preis",
+     * the term matched as a word beginning, so "preis" finds "Preise") that
+     * occurs in the question; '' for none.
+     *
+     * The deterministic half of topic routing: the model's tag is the other
+     * half and wins when present, but a smaller model drops tags, and the
+     * classifier runs before the model ever sees the question.
+     */
+    private function topicFromQuestion(Site $site, string $question): string
+    {
+        $settings = $site->getSettings();
+        $topics = $settings->get('meilisearch.rag.topics', []);
+        $entries = $settings->get('meilisearch.rag.topicTerms', []);
+        if (!is_array($topics) || !is_array($entries)) {
+            return '';
+        }
+        foreach ($entries as $entry) {
+            [$topic, $term] = array_map('trim', explode(':', (string)$entry, 2) + [1 => '']);
+            if ($term === '' || !in_array($topic, array_map('strval', $topics), true)) {
+                continue;
+            }
+            if (preg_match('/(?<!\p{L})' . preg_quote($term, '/') . '/iu', $question) === 1) {
+                return $topic;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * The topic if the site lists it in meilisearch.rag.topics, else ''.
+     */
+    private function knownTopic(Site $site, string $topic): string
+    {
+        $topics = $site->getSettings()->get('meilisearch.rag.topics', []);
+
+        return $topic !== '' && is_array($topics) && in_array($topic, array_map('strval', $topics), true) ? $topic : '';
     }
 
     /**
