@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 defined('TYPO3') or die();
 
+// Scheduler tasks configured through TCA exist from TYPO3 14 on; TYPO3 13
+// rejects the record type. There, schedule the console command instead
+// ("Execute console commands") — see README, "TYPO3 13".
+if ((new \TYPO3\CMS\Core\Information\Typo3Version())->getMajorVersion() < 14) {
+    return;
+}
+
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use WapplerSystems\Meilisearch\Task\FullReindexTask;
 

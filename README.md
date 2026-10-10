@@ -109,15 +109,31 @@ tomorrow) without rewriting templates or services.
 
 | Component | Version | Notes |
 |---|---|---|
-| **TYPO3** | `^14.0` | uses v14 PSR-7 attribute container, Site Settings typed identifiers, Locale value object |
-| **PHP** | `^8.2` | readonly properties, enums, `mixed` returns |
+| **TYPO3** | `^13.4 \|\| ^14.0` | v13: everything but the two TCA-configured scheduler tasks — see [TYPO3 13](#typo3-13) |
+| **PHP** | `^8.3` | `lochmueller/index` 2.x requires 8.3 |
 | **Meilisearch** | `>= 1.12` | needs `/similar`, `disableOnWords`, `disableOnNumbers`, swap-indexes; v1.47+ recommended for stable embedder pipeline |
 | **Apache Tika** | optional, `>= 2.x` recommended | required only for FAL text extraction (PDF / Office / RTF / EPUB) |
 | **Composer deps** | `cmsig/seal ^0.12`, `cmsig/seal-meilisearch-adapter ^0.12`, `meilisearch/meilisearch-php ^1.10`, `lochmueller/index ^2.0`, `patrickschur/language-detection ^5.3` | pulled in via this package's `composer.json` |
 | **Embedder** (optional) | any OpenAI-compatible `/v1/embeddings` endpoint | tested with Scaleway Generative APIs, Infomaniak AI Tools, OpenAI, Ollama, Mistral La Plateforme |
 | **LLM** (optional, for RAG) | OpenAI-compatible `/v1/chat/completions` | OpenAI, Anthropic, Mistral / Scaleway, Ollama, Infomaniak |
-| **Database** | MariaDB 10.5+ / MySQL 8.0+ | uses JSON columns + utf8mb4 collation; standard TYPO3 v14 baseline |
+| **Database** | MariaDB 10.5+ / MySQL 8.0+ | uses JSON columns + utf8mb4 collation; standard TYPO3 v13/v14 baseline |
 | **DDEV** (local dev) | `>= 1.22` | ships `.ddev/docker-compose.meilisearch.yaml` + `docker-compose.tika.yaml` |
+
+### TYPO3 13
+
+The extension runs on TYPO3 13.4 with the same code. Differences:
+
+- **Scheduler tasks.** *Meilisearch: full reindex* and *RAG regression tests*
+  are configured through TCA, which the scheduler supports from TYPO3 14 on.
+  On 13 they are not registered; schedule the console commands with the core
+  task *Execute console commands* instead — `ws_meilisearch:reindex <site>`,
+  `ws_meilisearch:run-rag-tests`, `ws_meilisearch:index-prune-pages <site>
+  --started-since=1200`.
+- **`messenger:consume`** has no `--time-limit` on 13. In the systemd unit
+  below, drop the option and rely on `--memory-limit` and `Restart=always`.
+- **EXT:index needs a `websiteTitle`** in the site configuration (on 13 and
+  14). Without it, the "database" technology indexes no page and logs the
+  reason only; `ws_meilisearch:doctor` reports it.
 
 ## Installation
 

@@ -207,6 +207,13 @@ final class DoctorCommand extends Command
         // 6. EXT:index integration — pages flow through it
         if (class_exists(\Lochmueller\Index\Event\IndexPageEvent::class)) {
             $this->ok($io, 'EXT:index integration wired (lochmueller/index loaded)');
+            // EXT:index's database indexing reads the site's websiteTitle and
+            // throws without it — caught per page, so the run "succeeds" and
+            // indexes nothing; the reason is only in the log.
+            if (trim((string)($site->getConfiguration()['websiteTitle'] ?? '')) === '') {
+                $this->fail($io, 'Site has no websiteTitle — EXT:index (technology "database") indexes no page without it. Set it in the site configuration.');
+                $hardFailures++;
+            }
         } else {
             $this->warn($io, 'lochmueller/index NOT installed — pages will not flow into the index');
         }
