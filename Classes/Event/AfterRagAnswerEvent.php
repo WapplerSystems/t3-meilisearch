@@ -24,5 +24,10 @@ final class AfterRagAnswerEvent
         public RagAnswer $answer,
         public readonly ?Site $site = null,
         public readonly ?int $languageId = null,
+        /**
+         * Asked by tooling (tests, backend test module, CLI, MCP), not by a
+         * visitor — kept out of the usage statistics.
+         */
+        public readonly bool $internal = false,
     ) {}
 }

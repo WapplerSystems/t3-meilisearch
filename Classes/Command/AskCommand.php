@@ -73,7 +73,7 @@ final class AskCommand extends Command
             $options['language'] = (int)$languageOption;
         }
 
-        $answer = $this->ragService->ask($site, $question, $options);
+        $answer = $this->ragService->ask($site, $question, ['internal' => true] + $options);
         if ($answer->status === 'clarify') {
             // Triage asked a clarifying question back instead of answering;
             // the question is carried in ->answer. Show it so the test

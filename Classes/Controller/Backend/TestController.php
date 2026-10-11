@@ -66,7 +66,7 @@ final class TestController
         $ragAnswer = null;
         $ragSources = [];
         if ($site instanceof Site && $askQuery !== '') {
-            $ragAnswer = $this->ragService->ask($site, $askQuery);
+            $ragAnswer = $this->ragService->ask($site, $askQuery, ['internal' => true]);
             // Pre-flag sources as cited so the template doesn't need a
             // nested loop just to render the ✓ marker.
             $citedSet = array_flip($ragAnswer->citedIds);

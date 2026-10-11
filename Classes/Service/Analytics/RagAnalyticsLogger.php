@@ -27,10 +27,10 @@ use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
  * Gating: opt-in per site via meilisearch.analytics.enabled = true
  * (shared master switch with search analytics).
  *
- * Context resolution: AfterRagAnswerEvent carries only the question +
- * RagAnswer, so site/language are read from the active request — which
- * also naturally scopes logging to the frontend (BE rag-test runs and
- * CLI have no FE 'site' attribute and are skipped).
+ * Context: site and language come from the event (falling back to the
+ * active request). Calls from tooling — RAG test runs, the backend test
+ * module, the CLI, MCP clients — are flagged `internal` on the event and
+ * skipped, so the statistics show visitors only.
  */
 final class RagAnalyticsLogger implements LoggerAwareInterface
 {
@@ -50,6 +50,11 @@ final class RagAnalyticsLogger implements LoggerAwareInterface
         // no real turn to record. Everything else (ok / no_context /
         // failed) is signal worth keeping.
         if ($event->answer->status === 'disabled') {
+            return;
+        }
+        // Test runs, the backend test module, the CLI and MCP clients are
+        // not visitors; counting them would bury the real questions.
+        if ($event->internal) {
             return;
         }
 

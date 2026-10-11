@@ -127,7 +127,7 @@ final class RagTestRunner
             // a spread far wider than any regression it is meant to catch.
             // Production keeps its own temperature; only the harness is
             // pinned.
-            $answer = $this->ragService->ask($site, $question, ['temperature' => 0.0]);
+            $answer = $this->ragService->ask($site, $question, ['temperature' => 0.0, 'internal' => true]);
         } catch (\Throwable $e) {
             return RagTestResult::error('RAG ask failed: ' . $e->getMessage());
         }

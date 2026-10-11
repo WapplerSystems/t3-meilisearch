@@ -628,7 +628,7 @@ final class RagService implements LoggerAwareInterface
         $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return $answer;
         }
 
@@ -652,7 +652,7 @@ final class RagService implements LoggerAwareInterface
                 $clarification->question,
                 $this->clarifyChoices($clarification->options, $event->question),
             );
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return $answer;
         }
 
@@ -686,7 +686,7 @@ final class RagService implements LoggerAwareInterface
                 'exception' => $e,
             ]);
             $answer = RagAnswer::failed($e->getMessage());
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return $answer;
         }
 
@@ -702,7 +702,7 @@ final class RagService implements LoggerAwareInterface
             outOfScope: $outOfScope,
             topic: $topic,
         );
-        $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options));
+        $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options));
         $this->eventDispatcher->dispatch($after);
         $final = $after->answer;
         if ($final->outOfScope) {
@@ -830,7 +830,7 @@ final class RagService implements LoggerAwareInterface
                 $event->question,
                 RagAnswer::noContext(),
                 $site,
-                $this->resolveLanguageId($options),
+                $this->resolveLanguageId($options), $this->isInternal($options),
             ));
             return;
         }
@@ -866,7 +866,7 @@ final class RagService implements LoggerAwareInterface
                     $this->clarifyChoices($clarification->options, $event->question),
                 ),
                 $site,
-                $this->resolveLanguageId($options),
+                $this->resolveLanguageId($options), $this->isInternal($options),
             ));
             return;
         }
@@ -945,7 +945,7 @@ final class RagService implements LoggerAwareInterface
                 yield RagStreamChunk::suggestions($cachedSuggestions);
             }
             yield RagStreamChunk::end();
-            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $cachedAnswer, $site, $this->resolveLanguageId($options)));
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $cachedAnswer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return;
         }
 
@@ -996,7 +996,7 @@ final class RagService implements LoggerAwareInterface
                 $event->question,
                 RagAnswer::failed($e->getMessage()),
                 $site,
-                $this->resolveLanguageId($options),
+                $this->resolveLanguageId($options), $this->isInternal($options),
             ));
             return;
         }
@@ -1056,7 +1056,7 @@ final class RagService implements LoggerAwareInterface
             yield RagStreamChunk::suggestions($suggestions);
         }
         yield RagStreamChunk::end();
-        $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options)));
+        $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
     }
 
     /**
@@ -1810,6 +1810,19 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $choices;
+    }
+
+    /**
+     * Whether the call comes from tooling rather than a visitor — the RAG
+     * test runner, the backend test module, the CLI, the MCP interface.
+     * Callers set `internal => true` in the ask options; it rides on
+     * AfterRagAnswerEvent so the usage statistics leave those turns out.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function isInternal(array $options): bool
+    {
+        return ($options['internal'] ?? false) === true;
     }
 
     private function resolveLanguageId(array $options): ?int

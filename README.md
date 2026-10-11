@@ -97,7 +97,7 @@ tomorrow) without rewriting templates or services.
 - **Analytics** tab: top queries, zero-result queries, source breakdown
   (search / suggest / similar), hybrid-vs-keyword rate, with 1/7/30/90-day
   windows. Opt-in per site; stores only aggregable signals — no IPs, no
-  session ids, no user agents.
+  session ids, no user agents. Only visitor questions count: RAG calls from the test runner, the backend test module, the CLI and MCP clients pass `internal => true` and are left out.
 - **Throttled reindex** via `meilisearch.indexing.requestsPerMinute`
   (token bucket) when the embedding provider rate-limits per minute.
 - **CLI commands**: `reindex`, `apply-settings`, `setup-index-config`,

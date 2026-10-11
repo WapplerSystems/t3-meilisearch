@@ -126,7 +126,7 @@ final class AskAssistantTool implements McpToolInterface
         $existingFilters = $options['filters'] ?? [];
         $options['filters'] = $this->accessControlFilter->applyTo($existingFilters, $site, $context->request);
 
-        $answer = $this->ragService->ask($site, $question, $options);
+        $answer = $this->ragService->ask($site, $question, ['internal' => true] + $options);
 
         $this->chatProtocolRecorder->record(
             site: $site,
