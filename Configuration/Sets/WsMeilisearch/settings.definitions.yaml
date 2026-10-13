@@ -804,6 +804,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.fixedReplies:
+    label: 'RAG: fixed replies per language'
+    description: 'Entries "<key>:<lang>:<sentence>", e.g. "no-answer:de:Dazu habe ich nichts gefunden." The system prompt asks the model for "[reply:<key>:<lang>]" at the start of its reply instead of a literal sentence, and the tag is replaced by the matching sentence (unknown language: the English one). With two literal sentences in the prompt a model picks the wrong language now and then; naming the language as a code it does reliably. List the sentences in meilisearch.rag.noAnswerPhrases as well if they mean "not answered".'
+    type: stringlist
+    default: []
+
   meilisearch.rag.factSheet:
     label: 'RAG: fact sheet'
     description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions.'

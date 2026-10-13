@@ -558,6 +558,17 @@ whatever it cites — contact card, knowledge-gap list:
     noAnswerPhrases: ['in unserer Wissensdatenbank nichts gefunden', "couldn't find anything on this in our knowledge base"]
 ```
 
+**Fixed replies.** Asked to pick one of two literal sentences by the language
+of the question, a model gets it wrong now and then. Let it name the language
+as a code instead — "[reply:no-answer:de]" at the start of the reply — and
+keep the sentences here (unknown language: English):
+
+```yaml
+    fixedReplies:
+      - 'no-answer:de:Dazu habe ich in unserer Wissensdatenbank nichts gefunden.'
+      - "no-answer:en:I couldn't find anything on this in our knowledge base."
+```
+
 **Fixed facts.** What the product does *not* do appears on no page, so the
 model can only answer "no information". `fixedFacts` is added to the context
 as an invisible, citable entry (id `site-facts`) — a clear "No" is then a

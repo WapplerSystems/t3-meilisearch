@@ -107,6 +107,18 @@ final class RagService implements LoggerAwareInterface
     /** Tolerant form for the final text: case, spaces, `_` or a missing hyphen. */
     private const OUT_OF_SCOPE_PATTERN = '/\[\s*out[\s_-]*of[\s_-]*scope\s*\]/i';
     private const TOPIC_PATTERN = '/\[\s*topic\s*:\s*([a-z_-]+)\s*\]/i';
+    /**
+     * Fixed reply the prompt may ask for instead of a literal sentence, e.g.
+     * "[reply:no-answer:de]"; replaced by the sentence configured for that key
+     * and language in meilisearch.rag.fixedReplies.
+     *
+     * Given two literal sentences in the prompt, one per language, a model
+     * picks the wrong one now and then (measured: the English "nothing found"
+     * sentence under a German question, 1 run in 3), although it gets the
+     * language of every free-text answer right. Naming the language as a code
+     * it does reliably; the sentence then comes from the configuration.
+     */
+    private const REPLY_PATTERN = '/\[\s*reply\s*:\s*([a-z_-]+)\s*:\s*([a-z]{2})\s*\]/i';
     private const CITATION_TOKEN_PATTERN = '/[A-Za-z0-9_:.\-]+/';
 
     public function __construct(
@@ -693,6 +705,7 @@ final class RagService implements LoggerAwareInterface
         }
 
         [$responseText, $outOfScope, $topic] = self::splitReplyTags($responseText);
+        $responseText = $this->expandFixedReplies($site, $responseText);
         $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
@@ -901,6 +914,7 @@ final class RagService implements LoggerAwareInterface
         // the cached text as a single token chunk.
         if ($before->response !== null) {
             [$cachedText, $outOfScope, $topic] = self::splitReplyTags($before->response);
+            $cachedText = $this->expandFixedReplies($site, $cachedText);
             $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
             $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
             yield RagStreamChunk::token($cachedText);
@@ -969,7 +983,7 @@ final class RagService implements LoggerAwareInterface
                         continue;
                     }
                     $headDecided = true;
-                    $delta = self::splitReplyTags($head)[0];
+                    $delta = $this->expandFixedReplies($site, self::splitReplyTags($head)[0]);
                 }
                 // The blank line the model puts after the marker would
                 // otherwise open the bubble.
@@ -983,7 +997,7 @@ final class RagService implements LoggerAwareInterface
                 yield RagStreamChunk::token($delta);
             }
             if (!$headDecided && trim(self::splitReplyTags($head)[0]) !== '') {
-                yield RagStreamChunk::token(self::splitReplyTags($head)[0]);
+                yield RagStreamChunk::token($this->expandFixedReplies($site, self::splitReplyTags($head)[0]));
             }
         } catch (LlmException $e) {
             $this->logger?->error('RAG streaming failed: {message}', [
@@ -1004,6 +1018,7 @@ final class RagService implements LoggerAwareInterface
         }
 
         [$accumulated, $outOfScope, $topic] = self::splitReplyTags($accumulated);
+        $accumulated = $this->expandFixedReplies($site, $accumulated);
         $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
@@ -1986,6 +2001,31 @@ final class RagService implements LoggerAwareInterface
         }
 
         return [trim($clean), preg_match(self::OUT_OF_SCOPE_PATTERN, $text) === 1, $topic];
+    }
+
+    /**
+     * Replaces "[reply:<key>:<lang>]" with the configured sentence
+     * (meilisearch.rag.fixedReplies, entries "<key>:<lang>:<sentence>").
+     * Unknown language: the English sentence, else the first one of the key;
+     * unknown key: the tag is dropped, never shown.
+     */
+    private function expandFixedReplies(Site $site, string $text): string
+    {
+        if (stripos($text, 'reply') === false) {
+            return $text;
+        }
+        $replies = [];
+        foreach ((array)$site->getSettings()->get('meilisearch.rag.fixedReplies', []) as $entry) {
+            $parts = array_map('trim', explode(':', (string)$entry, 3));
+            if (count($parts) === 3 && $parts[0] !== '' && $parts[2] !== '') {
+                $replies[strtolower($parts[0])][strtolower($parts[1])] = $parts[2];
+            }
+        }
+
+        return (string)preg_replace_callback(self::REPLY_PATTERN, static function (array $m) use ($replies): string {
+            $byLanguage = $replies[strtolower($m[1])] ?? [];
+            return $byLanguage[strtolower($m[2])] ?? $byLanguage['en'] ?? (reset($byLanguage) ?: '');
+        }, $text);
     }
 
     /**
