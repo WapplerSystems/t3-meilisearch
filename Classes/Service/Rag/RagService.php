@@ -6,6 +6,7 @@ namespace WapplerSystems\Meilisearch\Service\Rag;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
 use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
@@ -672,7 +673,7 @@ final class RagService implements LoggerAwareInterface
 
         $hits = $this->publishDateEnricher->enrich($site, $hits);
 
-        $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');
+        $systemPrompt = $this->siteText($site, 'meilisearch.rag.systemPrompt');
         $currentTurnMessages = $this->promptBuilder->build(
             $site,
             $event->question,
@@ -894,7 +895,7 @@ final class RagService implements LoggerAwareInterface
         // the user-visible "Sources" panel — see Rag/Ask.html.
         yield RagStreamChunk::sources($hits);
 
-        $systemPrompt = (string)$settings->get('meilisearch.rag.systemPrompt', '');
+        $systemPrompt = $this->siteText($site, 'meilisearch.rag.systemPrompt');
         $currentTurnMessages = $this->promptBuilder->build(
             $site,
             $event->question,
@@ -1909,7 +1910,7 @@ final class RagService implements LoggerAwareInterface
             [self::FACT_SHEET_ID, 'Fact sheet', 'meilisearch.rag.factSheet', 'meilisearch.rag.factSheetTriggers'],
         ];
         foreach ($entries as [$id, $title, $contentKey, $triggersKey]) {
-            $facts = trim((string)$settings->get($contentKey, ''));
+            $facts = trim($this->siteText($site, $contentKey));
             if ($facts === '' || !$this->touchesTriggers($question, $settings->get($triggersKey, []))) {
                 continue;
             }
@@ -1924,6 +1925,35 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $hits;
+    }
+
+    /**
+     * A long text setting (system prompt, fixed facts, fact sheet), either
+     * inline or as "file:<path>" relative to the site's configuration
+     * directory (config/sites/<identifier>/).
+     *
+     * TYPO3 also exports every site setting as a TypoScript constant
+     * ("key = value"), unescaped. A multi-line value turns into TypoScript
+     * lines of its own, and a line like "Unternehmen (Stand …)" opens a
+     * multi-line value that is never closed: every constant after it is
+     * lost, unrelated templates render "{$...}" literally. Texts with line
+     * breaks therefore belong in a file.
+     */
+    private function siteText(Site $site, string $key): string
+    {
+        $value = (string)$site->getSettings()->get($key, '');
+        if (!str_starts_with($value, 'file:')) {
+            return $value;
+        }
+        $relativePath = trim(substr($value, 5));
+        $siteDirectory = Environment::getConfigPath() . '/sites/' . $site->getIdentifier();
+        $file = realpath($siteDirectory . '/' . $relativePath);
+        if ($file === false || !str_starts_with($file, realpath($siteDirectory) . '/') || !is_file($file)) {
+            $this->logger?->error('RAG text setting points to a missing file', ['setting' => $key, 'file' => $relativePath, 'site' => $site->getIdentifier()]);
+            return '';
+        }
+
+        return (string)file_get_contents($file);
     }
 
     /**

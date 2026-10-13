@@ -602,7 +602,7 @@ settings:
 
   meilisearch.rag.systemPrompt:
     label: 'System prompt'
-    description: 'System message that instructs the LLM how to answer. Placeholders: {{language}} (site language label), {{today}} (current date, YYYY-MM-DD). The context reaches the model as "Knowledge base entries"; refer to them that way. Optional reply tags the prompt can ask for: [out-of-scope] in front of a reply to an off-topic question (no contact card, protocol status off_topic) and [topic:<key>] for meilisearch.rag.topics.'
+    description: 'System message that instructs the LLM how to answer. Placeholders: {{language}} (site language label), {{today}} (current date, YYYY-MM-DD). The context reaches the model as "Knowledge base entries"; refer to them that way. Optional reply tags the prompt can ask for: [out-of-scope] in front of a reply to an off-topic question (no contact card, protocol status off_topic) and [topic:<key>] for meilisearch.rag.topics. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'
     type: text
     default: "You are a helpful site assistant. Answer the user's question strictly using the knowledge base entries you are given. Do not use outside knowledge and never invent facts, names, numbers, or links. If the entries do not contain enough information to answer, say so plainly rather than guessing, and never mention entries, excerpts or context to the user. Cite each fact by appending [id] markers that match the IDs of the entries. Respond in the language of the user's question."
 
@@ -788,7 +788,7 @@ settings:
 
   meilisearch.rag.fixedFacts:
     label: 'RAG: fixed facts in every answer context'
-    description: 'Facts the assistant must know on every question, regardless of what retrieval finds — typically what the product does NOT do (e.g. no macOS version, no plugin for a platform it does not support), which no page states and which the model therefore can only answer with "I have no information". Added to the context of every answer as an invisible, citable entry, so a clear "No" is a grounded answer and does not trigger the contact card. Keep it short: it costs context tokens on every question.'
+    description: 'Facts the assistant must know on every question, regardless of what retrieval finds — typically what the product does NOT do (e.g. no macOS version, no plugin for a platform it does not support), which no page states and which the model therefore can only answer with "I have no information". Added to the context of every answer as an invisible, citable entry, so a clear "No" is a grounded answer and does not trigger the contact card. Keep it short: it costs context tokens on every question. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'
     type: text
     default: ''
 
@@ -812,7 +812,7 @@ settings:
 
   meilisearch.rag.factSheet:
     label: 'RAG: fact sheet'
-    description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions.'
+    description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'
     type: text
     default: ''
 
