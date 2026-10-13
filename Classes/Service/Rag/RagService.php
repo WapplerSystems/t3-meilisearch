@@ -102,6 +102,8 @@ final class RagService implements LoggerAwareInterface
     public const TOPIC_TAG_FORMAT = '[topic:%s]';
     /** Context id of the site's fixed facts, see withFixedFacts(). */
     public const FIXED_FACTS_ID = 'site-facts';
+    /** Context id of the site's fact sheet, see withFixedFacts(). */
+    public const FACT_SHEET_ID = 'site-fact-sheet';
     /** Tolerant form for the final text: case, spaces, `_` or a missing hyphen. */
     private const OUT_OF_SCOPE_PATTERN = '/\[\s*out[\s_-]*of[\s_-]*scope\s*\]/i';
     private const TOPIC_PATTERN = '/\[\s*topic\s*:\s*([a-z_-]+)\s*\]/i';
@@ -1876,43 +1878,66 @@ final class RagService implements LoggerAwareInterface
      * and does not trigger the contact card. Typed as a knowledge resource,
      * so it never shows up in the visible source list.
      *
+     * The fact sheet (meilisearch.rag.factSheet) works the same way for the
+     * longer, positive half — company, product lines, which module does what.
+     * It is passed in full: cut at maxContextChars like a page, its second
+     * half would silently never reach the model.
+     *
      * @param list<array<string,mixed>> $hits
      * @return list<array<string,mixed>>
      */
     private function withFixedFacts(Site $site, string $question, array $hits): array
     {
         $settings = $site->getSettings();
-        $facts = trim((string)$settings->get('meilisearch.rag.fixedFacts', ''));
-        if ($facts === '') {
-            return $hits;
-        }
-        // Only when the question touches them: offered on every question, a
-        // model starts weaving "the product runs on platforms A, B and C"
-        // into answers about unrelated settings (measured locally).
-        // Whole words, so "mac" finds "Mac?" but not "machen".
-        $triggers = $settings->get('meilisearch.rag.fixedFactsTriggers', []);
-        if (is_array($triggers) && $triggers !== []) {
-            $touched = false;
-            foreach ($triggers as $trigger) {
-                $trigger = trim((string)$trigger);
-                if ($trigger !== '' && preg_match('/(?<!\p{L})' . preg_quote($trigger, '/') . '(?!\p{L})/iu', $question) === 1) {
-                    $touched = true;
-                    break;
-                }
-            }
-            if (!$touched) {
-                return $hits;
-            }
-        }
-        $hits[] = [
-            'id' => self::FIXED_FACTS_ID,
-            'type' => 'knowledge_resource',
-            'resourceType' => 'manual',
-            'title' => 'Fixed facts',
-            'content' => $facts,
+        $entries = [
+            [self::FIXED_FACTS_ID, 'Fixed facts', 'meilisearch.rag.fixedFacts', 'meilisearch.rag.fixedFactsTriggers'],
+            [self::FACT_SHEET_ID, 'Fact sheet', 'meilisearch.rag.factSheet', 'meilisearch.rag.factSheetTriggers'],
         ];
+        foreach ($entries as [$id, $title, $contentKey, $triggersKey]) {
+            $facts = trim((string)$settings->get($contentKey, ''));
+            if ($facts === '' || !$this->touchesTriggers($question, $settings->get($triggersKey, []))) {
+                continue;
+            }
+            $hits[] = [
+                'id' => $id,
+                'type' => 'knowledge_resource',
+                'resourceType' => 'manual',
+                'title' => $title,
+                'content' => $facts,
+                PromptBuilder::FULL_TEXT => true,
+            ];
+        }
 
         return $hits;
+    }
+
+    /**
+     * Whether the question contains one of the trigger words; no triggers:
+     * always. Only when the question touches them: offered on every
+     * question, a model starts weaving "the product runs on platforms A, B
+     * and C" into answers about unrelated settings (measured locally).
+     * Whole words, so "mac" finds "Mac?" but not "machen"; a trailing "*"
+     * makes a prefix ("modul*" finds "Modul", "Module", "Modulen").
+     */
+    private function touchesTriggers(string $question, mixed $triggers): bool
+    {
+        if (!is_array($triggers) || $triggers === []) {
+            return true;
+        }
+        foreach ($triggers as $trigger) {
+            $trigger = trim((string)$trigger);
+            $prefix = str_ends_with($trigger, '*');
+            $trigger = rtrim($trigger, '*');
+            if ($trigger === '') {
+                continue;
+            }
+            $pattern = '/(?<!\p{L})' . preg_quote($trigger, '/') . ($prefix ? '' : '(?!\p{L})') . '/iu';
+            if (preg_match($pattern, $question) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

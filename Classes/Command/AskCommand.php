@@ -43,6 +43,13 @@ final class AskCommand extends Command
                 . 'languages then crowd the top-K context with N copies of the same record. '
                 . 'Default: 0 (the site default language).',
                 '0',
+            )
+            ->addOption(
+                'json',
+                null,
+                InputOption::VALUE_NONE,
+                'Print the result as one JSON object (status, answer, cited ids, topic, '
+                . 'out-of-scope flag, notes, suggestions) — for scripted test runs over a question catalogue.',
             );
     }
 
@@ -74,6 +81,25 @@ final class AskCommand extends Command
         }
 
         $answer = $this->ragService->ask($site, $question, ['internal' => true] + $options);
+        if ($input->getOption('json')) {
+            $output->writeln(json_encode([
+                'question' => $question,
+                'status' => $answer->status,
+                'error' => $answer->error,
+                'answer' => $answer->answer,
+                'citedIds' => $answer->citedIds,
+                'sources' => array_map(static fn (array $hit): array => [
+                    'id' => (string)($hit['id'] ?? ''),
+                    'type' => (string)($hit['type'] ?? ''),
+                    'title' => (string)($hit['title'] ?? ''),
+                ], $answer->sources),
+                'topic' => $answer->topic,
+                'outOfScope' => $answer->outOfScope,
+                'notes' => $answer->notes,
+                'suggestions' => $answer->suggestions,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+            return $answer->status === 'failed' ? Command::FAILURE : Command::SUCCESS;
+        }
         if ($answer->status === 'clarify') {
             // Triage asked a clarifying question back instead of answering;
             // the question is carried in ->answer. Show it so the test

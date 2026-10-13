@@ -800,7 +800,19 @@ settings:
 
   meilisearch.rag.fixedFactsTriggers:
     label: 'RAG: words that bring the fixed facts into the context'
-    description: 'Whole words, case-insensitive (e.g. "mac", "macos", "linux", "browser"; plural forms need their own entry). When set, meilisearch.rag.fixedFacts is added only to questions containing one of them; empty: to every question.'
+    description: 'Whole words, case-insensitive (e.g. "mac", "macos", "linux", "browser"); a trailing "*" matches a prefix ("plugin*" also finds "Plugins"). When set, meilisearch.rag.fixedFacts is added only to questions containing one of them; empty: to every question.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.factSheet:
+    label: 'RAG: fact sheet'
+    description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions.'
+    type: text
+    default: ''
+
+  meilisearch.rag.factSheetTriggers:
+    label: 'RAG: words that bring the fact sheet into the context'
+    description: 'Same syntax as meilisearch.rag.fixedFactsTriggers: whole words, case-insensitive, trailing "*" for a prefix ("modul*", "licen*"). Empty: the fact sheet goes into every question.'
     type: stringlist
     default: []
 

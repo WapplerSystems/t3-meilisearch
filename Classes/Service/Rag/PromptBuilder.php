@@ -33,6 +33,13 @@ final class PromptBuilder
     private const FIELDS_PREFERRED = ['bodytext', 'content', 'description', 'abstract', 'teaser'];
 
     /**
+     * Hit flag: pass the body uncut, ignoring maxContextChars. For entries the
+     * site maintains as a whole (e.g. the fact sheet), where a cut would drop
+     * whatever stands below the limit without anyone noticing.
+     */
+    public const FULL_TEXT = '_fullText';
+
+    /**
      * Map of ISO-639-1 language codes to English language names. Used to
      * substitute `{{language}}` in the system prompt with a label every
      * LLM reliably recognises ("German", not "de_DE.utf8" or "Deutsch")
@@ -171,7 +178,12 @@ final class PromptBuilder
         $type = (string)($hit['type'] ?? '');
 
         $body = self::contextBody($hit);
-        if ($maxContextChars > 0 && mb_strlen($body) > $maxContextChars) {
+        if (!empty($hit[self::FULL_TEXT])) {
+            // Keep the line structure: headings and list items are what
+            // separates "Revit only" from the item next to it.
+            $body = trim(preg_replace(['/[^\S\n]+/u', '/\n\s*\n+/u'], [' ', "\n"], (string)($hit['content'] ?? '')) ?? $body);
+        }
+        if ($maxContextChars > 0 && empty($hit[self::FULL_TEXT]) && mb_strlen($body) > $maxContextChars) {
             $body = mb_substr($body, 0, $maxContextChars) . '…';
         }
 

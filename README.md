@@ -571,6 +571,21 @@ mentioning it everywhere. It is also added when retrieval finds nothing.
     fixedFactsTriggers: ['mac', 'macos', 'linux', 'browser']
 ```
 
+A trailing `*` makes a trigger a prefix (`plugin*` also finds "Plugins").
+
+**Fact sheet.** The longer, positive counterpart — company data, product
+lines, which module does what — goes into `factSheet`. It is added the same
+way (invisible, citable, id `site-fact-sheet`), but in full and with its line
+breaks, whatever `maxContextChars` says. Give it triggers, or it is in every
+question:
+
+```yaml
+    factSheet: |
+      Acme Ltd., founded 1993.
+      Acme Pro: heating and cooling. Acme Lite: heating only.
+    factSheetTriggers: ['modul*', 'licen*', 'founded', 'company']
+```
+
 **Topics and contact routing.** `[topic:<key>]` in front of a reply — or a
 word from `topicTerms` in the question — sets the turn's topic. A topic
 question skips the clarifying question, and `RagEscalationEvent::$topic`
