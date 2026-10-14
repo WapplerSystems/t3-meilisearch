@@ -86,6 +86,7 @@ final class RagController extends ActionController
             'escalation' => $escalation?->toArray(),
             'pageType' => $this->currentPageType(),
             'streamEndpoint' => $this->streamEndpoint(),
+            'feedback' => $this->feedbackConfig($site),
         ]);
         return $this->htmlResponse();
     }
@@ -236,6 +237,27 @@ final class RagController extends ActionController
         $prefix = $language instanceof SiteLanguage ? rtrim($language->getBase()->getPath(), '/') : '';
 
         return $prefix . '/_ws_meilisearch/rag/stream';
+    }
+
+    /**
+     * Thumbs under each streamed answer (meilisearch.rag.feedback.*): the
+     * endpoint shares the stream's language prefix.
+     *
+     * @return array{enabled: bool, endpoint: string, supportLink: string, conversationParameter: string}
+     */
+    private function feedbackConfig(?Site $site): array
+    {
+        $settings = $site?->getSettings();
+        $enabled = $site instanceof Site
+            && (bool)$settings->get('meilisearch.rag.protocol.enabled', false)
+            && (bool)$settings->get('meilisearch.rag.feedback.enabled', false);
+
+        return [
+            'enabled' => $enabled,
+            'endpoint' => substr($this->streamEndpoint(), 0, -strlen('/stream')) . '/feedback',
+            'supportLink' => $enabled ? trim((string)$settings->get('meilisearch.rag.feedback.supportLink', '')) : '',
+            'conversationParameter' => $enabled ? trim((string)$settings->get('meilisearch.rag.feedback.supportConversationParameter', '')) : '',
+        ];
     }
 
     private function currentPageType(): int

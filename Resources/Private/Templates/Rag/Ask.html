@@ -30,7 +30,7 @@
                                     <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.heading"/>
                                 </div>
                                 <div class="card-body">
-                                    <p class="card-text" style="white-space: pre-wrap;"><f:format.raw>{answer.answerHtml}</f:format.raw></p>
+                                    <div class="card-text ws-meilisearch-rag-answer"><f:format.raw>{answer.answerHtml}</f:format.raw></div>
                                 </div>
                             </div>
 
@@ -83,7 +83,7 @@
                                 <p class="fw-semibold mb-1">
                                     <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.clarify.heading"/>
                                 </p>
-                                <p class="mb-0" style="white-space: pre-wrap;"><f:format.raw>{answer.answerHtml}</f:format.raw></p>
+                                <div class="mb-0 ws-meilisearch-rag-answer"><f:format.raw>{answer.answerHtml}</f:format.raw></div>
                             </div>
                         </f:case>
                         <f:case value="failed">

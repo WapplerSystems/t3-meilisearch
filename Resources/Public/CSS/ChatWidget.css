@@ -1,155 +1,751 @@
 /*
- * RAG floating chat widget.
+ * RAG floating chat widget: launcher, teaser bubble, panel, greeting.
  *
- * Brand-neutral defaults — picks up the host page's --bs-primary
- * when available (Bootstrap 5 sites) but works on any CSS context.
- * Overrideable via CSS custom properties scoped to .ws-meilisearch-chat-bubble
- * or .ws-meilisearch-chat-panel without touching the markup.
+ * Brand-neutral. Every colour, the font, the corner radius and the sizes are
+ * custom properties on .ws-meilisearch-chat, the element ChatWidget.js wraps
+ * launcher, teaser and panel in. A site brands the widget by overriding them
+ * in its own stylesheet, e.g.
  *
- * Mobile (< 480px wide) → panel becomes full-screen sheet.
- * Desktop → 380×580 corner panel anchored above the bubble.
+ *   .ws-meilisearch-chat {
+ *       --wsms-chat-primary: #183d46;
+ *       --wsms-chat-accent: #2f6f70;
+ *       --wsms-chat-radius: 0;
+ *       --wsms-chat-width: 520px;
+ *   }
+ *
+ * Name, icon and texts come from the chatWidget.* site settings.
+ * Defaults pick up the host page's --bs-primary on Bootstrap 5 sites.
+ *
+ * Below 768px the panel is full screen, without expand button and teaser.
  */
 
-.ws-meilisearch-chat-bubble {
-    --bubble-bg: var(--bs-primary, #0d6efd);
-    --bubble-fg: #fff;
-    --bubble-bg-hover: var(--bs-primary-bg-subtle, #084298);
+.ws-meilisearch-chat {
+    --wsms-chat-primary: var(--bs-primary, #0d6efd);       /* launcher, panel head */
+    --wsms-chat-on-primary: #fff;                           /* text and icons on it */
+    --wsms-chat-on-primary-muted: rgba(255, 255, 255, .8); /* subtitle on it */
+    --wsms-chat-accent: var(--bs-primary, #0d6efd);        /* links, send button, labels */
+    --wsms-chat-on-accent: #fff;
+    --wsms-chat-text: #1d2228;
+    --wsms-chat-muted: #5b6570;                             /* hints, notes */
+    --wsms-chat-border: #d7dbe0;
+    --wsms-chat-soft: #f2f4f7;                              /* visitor question, examples */
+    --wsms-chat-bg: #fff;
+    --wsms-chat-focus: var(--wsms-chat-accent);
+    --wsms-chat-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --wsms-chat-font-size: 15px;
+    --wsms-chat-radius: 8px;
+    --wsms-chat-launcher-radius: 28px;                      /* pill / circle */
+    --wsms-chat-width: 420px;
+    --wsms-chat-width-expanded: 800px;
+    --wsms-chat-height: 680px;
+    --wsms-chat-content-max: 680px;                         /* line length when expanded */
+    --wsms-chat-offset: 24px;                               /* distance from the viewport corner */
+    --wsms-chat-shadow: 0 12px 32px rgba(0, 0, 0, .22);
+    --wsms-chat-z: 1050;
+    font-family: var(--wsms-chat-font);
+}
+
+.ws-meilisearch-chat [hidden] {
+    display: none !important;
+}
+
+.ws-meilisearch-chat :focus-visible {
+    outline: 2px solid var(--wsms-chat-focus);
+    outline-offset: 2px;
+}
+
+/* --- Launcher -------------------------------------------------------- */
+
+.ws-meilisearch-chat-launcher {
     position: fixed;
-    right: 1.25rem;
-    bottom: 1.25rem;
-    z-index: 1050;
-    width: 56px;
-    height: 56px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: var(--bubble-bg);
-    color: var(--bubble-fg);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
+    right: var(--wsms-chat-offset);
+    bottom: var(--wsms-chat-offset);
+    z-index: var(--wsms-chat-z);
     display: inline-flex;
     align-items: center;
+    gap: 12px;
+    height: 56px;
+    padding: 0 24px 0 18px;
+    border: 0;
+    border-radius: var(--wsms-chat-launcher-radius);
+    background: var(--wsms-chat-primary);
+    color: var(--wsms-chat-on-primary);
+    font: 600 15px/1 var(--wsms-chat-font);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.ws-meilisearch-chat-launcher--icon-only {
+    width: 56px;
+    padding: 0;
     justify-content: center;
-    transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
-.ws-meilisearch-chat-bubble:hover,
-.ws-meilisearch-chat-bubble:focus-visible {
-    background: var(--bubble-bg-hover);
+.ws-meilisearch-chat-launcher:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
-    outline: none;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .3);
 }
-.ws-meilisearch-chat-bubble:focus-visible {
-    outline: 3px solid rgba(13, 110, 253, 0.4);
-    outline-offset: 3px;
+.ws-meilisearch-chat-launcher__icon {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
 }
-.ws-meilisearch-chat-bubble.is-active {
-    transform: rotate(8deg);
+.ws-meilisearch-chat-launcher--icon-only .ws-meilisearch-chat-launcher__icon {
+    width: 28px;
+    height: 28px;
 }
+/* The open panel covers the corner; the launcher steps aside. */
+.ws-meilisearch-chat-launcher.is-active {
+    visibility: hidden;
+}
+
+/* --- Teaser bubble --------------------------------------------------- */
+
+.ws-meilisearch-chat-teaser {
+    position: fixed;
+    right: var(--wsms-chat-offset);
+    bottom: calc(var(--wsms-chat-offset) + 72px);
+    z-index: var(--wsms-chat-z);
+    width: 280px;
+    background: var(--wsms-chat-bg);
+    color: var(--wsms-chat-text);
+    border: 1px solid var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+}
+.ws-meilisearch-chat-teaser__open {
+    display: block;
+    width: 100%;
+    padding: 16px 40px 16px 16px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: 14px/1.5 var(--wsms-chat-font);
+    text-align: left;
+    cursor: pointer;
+}
+.ws-meilisearch-chat-teaser__title {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.ws-meilisearch-chat-teaser__close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--wsms-chat-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.ws-meilisearch-chat-teaser__close svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* --- Panel ----------------------------------------------------------- */
 
 .ws-meilisearch-chat-panel {
     position: fixed;
-    right: 1.25rem;
-    bottom: 5.5rem; /* clear of the bubble + small gap */
-    z-index: 1049;
-    width: 380px;
-    height: 580px;
-    max-height: calc(100vh - 7rem);
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    right: var(--wsms-chat-offset);
+    bottom: var(--wsms-chat-offset);
+    z-index: calc(var(--wsms-chat-z) + 1);
+    width: var(--wsms-chat-width);
+    max-width: calc(100vw - 2 * var(--wsms-chat-offset));
+    height: min(var(--wsms-chat-height), calc(100vh - 2 * var(--wsms-chat-offset)));
+    background: var(--wsms-chat-bg);
+    color: var(--wsms-chat-text);
+    border-radius: var(--wsms-chat-radius);
+    box-shadow: var(--wsms-chat-shadow);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    font-size: var(--wsms-chat-font-size);
+    line-height: 1.55;
     /* Off-state: invisible + nudged down so the open transition has
        travel to animate. */
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(8px) scale(.98);
     transform-origin: bottom right;
     pointer-events: none;
     transition: opacity 160ms ease, transform 160ms ease;
 }
 .ws-meilisearch-chat-panel.is-open {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
     pointer-events: auto;
+}
+/* Expanded: a full-height side panel on the right. */
+.ws-meilisearch-chat-panel.is-expanded {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--wsms-chat-width-expanded);
+    max-width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, .18);
 }
 
 .ws-meilisearch-chat-panel__header {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: var(--bs-primary, #0d6efd);
-    color: #fff;
+    gap: 12px;
+    padding: 14px 12px 14px 20px;
+    background: var(--wsms-chat-primary);
+    color: var(--wsms-chat-on-primary);
+}
+.ws-meilisearch-chat-panel__icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+}
+.ws-meilisearch-chat-panel__titles {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
 }
 .ws-meilisearch-chat-panel__heading {
+    font-size: 18px;
     font-weight: 600;
-    font-size: 0.95rem;
 }
-.ws-meilisearch-chat-panel__close {
+.ws-meilisearch-chat-panel__subtitle {
+    font-size: 13px;
+    color: var(--wsms-chat-on-primary-muted);
+}
+.ws-meilisearch-chat-panel__btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--wsms-chat-radius);
     background: transparent;
-    border: none;
     color: inherit;
-    padding: 0.25rem;
-    margin-right: -0.25rem;
-    cursor: pointer;
-    border-radius: 4px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 120ms ease;
+    cursor: pointer;
 }
-.ws-meilisearch-chat-panel__close:hover,
-.ws-meilisearch-chat-panel__close:focus-visible {
-    background: rgba(255, 255, 255, 0.18);
-    outline: none;
+.ws-meilisearch-chat-panel__btn:hover {
+    background: rgba(255, 255, 255, .12);
+}
+.ws-meilisearch-chat-panel__btn svg {
+    width: 20px;
+    height: 20px;
+}
+.ws-meilisearch-chat-panel__header :focus-visible {
+    outline-color: var(--wsms-chat-on-primary);
 }
 
 /* Inline chat body (replaces the former iframe): scrolls the transcript. */
 .ws-meilisearch-chat-panel__body {
+    box-sizing: border-box;
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
     overflow-y: auto;
-    background: #fff;
+    background: var(--wsms-chat-bg);
 }
 .ws-meilisearch-chat-panel__status {
     padding: 1rem;
-    color: #5b6570;
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--wsms-chat-muted);
 }
 .ws-meilisearch-chat-panel__status--error { color: #b3261e; }
 
-/* Mobile sheet: cover the whole viewport instead of a postage-stamp
-   panel — typing on a phone in a 380px box is unusable. */
-@media (max-width: 480px) {
-    .ws-meilisearch-chat-bubble {
-        right: 1rem;
-        bottom: 1rem;
+/* The embedded shell takes its colours from the widget. RagEmbed.css sets
+ * its own defaults on .ws-meilisearch-rag-embed; this selector is the more
+ * specific one. */
+.ws-meilisearch-chat .ws-meilisearch-rag-embed {
+    --wsm-accent: var(--wsms-chat-accent);
+    --wsm-border: var(--wsms-chat-border);
+    --wsm-muted: var(--wsms-chat-muted);
+    --wsm-bg-soft: var(--wsms-chat-soft);
+    padding: 24px 24px 0;
+    font-family: var(--wsms-chat-font);
+    font-size: var(--wsms-chat-font-size);
+    color: var(--wsms-chat-text);
+    background: var(--wsms-chat-bg);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed a {
+    color: var(--wsms-chat-accent);
+}
+/* The shell fills the panel, so the input sits at the bottom edge even while
+ * the conversation is still short. */
+.ws-meilisearch-chat [data-ws-meilisearch-rag-stream] {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+.ws-meilisearch-chat [data-ws-meilisearch-rag-stream] > .ws-meilisearch-rag-ask {
+    margin-top: auto;
+}
+.ws-meilisearch-chat-panel.is-expanded [data-ws-meilisearch-rag-stream] {
+    max-width: var(--wsms-chat-content-max);
+    margin: 0 auto;
+}
+
+/* --- Greeting -------------------------------------------------------- */
+
+.ws-meilisearch-chat-greeting {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.ws-meilisearch-chat-greeting p {
+    margin: 0;
+}
+.ws-meilisearch-chat .ws-meilisearch-chat-greeting__title {
+    margin: 8px 0 0;
+    font-size: 26px;
+    font-weight: 300;
+    line-height: 1.25;
+}
+.ws-meilisearch-chat-greeting__hint {
+    font-size: 14px;
+    color: var(--wsms-chat-muted);
+}
+.ws-meilisearch-chat-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ws-meilisearch-chat .ws-meilisearch-chat-examples__label {
+    margin: 4px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--wsms-chat-accent);
+}
+.ws-meilisearch-chat-example {
+    min-height: 48px;
+    padding: 12px 16px;
+    border: 1px solid var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-soft);
+    color: var(--wsms-chat-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.ws-meilisearch-chat-example:hover {
+    border-color: var(--wsms-chat-accent);
+}
+
+/* --- Conversation ----------------------------------------------------- */
+/* Chat layout inside the panel only — the plugin page keeps its cards. The
+ * visitor's question is a bubble on the right, the answer runs without frame
+ * over the full width, the "You" / "Assistant" captions go. */
+
+.ws-meilisearch-chat .ws-meilisearch-rag-thread {
+    margin-bottom: 20px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-turn__role {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-turn__question {
+    align-self: flex-end;
+    max-width: 80%;
+    margin: 0;
+    border: 0;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-soft);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-turn__question .card-body {
+    padding: 10px 16px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-turn__answer {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-turn__answer > .card-body {
+    padding: 0;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-answer strong {
+    font-weight: 600;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-callout {
+    padding: 12px 16px;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-soft);
+    font-size: 14px;
+}
+
+/* Section captions: "Source", "Related", "Ask further" … */
+.ws-meilisearch-chat .ws-meilisearch-rag-media__heading,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__more,
+.ws-meilisearch-chat .ws-meilisearch-rag-suggestions small {
+    margin: 4px 0 0 !important;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--wsms-chat-accent);
+    opacity: 1;
+}
+
+/* Inline references: a small box with the number, no brackets. */
+.ws-meilisearch-chat .ws-meilisearch-rag-citation__bracket {
+    display: none;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-citation,
+.ws-meilisearch-chat .ws-meilisearch-rag-citation--media {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 20px;
+    margin-left: 2px;
+    padding: 0 6px;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-soft);
+    color: var(--wsms-chat-accent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+    text-decoration: none;
+    vertical-align: 1px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-callout .ws-meilisearch-rag-citation {
+    background: var(--wsms-chat-bg);
+}
+
+/* Media: the cited video as a large card, more videos in a grid. */
+.ws-meilisearch-chat .ws-meilisearch-rag-media {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: 0;
+    gap: 12px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card {
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    border: 1px solid var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-bg);
+    color: var(--wsms-chat-text);
+    overflow: hidden;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card--primary {
+    background: var(--wsms-chat-bg);
+    border-color: var(--wsms-chat-border);
+}
+/* The card is a link; its text keeps the text colour, only the call to
+ * action carries the accent. */
+.ws-meilisearch-chat .ws-meilisearch-rag-embed a.ws-meilisearch-rag-media__card {
+    color: var(--wsms-chat-text);
+    text-decoration: none;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:hover,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:focus-visible {
+    border-color: var(--wsms-chat-accent);
+    color: var(--wsms-chat-text);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__thumb,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__thumb {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: var(--wsms-chat-border);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__play,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__thumb:has(.ws-meilisearch-rag-media__image) .ws-meilisearch-rag-media__play {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-primary);
+    box-shadow: none;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:not(.ws-meilisearch-rag-media__card--primary) .ws-meilisearch-rag-media__play {
+    width: 28px;
+    height: 28px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__play::after {
+    border-color: transparent transparent transparent var(--wsms-chat-on-primary);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__start {
+    right: 6px;
+    bottom: 6px;
+    padding: 1px 6px;
+    background: var(--wsms-chat-primary);
+    color: var(--wsms-chat-on-primary);
+    font-size: 12px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__body {
+    gap: 4px;
+    padding: 12px 16px;
+    font-size: 14px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:not(.ws-meilisearch-rag-media__card--primary) .ws-meilisearch-rag-media__body {
+    padding: 8px 12px 10px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__title,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__title {
+    font-size: 16px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__number {
+    margin-right: 8px;
+    padding: 0 6px;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-accent);
+    color: var(--wsms-chat-on-accent);
+    font-size: 12px;
+    vertical-align: 2px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:not(.ws-meilisearch-rag-media__card--primary) .ws-meilisearch-rag-media__number {
+    display: none;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__context,
+.ws-meilisearch-chat .ws-meilisearch-rag-media__meta {
+    font-size: 13px;
+    color: var(--wsms-chat-muted);
+    opacity: 1;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__card:not(.ws-meilisearch-rag-media__card--primary) .ws-meilisearch-rag-media__context {
+    font-size: 12px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__foot {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--wsms-chat-soft);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__cta {
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+    color: var(--wsms-chat-accent);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__access {
+    font-size: 12px;
+    color: var(--wsms-chat-muted);
+    opacity: 1;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-media__note,
+.ws-meilisearch-chat .ws-meilisearch-rag-citation-note,
+.ws-meilisearch-chat .ws-meilisearch-rag-answer-note {
+    font-size: 12px;
+    color: var(--wsms-chat-muted);
+    opacity: 1;
+}
+/* Wider panel: the large card puts its still next to the text. */
+.ws-meilisearch-chat-panel.is-expanded .ws-meilisearch-rag-media__card--primary {
+    flex-direction: row;
+}
+.ws-meilisearch-chat-panel.is-expanded .ws-meilisearch-rag-media__card--primary .ws-meilisearch-rag-media__thumb {
+    flex: 0 0 288px;
+    width: 288px;
+    height: 162px;
+}
+
+/* Documents the answer cited: one line each with the number box. */
+.ws-meilisearch-chat .ws-meilisearch-rag-citations {
+    counter-reset: wsms-ref;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    opacity: 1;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-citations li {
+    counter-increment: wsms-ref;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-citations li::before {
+    content: counter(wsms-ref);
+    flex-shrink: 0;
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-soft);
+    color: var(--wsms-chat-accent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
+}
+
+/* "Ask further": square-ish buttons, a click asks at once. */
+.ws-meilisearch-chat .ws-meilisearch-rag-suggestions {
+    margin-top: 16px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestion {
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-bg);
+    color: var(--wsms-chat-text);
+    font-size: 14px;
+    font-weight: 400;
+    text-align: left;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-suggestion:hover {
+    border-color: var(--wsms-chat-accent);
+    background: var(--wsms-chat-bg);
+    color: var(--wsms-chat-text);
+    filter: none;
+}
+
+/* Contact card and feedback row. */
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-fallback {
+    border-radius: var(--wsms-chat-radius);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-feedback {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top-color: var(--wsms-chat-soft);
+    font-size: 14px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-feedback__btn {
+    border-color: var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    color: var(--wsms-chat-accent);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-feedback__btn[aria-pressed="true"] {
+    background: var(--wsms-chat-accent);
+    border-color: var(--wsms-chat-accent);
+    color: var(--wsms-chat-on-accent);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-feedback__support {
+    color: var(--wsms-chat-accent);
+}
+
+/* --- Input ----------------------------------------------------------- */
+
+.ws-meilisearch-chat .ws-meilisearch-rag-ask {
+    margin: 0 -24px;
+    padding: 16px 24px 12px;
+    border-top: 1px solid var(--wsms-chat-soft);
+    background: var(--wsms-chat-bg);
+    box-shadow: none;
+}
+.ws-meilisearch-chat-panel.is-expanded .ws-meilisearch-rag-ask {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .input-group {
+    gap: 8px;
+    align-items: center;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .input-group .form-control {
+    height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--wsms-chat-border);
+    border-radius: var(--wsms-chat-radius);
+    font-size: 15px;
+    color: var(--wsms-chat-text);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .form-control:focus {
+    outline: 2px solid var(--wsms-chat-focus);
+    outline-offset: -1px;
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-chat-send {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--wsms-chat-radius);
+    background: var(--wsms-chat-accent);
+    color: var(--wsms-chat-on-accent);
+}
+.ws-meilisearch-chat-send svg {
+    width: 20px;
+    height: 20px;
+}
+.ws-meilisearch-chat-send[disabled] {
+    opacity: .6;
+    cursor: progress;
+}
+/* The panel head carries "new conversation"; the plugin's own link would be
+ * a second way to the same thing. */
+.ws-meilisearch-chat .ws-meilisearch-rag-reset {
+    display: none;
+}
+.ws-meilisearch-chat-disclaimer {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--wsms-chat-muted);
+}
+
+/* --- Small screens: full screen -------------------------------------- */
+
+@media (max-width: 767px) {
+    .ws-meilisearch-chat-launcher {
+        right: 16px;
+        bottom: 16px;
     }
-    .ws-meilisearch-chat-panel {
-        right: 0;
-        bottom: 0;
-        left: 0;
-        top: 0;
-        width: 100vw;
-        height: 100vh;
-        max-height: 100vh;
+    .ws-meilisearch-chat-panel,
+    .ws-meilisearch-chat-panel.is-expanded {
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        height: 100dvh;
         border-radius: 0;
+    }
+    .ws-meilisearch-chat-panel__btn--expand,
+    .ws-meilisearch-chat-teaser {
+        display: none !important;
+    }
+    /* 16px keeps iOS from zooming into the field. */
+    .ws-meilisearch-chat .ws-meilisearch-rag-embed .input-group .form-control {
+        font-size: 16px;
+    }
+    .ws-meilisearch-chat .ws-meilisearch-rag-embed {
+        padding: 16px 16px 0;
+    }
+    .ws-meilisearch-chat .ws-meilisearch-rag-ask {
+        margin: 0 -16px;
+        padding: 12px 16px 10px;
     }
 }
 
 /* Respect prefers-reduced-motion — no zoom/translate transitions. */
 @media (prefers-reduced-motion: reduce) {
-    .ws-meilisearch-chat-bubble,
+    .ws-meilisearch-chat-launcher,
     .ws-meilisearch-chat-panel {
         transition: none;
     }
-    .ws-meilisearch-chat-bubble.is-active {
-        transform: none;
-    }
+    .ws-meilisearch-chat-launcher:hover,
     .ws-meilisearch-chat-panel {
         transform: none;
     }

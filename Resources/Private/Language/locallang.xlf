@@ -192,6 +192,45 @@
                 <trans-unit id="search.recovery.chip.relaxed" resname="search.recovery.chip.relaxed">
                     <source>Search without every word</source>
                 </trans-unit>
+            <trans-unit id="chat.widget.newChat">
+                <source>New conversation</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.expand">
+                <source>Expand</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.shrink">
+                <source>Shrink</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.close">
+                <source>Close chat</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.closeTeaser">
+                <source>Close notice</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.loading">
+                <source>Loading …</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.error">
+                <source>The chat could not be loaded.</source>
+            </trans-unit>
+            <trans-unit id="chat.widget.send">
+                <source>Send question</source>
+            </trans-unit>
+            <trans-unit id="rag.feedback.question">
+                <source>Was this helpful?</source>
+            </trans-unit>
+            <trans-unit id="rag.feedback.up">
+                <source>Yes, helpful</source>
+            </trans-unit>
+            <trans-unit id="rag.feedback.down">
+                <source>No, not helpful</source>
+            </trans-unit>
+            <trans-unit id="rag.feedback.thanks">
+                <source>Thank you for your feedback.</source>
+            </trans-unit>
+            <trans-unit id="rag.feedback.support">
+                <source>Contact support</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

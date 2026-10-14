@@ -104,6 +104,8 @@ final class RagCitationLabelsEvent
      *              preview stays a coloured area with the play mark
      *   url        the link of the card
      *   cta        the link text ("Watch from 1:07")
+     *   access     who may open it, shown with a lock ("Customer login"),
+     *              optional — for content behind a login
      *   intro      a sentence above the card when it is the first one shown
      *   heading    the heading of the block
      *   more       the line above the further cards
@@ -119,7 +121,7 @@ final class RagCitationLabelsEvent
             return;
         }
         $clean = [];
-        foreach (['title', 'context', 'meta', 'start', 'image', 'url', 'cta', 'intro', 'heading', 'more'] as $key) {
+        foreach (['title', 'context', 'meta', 'start', 'image', 'url', 'cta', 'access', 'intro', 'heading', 'more'] as $key) {
             $value = trim((string)($media[$key] ?? ''));
             if ($value !== '') {
                 $clean[$key] = $value;

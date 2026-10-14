@@ -166,6 +166,15 @@ final class RagStreamMiddleware implements MiddlewareInterface
         header('X-Accel-Buffering: no');
         // Tell the browser an explicit retry interval if the connection drops.
         echo "retry: 5000\n\n";
+        // Visitor feedback: the key the thumbs under this answer rate it with,
+        // handed out before the answer because the protocol row only comes
+        // into being once the stream has ended. The conversation id rides
+        // along so a "contact support" link can carry it.
+        $turnKey = '';
+        if ($this->protocolRecorder->isFeedbackEnabled($site)) {
+            $turnKey = ChatProtocolRecorder::newTurnKey();
+            $this->emitFrame(RagStreamChunk::turn($turnKey, $conversation->id));
+        }
         flush();
 
         $finalChunk = null;
@@ -213,7 +222,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
             }
         }
 
-        $this->recordProtocol($site, $languageId, $conversation->id, $question, $terminalChunk, $streamedText, $sources, $escalated);
+        $this->recordProtocol($site, $languageId, $conversation->id, $question, $terminalChunk, $streamedText, $sources, $escalated, $turnKey);
 
         // Persist the conversation turn if we produced an answer or asked a
         // clarifying question. We can't piggy-back this on the controller (the
@@ -280,6 +289,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
         string $streamedText,
         array $sources,
         bool $escalated,
+        string $turnKey = '',
     ): void {
         [$status, $answer, $citedIds] = match ($terminalChunk?->type) {
             RagStreamChunk::TYPE_DONE => [
@@ -293,7 +303,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
             RagStreamChunk::TYPE_DISABLED => ['disabled', '', []],
             default => [ChatProtocolRecorder::STATUS_ABORTED, trim($streamedText), []],
         };
-        $this->protocolRecorder->record($site, $languageId, $conversationId, $question, $answer, $status, $citedIds, $sources, $escalated);
+        $this->protocolRecorder->record($site, $languageId, $conversationId, $question, $answer, $status, $citedIds, $sources, $escalated, turnKey: $turnKey);
     }
 
     private function emitFrame(RagStreamChunk $chunk): void

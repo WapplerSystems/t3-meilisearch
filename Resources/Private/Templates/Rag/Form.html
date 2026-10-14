@@ -19,6 +19,7 @@
         --></f:comment>
         <div data-ws-meilisearch-rag-stream
              data-endpoint="{streamEndpoint}"
+             data-reset-url="{f:uri.action(action: 'reset', pageType: pageType)}"
              data-label-you="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you')}"
              data-label-assistant="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant')}"
              data-label-suggestions="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.suggestions.heading')}"
@@ -26,7 +27,15 @@
              data-label-status-disabled="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.disabled')}"
              data-label-status-failed="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.status.failed')}"
              data-label-loading="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.loading')}"
-             data-label-interrupted="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.interrupted')}">
+             data-label-interrupted="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.answer.interrupted')}"
+             data-feedback-endpoint="{f:if(condition: feedback.enabled, then: feedback.endpoint)}"
+             data-feedback-support-url="{f:uri.typolink(parameter: feedback.supportLink)}"
+             data-feedback-conversation-parameter="{feedback.conversationParameter}"
+             data-label-feedback-question="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.feedback.question')}"
+             data-label-feedback-up="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.feedback.up')}"
+             data-label-feedback-down="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.feedback.down')}"
+             data-label-feedback-thanks="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.feedback.thanks')}"
+             data-label-feedback-support="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.feedback.support')}">
             <f:comment>
                 Transcript first, input below it: the answer grows downwards
                 and the reader follows it, so the field they type the next

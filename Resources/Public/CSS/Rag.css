@@ -386,3 +386,105 @@
      * would win over stretching. */
     height: auto;
 }
+
+/* "Was this helpful?" under a finished answer (meilisearch.rag.feedback). */
+.ws-meilisearch-rag-feedback {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: .75rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--wsm-bg-soft, #f2f4f7);
+    font-size: .93em;
+}
+.ws-meilisearch-rag-feedback__btn {
+    width: 44px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--wsm-border, #d7dbe0);
+    border-radius: .375rem;
+    background: #fff;
+    color: var(--wsm-accent, #1a5fb4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.ws-meilisearch-rag-feedback__btn svg {
+    width: 18px;
+    height: 18px;
+}
+.ws-meilisearch-rag-feedback__btn:hover {
+    border-color: var(--wsm-accent, #1a5fb4);
+}
+.ws-meilisearch-rag-feedback__btn[aria-pressed="true"] {
+    background: var(--wsm-accent, #1a5fb4);
+    border-color: var(--wsm-accent, #1a5fb4);
+    color: #fff;
+}
+.ws-meilisearch-rag-feedback__thanks {
+    color: var(--wsm-muted, #5b6570);
+    font-size: .9em;
+}
+.ws-meilisearch-rag-feedback__thanks:empty {
+    display: none;
+}
+.ws-meilisearch-rag-feedback__support {
+    margin-left: auto;
+    font-weight: 600;
+}
+
+/* The finished answer is block HTML (CitationRenderer::blocks()): paragraphs,
+ * lists, callouts. While tokens arrive it is raw text, whose line breaks only
+ * show with pre-wrap. */
+.ws-meilisearch-rag-answer[data-streaming="true"] {
+    white-space: pre-wrap;
+}
+.ws-meilisearch-rag-answer > p,
+.ws-meilisearch-rag-answer > ol,
+.ws-meilisearch-rag-answer > ul,
+.ws-meilisearch-rag-callout {
+    margin: 0 0 .75em;
+}
+.ws-meilisearch-rag-answer ol,
+.ws-meilisearch-rag-answer ul {
+    padding-left: 1.4em;
+}
+.ws-meilisearch-rag-answer li + li {
+    margin-top: .35em;
+}
+.ws-meilisearch-rag-answer li > ul {
+    margin: .35em 0 0;
+}
+.ws-meilisearch-rag-callout {
+    padding: .75em 1em;
+    background: var(--wsm-bg-soft, #f2f4f7);
+    font-size: .94em;
+}
+.ws-meilisearch-rag-callout > p {
+    margin: 0 0 .35em;
+}
+.ws-meilisearch-rag-callout > :last-child {
+    margin-bottom: 0;
+}
+.ws-meilisearch-rag-media__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    margin-top: auto;
+}
+.ws-meilisearch-rag-media__access {
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    font-size: .85em;
+    opacity: .85;
+}
+.ws-meilisearch-rag-media__lock {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+}

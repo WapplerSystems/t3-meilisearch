@@ -45,6 +45,8 @@ final class RagStreamChunk
     public const TYPE_END = 'end';
     public const TYPE_CLARIFY = 'clarify';
     public const TYPE_FALLBACK = 'fallback';
+    /** First frame when visitor feedback is on: the key to rate this turn with. */
+    public const TYPE_TURN = 'turn';
 
     /**
      * @param array<string,mixed> $data
@@ -60,6 +62,11 @@ final class RagStreamChunk
     public static function sources(array $sources): self
     {
         return new self(self::TYPE_SOURCES, ['sources' => $sources]);
+    }
+
+    public static function turn(string $key, string $conversationId): self
+    {
+        return new self(self::TYPE_TURN, ['key' => $key, 'conversation' => $conversationId]);
     }
 
     public static function token(string $text): self

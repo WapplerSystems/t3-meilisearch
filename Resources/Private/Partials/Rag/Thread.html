@@ -15,20 +15,20 @@
     <ol class="ws-meilisearch-rag-thread list-unstyled mb-4" data-rag-thread>
         <f:for each="{conversation}" as="turn">
             <li class="ws-meilisearch-rag-turn mb-3">
-                <div class="card mb-2">
+                <div class="card mb-2 ws-meilisearch-rag-turn__question">
                     <div class="card-body py-2">
-                        <small class="text-muted d-block mb-1">
+                        <small class="text-muted d-block mb-1 ws-meilisearch-rag-turn__role">
                             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.you"/>
                         </small>
                         <p class="card-text mb-0">{turn.question}</p>
                     </div>
                 </div>
-                <div class="card border-primary">
+                <div class="card border-primary ws-meilisearch-rag-turn__answer">
                     <div class="card-body py-2">
-                        <small class="text-primary d-block mb-1">
+                        <small class="text-primary d-block mb-1 ws-meilisearch-rag-turn__role">
                             <f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:rag.conversation.assistant"/>
                         </small>
-                        <p class="card-text mb-0" style="white-space: pre-wrap;"><f:format.raw>{turn.displayAnswerHtml}</f:format.raw></p>
+                        <div class="card-text mb-0 ws-meilisearch-rag-answer"><f:format.raw>{turn.displayAnswerHtml}</f:format.raw></div>
                         <f:comment>
                             No source list here: the answer text carries the
                             citations as links, and a row of raw document ids

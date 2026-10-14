@@ -70,7 +70,19 @@
             // them, and an empty label would leave the turn blank.
             statusNoContext: root.dataset.labelStatusNoContext || 'No matching documents found.',
             statusDisabled: root.dataset.labelStatusDisabled || 'RAG is not configured for this site.',
-            statusFailed: root.dataset.labelStatusFailed || 'Sorry, something went wrong: %s'
+            statusFailed: root.dataset.labelStatusFailed || 'Sorry, something went wrong: %s',
+            feedbackQuestion: root.dataset.labelFeedbackQuestion || 'Was this helpful?',
+            feedbackUp: root.dataset.labelFeedbackUp || 'Yes, helpful',
+            feedbackDown: root.dataset.labelFeedbackDown || 'No, not helpful',
+            feedbackThanks: root.dataset.labelFeedbackThanks || 'Thank you for your feedback.',
+            feedbackSupport: root.dataset.labelFeedbackSupport || 'Contact support'
+        };
+        // Thumbs under each answer (meilisearch.rag.feedback.enabled): the
+        // endpoint is empty when the feature is off.
+        const feedback = {
+            endpoint: root.dataset.feedbackEndpoint || '',
+            supportUrl: root.dataset.feedbackSupportUrl || '',
+            conversationParameter: root.dataset.feedbackConversationParameter || ''
         };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
@@ -118,38 +130,110 @@
         // navigation would yank the whole host page away. Intercept it — clear
         // the transcript and fire the reset URL in the background to drop the
         // server-side conversation session.
-        root.addEventListener('click', function (e) {
-            const reset = e.target.closest('[data-rag-reset]');
-            if (!reset) return;
-            e.preventDefault();
-            const href = reset.getAttribute('href') || '';
+        function reset(href) {
+            if (currentStream) { currentStream.close(); currentStream = null; setBusy(false); }
             if (href) {
                 fetch(href, { credentials: 'include' }).catch(function () { /* best effort */ });
             }
             thread.innerHTML = '';
             if (inputEl) { inputEl.value = ''; inputEl.focus(); }
+        }
+        root.addEventListener('click', function (e) {
+            const link = e.target.closest('[data-rag-reset]');
+            if (!link) return;
+            e.preventDefault();
+            reset(link.getAttribute('href') || '');
         });
+        // "New conversation" from outside the shell (the chat widget's head).
+        // The reset URL comes from the shell itself: the link above is only
+        // rendered once the server knows a conversation, a streamed one it
+        // never learns about.
+        root.addEventListener('wsms:rag-reset', function () {
+            reset(root.dataset.resetUrl || '');
+        });
+        // Ask from outside the shell (the widget's example questions).
+        root.addEventListener('wsms:rag-ask', function (e) {
+            const q = e.detail && e.detail.question ? String(e.detail.question).trim() : '';
+            if (q === '') return;
+            if (currentStream) currentStream.close();
+            ask(q);
+        });
+
+        // "Was this helpful?" row under a finished answer. Needs the key from
+        // the `turn` frame; without it (feature off, old server) nothing is
+        // drawn.
+        function renderFeedback(turn) {
+            if (!turn.feedbackEl || !feedback.endpoint || !turn.key) return;
+            let support = '';
+            if (feedback.supportUrl) {
+                let href = feedback.supportUrl;
+                if (feedback.conversationParameter && turn.conversation) {
+                    href += (href.indexOf('?') === -1 ? '?' : '&')
+                        + encodeURIComponent(feedback.conversationParameter) + '=' + encodeURIComponent(turn.conversation);
+                }
+                support = '<a class="ws-meilisearch-rag-feedback__support" href="' + escapeAttr(href) + '">' + escapeText(labels.feedbackSupport) + '</a>';
+            }
+            turn.feedbackEl.innerHTML =
+                '<div class="ws-meilisearch-rag-feedback" data-rag-feedback="' + escapeAttr(turn.key) + '">'
+                + '<span class="ws-meilisearch-rag-feedback__question">' + escapeText(labels.feedbackQuestion) + '</span>'
+                + feedbackButton(1, labels.feedbackUp)
+                + feedbackButton(-1, labels.feedbackDown)
+                + '<span class="ws-meilisearch-rag-feedback__thanks" role="status"></span>'
+                + support
+                + '</div>';
+        }
+
+        thread.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-rag-rating]');
+            if (!btn) return;
+            const row = btn.closest('[data-rag-feedback]');
+            if (!row) return;
+            const rating = btn.getAttribute('data-rag-rating');
+            row.querySelectorAll('[data-rag-rating]').forEach(function (b) {
+                b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+            });
+            sendRating(row.getAttribute('data-rag-feedback'), rating, 1, function (ok) {
+                const thanks = row.querySelector('.ws-meilisearch-rag-feedback__thanks');
+                if (thanks && ok) thanks.textContent = labels.feedbackThanks;
+            });
+        });
+
+        // The protocol row is written when the stream ends, a moment after the
+        // answer is on screen; a quick click may beat it (404) and is retried.
+        function sendRating(key, rating, attempt, done) {
+            const body = new URLSearchParams({ turn: key, rating: rating });
+            fetch(feedback.endpoint, { method: 'POST', credentials: 'include', body: body })
+                .then(function (r) {
+                    if (r.status === 404 && attempt < 4) {
+                        setTimeout(function () { sendRating(key, rating, attempt + 1, done); }, 1500 * attempt);
+                        return;
+                    }
+                    done(r.ok);
+                })
+                .catch(function () { done(false); });
+        }
 
         function appendTurn(question) {
             const li = document.createElement('li');
             li.className = 'ws-meilisearch-rag-turn mb-3';
             li.innerHTML =
-                '<div class="card mb-2"><div class="card-body py-2">'
-                + '<small class="text-muted d-block mb-1">' + escapeText(labels.you) + '</small>'
+                '<div class="card mb-2 ws-meilisearch-rag-turn__question"><div class="card-body py-2">'
+                + '<small class="text-muted d-block mb-1 ws-meilisearch-rag-turn__role">' + escapeText(labels.you) + '</small>'
                 + '<p class="card-text mb-0">' + escapeText(question) + '</p>'
                 + '</div></div>'
-                + '<div class="card border-primary"><div class="card-body py-2">'
-                + '<small class="text-primary d-block mb-1">' + escapeText(labels.assistant) + '</small>'
+                + '<div class="card border-primary ws-meilisearch-rag-turn__answer"><div class="card-body py-2">'
+                + '<small class="text-primary d-block mb-1 ws-meilisearch-rag-turn__role">' + escapeText(labels.assistant) + '</small>'
                 // The answer is built faded in place with the spinner over it,
                 // so the field is never blank while the model is working.
                 + '<div class="ws-meilisearch-rag-answer-wrap">'
-                + '<p class="card-text mb-0 ws-meilisearch-rag-answer" data-streaming="true" aria-busy="true" style="white-space: pre-wrap;"></p>'
+                + '<div class="card-text mb-0 ws-meilisearch-rag-answer" data-streaming="true" aria-busy="true"></div>'
                 + '<div class="ws-meilisearch-rag-spinner" role="status">'
                 + '<span class="ws-meilisearch-rag-spinner__label">' + escapeText(labels.loading) + '</span>'
                 + '</div>'
                 + '</div>'
                 + '<div class="ws-meilisearch-rag-suggestions mt-2"></div>'
                 + '<div class="ws-meilisearch-rag-fallback-slot"></div>'
+                + '<div class="ws-meilisearch-rag-feedback-slot"></div>'
                 + '</div></div>';
             thread.appendChild(li);
             li.scrollIntoView({ block: 'nearest' });
@@ -158,6 +242,10 @@
                 spinnerEl: li.querySelector('.ws-meilisearch-rag-spinner'),
                 suggestionsEl: li.querySelector('.ws-meilisearch-rag-suggestions'),
                 fallbackEl: li.querySelector('.ws-meilisearch-rag-fallback-slot'),
+                feedbackEl: li.querySelector('.ws-meilisearch-rag-feedback-slot'),
+                // Set by the `turn` frame: the key this answer is rated with.
+                key: '',
+                conversation: '',
                 // Set by the `fallback` frame, rendered by stopStreaming().
                 fallback: null,
                 question: question
@@ -203,6 +291,14 @@
                 currentStream = null;
             }
 
+            es.addEventListener('turn', function (ev) {
+                try {
+                    const p = JSON.parse(ev.data);
+                    turn.key = (p.key || '').toString();
+                    turn.conversation = (p.conversation || '').toString();
+                } catch (_) { /* ignore */ }
+            });
+
             es.addEventListener('sources', function (ev) {
                 try {
                     const p = JSON.parse(ev.data);
@@ -237,6 +333,10 @@
                     const finalText = typeof p.answer === 'string' && p.answer !== '' ? p.answer : acc;
                     turn.answerEl.innerHTML = renderAnswerHtml(finalText, turn.sources)
                         + renderNotes(Array.isArray(p.notes) ? p.notes : []);
+                    // An off-topic refusal is not an answer to rate.
+                    if (p.outOfScope !== true) {
+                        renderFeedback(turn);
+                    }
                 } catch (_) { /* ignore */ }
                 closeTimer = setTimeout(finish, 15000);
             });
@@ -377,6 +477,17 @@
             + '</aside>';
     }
 
+    const THUMB_UP = '<path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/>';
+    const THUMB_DOWN = '<path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 5.4 3H17"/>';
+
+    function feedbackButton(rating, label) {
+        return '<button type="button" class="ws-meilisearch-rag-feedback__btn" data-rag-rating="' + rating + '"'
+            + ' aria-pressed="false" aria-label="' + escapeAttr(label) + '" title="' + escapeAttr(label) + '">'
+            + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"'
+            + ' stroke-linejoin="round" aria-hidden="true" focusable="false">' + (rating > 0 ? THUMB_UP : THUMB_DOWN) + '</svg>'
+            + '</button>';
+    }
+
     function renderSuggestions(container, items, heading) {
         if (!container) return;
         if (!items.length) { container.innerHTML = ''; return; }
@@ -492,12 +603,12 @@
                 return (a.media ? 1 : 0) - (b.media ? 1 : 0) || a.number - b.number;
             });
             return numbers.map(function (ref) {
-                return ref.media ? mediaAnchor(ref) : '[' + citationAnchor(ref, String(ref.number)) + ']';
+                return ref.media ? mediaAnchor(ref) : BRACKET_OPEN + citationAnchor(ref, String(ref.number)) + BRACKET_CLOSE;
             }).join('');
         });
         // Markdown last, exactly as the server does: escaping left the
         // markers alone and the citation texts must not be re-scanned.
-        const bold = markdownLight(linked);
+        const bold = formatText(linked);
 
         return bold
             + mediaBlock(order.filter(function (ref) { return ref.media; }))
@@ -563,7 +674,7 @@
             + '<span class="ws-meilisearch-rag-media__title"><span class="ws-meilisearch-rag-media__number">' + ref.number + '</span>' + escapeText(m.title || '') + '</span>'
             + (m.context ? '<span class="ws-meilisearch-rag-media__context">' + escapeText(m.context) + '</span>' : '')
             + (primary && m.meta ? '<span class="ws-meilisearch-rag-media__meta">' + escapeText(m.meta) + '</span>' : '')
-            + (primary && m.cta ? '<span class="ws-meilisearch-rag-media__cta">' + escapeText(m.cta) + '</span>' : '')
+            + (primary ? mediaFoot(m) : mediaAccess(m))
             + '</span>';
         if (ref.uri === '') { return '<div class="' + cls + '">' + inner + '</div>'; }
         return '<a class="' + cls + '" href="' + escapeAttr(ref.uri) + '" target="_blank" rel="noopener">' + inner + '</a>';
@@ -620,7 +731,96 @@
     }
 
     function renderMarkdownLight(text) {
-        return markdownLight(escapeText(text));
+        return formatText(escapeText(text));
+    }
+
+    // The brackets around a document reference are their own elements, so a
+    // chat layout that draws the number as a box can hide them (mirrors
+    // CitationRenderer::BRACKET_*).
+    const BRACKET_OPEN = '<span class="ws-meilisearch-rag-citation__bracket">[</span>';
+    const BRACKET_CLOSE = '<span class="ws-meilisearch-rag-citation__bracket">]</span>';
+    // Mirrors CitationRenderer::CALLOUT.
+    const CALLOUT = /^(?:<strong>|<em>)?\s*(?:Wichtig|Hinweis|Achtung|Tipp|Beachten Sie|Important|Note|Warning|Tip|Attention|Remarque|Belangrijk|Let op|Importante|Nota|Önemli|Uwaga|Ważne|Важно|Внимание|Примечание)(?![\p{L}\p{N}_])/iu;
+    const LOCK_ICON = '<svg class="ws-meilisearch-rag-media__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+    function formatText(html) {
+        return blocks(markdownLight(html));
+    }
+
+    // Block structure on top of markdown-light: paragraphs, numbered and
+    // bulleted lists (a bullet indented under a numbered step nests into it)
+    // and callouts — a paragraph opening with "Wichtig", "Note" … together
+    // with a list right after it. Mirrors CitationRenderer::blocks().
+    function blocks(html) {
+        const out = [];
+        let paragraph = [];
+        let list = null;
+        function flushParagraph() {
+            if (paragraph.length) { out.push({ type: 'p', content: paragraph.join('<br>') }); paragraph = []; }
+        }
+        function flushList() {
+            if (list) { out.push({ type: 'list', content: list }); list = null; }
+        }
+        String(html).split(/\r\n|\r|\n/).forEach(function (line) {
+            if (line.trim() === '') { flushParagraph(); flushList(); return; }
+            const o = line.match(/^[ \t]{0,3}(\d{1,3})[.)][ \t]+(.*)$/);
+            const b = line.match(/^([ \t]*)[-*•][ \t]+(.*)$/);
+            if (b && list && list.tag === 'ol' && b[1].length >= 2) {
+                list.items[list.items.length - 1].sub.push(b[2]);
+                return;
+            }
+            if (o || b) {
+                const tag = o ? 'ol' : 'ul';
+                flushParagraph();
+                if (list && list.tag !== tag) { flushList(); }
+                if (!list) { list = { tag: tag, start: o ? parseInt(o[1], 10) : 1, items: [] }; }
+                list.items.push({ text: o ? o[2] : b[2], sub: [] });
+                return;
+            }
+            if (list && /^[ \t]{2,}\S/.test(line)) {
+                list.items[list.items.length - 1].text += '<br>' + line.trim();
+                return;
+            }
+            flushList();
+            paragraph.push(line.trim());
+        });
+        flushParagraph();
+        flushList();
+
+        let html2 = '';
+        for (let i = 0; i < out.length; i++) {
+            const block = out[i];
+            if (block.type === 'p' && CALLOUT.test(block.content)) {
+                let inner = '<p>' + block.content + '</p>';
+                if (out[i + 1] && out[i + 1].type === 'list') { inner += listHtml(out[++i].content); }
+                html2 += '<div class="ws-meilisearch-rag-callout">' + inner + '</div>';
+                continue;
+            }
+            html2 += block.type === 'p' ? '<p>' + block.content + '</p>' : listHtml(block.content);
+        }
+        return html2;
+    }
+
+    function listHtml(list) {
+        let html = '<' + list.tag + (list.tag === 'ol' && list.start > 1 ? ' start="' + list.start + '"' : '') + '>';
+        list.items.forEach(function (item) {
+            html += '<li>' + item.text;
+            if (item.sub.length) { html += '<ul><li>' + item.sub.join('</li><li>') + '</li></ul>'; }
+            html += '</li>';
+        });
+        return html + '</' + list.tag + '>';
+    }
+
+    // Bottom line of the large media card: call to action and, for content
+    // behind a login, the access hint with a lock (mirrors mediaFoot()).
+    function mediaFoot(m) {
+        const cta = m.cta ? '<span class="ws-meilisearch-rag-media__cta">' + escapeText(m.cta) + '</span>' : '';
+        const access = mediaAccess(m);
+        return (cta + access) === '' ? '' : '<span class="ws-meilisearch-rag-media__foot">' + cta + access + '</span>';
+    }
+
+    function mediaAccess(m) {
+        return m.access ? '<span class="ws-meilisearch-rag-media__access">' + LOCK_ICON + escapeText(m.access) + '</span>' : '';
     }
 
     // Markdown-light on already-escaped text. The model writes markdown

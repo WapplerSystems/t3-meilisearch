@@ -1821,6 +1821,15 @@
             <trans-unit id="be.kr.unknownFieldTypeFor" resname="be.kr.unknownFieldTypeFor">
                 <source>Unknown field type &lt;code&gt;%s&lt;/code&gt; for &lt;code&gt;%s&lt;/code&gt;.</source>
             </trans-unit>
+            <trans-unit id="be.protocol.onlyNegative" resname="be.protocol.onlyNegative">
+                <source>only rated "not helpful"</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.ratedUp" resname="be.protocol.ratedUp">
+                <source>Visitor: helpful</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.ratedDown" resname="be.protocol.ratedDown">
+                <source>Visitor: not helpful</source>
+            </trans-unit>
     </body>
     </file>
 </xliff>

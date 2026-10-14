@@ -100,6 +100,11 @@ services:
   WapplerSystems\Meilisearch\Service\SearchService:
     public: true
 
+  # USER cObject of the chat widget (setup.typoscript); a userFunc is fetched
+  # from the container and needs a public service for its constructor injection.
+  WapplerSystems\Meilisearch\Frontend\ChatWidgetRenderer:
+    public: true
+
   WapplerSystems\Meilisearch\Service\Rag\RagService:
     public: true
 

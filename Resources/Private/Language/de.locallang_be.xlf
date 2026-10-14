@@ -2429,6 +2429,18 @@
                 <source>Unknown field type &lt;code&gt;%s&lt;/code&gt; for &lt;code&gt;%s&lt;/code&gt;.</source>
                 <target>Unbekannter Feldtyp &lt;code&gt;%s&lt;/code&gt; für &lt;code&gt;%s&lt;/code&gt;.</target>
             </trans-unit>
+            <trans-unit id="be.protocol.onlyNegative" resname="be.protocol.onlyNegative">
+                <source>only rated "not helpful"</source>
+                <target>nur „nicht hilfreich“ bewertete</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.ratedUp" resname="be.protocol.ratedUp">
+                <source>Visitor: helpful</source>
+                <target>Besucher: hilfreich</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.ratedDown" resname="be.protocol.ratedDown">
+                <source>Visitor: not helpful</source>
+                <target>Besucher: nicht hilfreich</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

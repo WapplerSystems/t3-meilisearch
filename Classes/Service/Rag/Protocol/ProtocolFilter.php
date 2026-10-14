@@ -24,6 +24,8 @@ final class ProtocolFilter
         public readonly ?int $languageId = null,
         public readonly bool $onlyEscalated = false,
         public readonly bool $onlyProblems = false,
+        /** Only conversations with a turn the visitor rated "not helpful". */
+        public readonly bool $onlyNegative = false,
         /** Substring of any question or answer in the conversation. */
         public readonly string $search = '',
         /** Exact conversation id (as quoted in a contact-form mail). */

@@ -103,7 +103,8 @@
 .ws-meilisearch-rag-embed .text-bg-warning { background: #ffc107; color: #1d2228; }
 
 /* AJAX-streamed answer + sources (rendered by RagStream.js into thread turns) */
-.ws-meilisearch-rag-embed .ws-meilisearch-rag-answer { white-space: pre-wrap; }
+/* Raw text while tokens arrive; the finished answer is block HTML. */
+.ws-meilisearch-rag-embed .ws-meilisearch-rag-answer[data-streaming="true"] { white-space: pre-wrap; }
 .ws-meilisearch-rag-embed .ws-meilisearch-rag-answer[data-streaming="true"]::after {
     content: "▋"; margin-left: 2px; color: var(--wsm-muted);
     animation: wsm-blink 1s steps(2) infinite;

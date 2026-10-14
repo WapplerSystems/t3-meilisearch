@@ -276,6 +276,101 @@ settings:
     type: string
     default: 'KI-Chat'
 
+  # Branding of the widget. Every text accepts plain text or an
+  # "LLL:EXT:…" reference, which is resolved in the language of the page —
+  # site settings are not translatable themselves. Colours, font, corners and
+  # sizes are CSS custom properties (--wsms-chat-*, see ChatWidget.css) that a
+  # site package overrides in its own stylesheet.
+  meilisearch.rag.chatWidget.title:
+    label: 'Chat widget: title in the panel head'
+    description: 'Name shown in the panel head, e.g. the assistant''s name. Empty: chatWidget.label. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.subtitle:
+    label: 'Chat widget: subtitle in the panel head'
+    description: 'Second line under the title, e.g. "AI assistant of <company>". Keep an AI hint in title or subtitle: the EU AI Act (Art. 50) requires the visitor to know they talk to an AI. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.launcherText:
+    label: 'Chat widget: text on the launcher button'
+    description: 'Text next to the icon on the closed widget. Empty: a round icon-only button. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.icon:
+    label: 'Chat widget: icon'
+    description: 'SVG or bitmap shown on the launcher and in the panel head, as EXT:… path or URL. It sits on the --wsms-chat-primary colour, so use a light variant. Empty: a neutral speech bubble.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.teaserTitle:
+    label: 'Chat widget: teaser bubble title'
+    description: 'First line of the teaser bubble above the closed launcher. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.teaserText:
+    label: 'Chat widget: teaser bubble text'
+    description: 'Text of the teaser bubble. Empty: no teaser. Shown once per browser session (sessionStorage, no cookie), on desktop only, chatWidget.teaserDelay seconds after the page loaded, and not when the visitor already opened the chat in this session. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.teaserDelay:
+    label: 'Chat widget: teaser delay (seconds)'
+    description: 'Seconds after page load before the teaser bubble appears.'
+    type: int
+    default: 4
+
+  meilisearch.rag.chatWidget.expandable:
+    label: 'Chat widget: offer an expanded side panel'
+    description: 'Adds a button to the panel head that turns the corner panel into a full-height side panel (--wsms-chat-width-expanded). Remembered for the browser session. Never offered on small screens, where the panel is full screen anyway.'
+    type: bool
+    default: true
+
+  meilisearch.rag.chatWidget.greetingTitle:
+    label: 'Chat widget: greeting title'
+    description: 'Heading in the empty panel, shown until the first question and again after "new conversation". Empty title and text: no greeting. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.greetingText:
+    label: 'Chat widget: greeting text'
+    description: 'Paragraph under the greeting title: what the assistant helps with and where its answers come from. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.greetingHint:
+    label: 'Chat widget: hint above the example questions'
+    description: 'Small line above the example questions, e.g. "Click an example or ask your own question below." Shown only when there are examples for the page language. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.exampleGroups:
+    label: 'Chat widget: example question groups'
+    description: 'Headings of the example groups, entries "<group>:<lang>:<heading>", e.g. "usage:de:Beispiele zur Bedienung". Groups appear in the order of their first entry. A group without a heading in the page language is shown without heading.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.chatWidget.examples:
+    label: 'Chat widget: example questions'
+    description: 'Clickable example questions in the empty panel, entries "<group>:<lang>:<question>", e.g. "usage:de:Wie starte ich die Heizlastberechnung?". <lang> is the two-letter language code of the page; only entries in the page language are shown. A click sends the question at once. A group may be styled per name: .ws-meilisearch-chat-example--<group>.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.chatWidget.placeholder:
+    label: 'Chat widget: input placeholder'
+    description: 'Placeholder and screen-reader label of the input in the panel, e.g. "Your question to <name> …". Empty: the extension''s default wording. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.disclaimer:
+    label: 'Chat widget: note under the input'
+    description: 'Small centred line under the input field, e.g. an AI notice: "<name> is an AI and can make mistakes. If in doubt, [our support](t3://page?uid=12) will help." One [text](link) is turned into a link; the link may be a t3:// reference, a URL or a mail address. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'
     description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'
@@ -803,6 +898,24 @@ settings:
     description: 'Whole words, case-insensitive (e.g. "mac", "macos", "linux", "browser"); a trailing "*" matches a prefix ("plugin*" also finds "Plugins"). When set, meilisearch.rag.fixedFacts is added only to questions containing one of them; empty: to every question.'
     type: stringlist
     default: []
+
+  meilisearch.rag.feedback.enabled:
+    label: 'RAG: thumbs up / down under each answer'
+    description: 'Asks "Was this helpful?" under every streamed answer. The verdict is stored with the turn in the chat protocol (needs meilisearch.rag.protocol.enabled) and shown and filterable in the backend tab "Chat protocol".'
+    type: bool
+    default: false
+
+  meilisearch.rag.feedback.supportLink:
+    label: 'RAG: support link next to the thumbs'
+    description: 'Link target of "Contact support" in the feedback row — a t3:// reference, URL or mail address. Empty: no link.'
+    type: string
+    default: ''
+
+  meilisearch.rag.feedback.supportConversationParameter:
+    label: 'RAG: query parameter for the conversation id on the support link'
+    description: 'When set (e.g. "chat"), the support link carries the conversation id as ?<parameter>=<id>, so a support form can attach the chat protocol. Empty: plain link.'
+    type: string
+    default: ''
 
   meilisearch.rag.fixedReplies:
     label: 'RAG: fixed replies per language'

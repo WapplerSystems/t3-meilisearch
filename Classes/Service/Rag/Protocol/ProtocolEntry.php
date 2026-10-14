@@ -33,6 +33,10 @@ final class ProtocolEntry
         public readonly int $uid = 0,
         /** web | mcp — see ChatProtocolRecorder::CHANNEL_* */
         public readonly string $channel = 'web',
+        /** Key the visitor rates this turn with, see ChatProtocolRecorder. */
+        public readonly string $turnKey = '',
+        /** 1 helpful, -1 not helpful, 0 not rated. */
+        public readonly int $rating = 0,
     ) {}
 
     /**
@@ -53,6 +57,8 @@ final class ProtocolEntry
             crdate: (int)($row['crdate'] ?? 0),
             uid: (int)($row['uid'] ?? 0),
             channel: (string)($row['channel'] ?? 'web'),
+            turnKey: (string)($row['turn_key'] ?? ''),
+            rating: (int)($row['rating'] ?? 0),
         );
     }
 
@@ -73,6 +79,8 @@ final class ProtocolEntry
             'sources' => (string)json_encode($this->sources, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'escalated' => $this->escalated ? 1 : 0,
             'channel' => mb_substr($this->channel, 0, 16),
+            'turn_key' => $this->turnKey,
+            'rating' => max(-1, min(1, $this->rating)),
         ];
     }
 

@@ -627,6 +627,63 @@ detected text language of the site language, not only by the page tree.
 The context reaches the model as "Knowledge base entries"; a prompt that
 calls them that keeps the model from telling visitors about "excerpts".
 
+### Chat widget and branding
+
+`chatWidget.enabled` puts a launcher bottom right on every page (narrow it with
+`restrictToPageUid` / `restrictToSubtreeUid`). It opens a panel with the chat
+shell of `chatWidget.pageUid`, inline, no iframe. The extension ships no
+branding: the name, icon and texts come from site settings, and every text may
+be an `LLL:EXT:…` reference. The reference is resolved in the page language,
+because site settings cannot be translated.
+
+```yaml
+meilisearch:
+  rag:
+    chatWidget:
+      enabled: true
+      pageUid: 12
+      label: 'Acme assistant'                 # accessible name
+      title: 'Ada'                            # panel head
+      subtitle: 'AI assistant of Acme'        # keep an AI hint (EU AI Act, Art. 50)
+      launcherText: 'Questions? Ada helps'    # empty: round icon button
+      icon: 'EXT:site/Resources/Public/Icons/assistant-white.svg'
+      teaserTitle: 'Hello, I am Ada.'         # bubble above the launcher, once per
+      teaserText: 'Ask me anything.'          # session, desktop only; empty: none
+      teaserDelay: 4
+      expandable: true                        # full-height side panel button
+      greetingTitle: 'Hello, I am Ada.'       # empty panel
+      greetingText: 'I answer from our documentation, with sources.'
+      greetingHint: 'Click an example or ask below.'
+      exampleGroups: ['usage:en:Using the software']                # <group>:<lang>:<heading>
+      examples: ['usage:en:How do I start a calculation?']         # <group>:<lang>:<question>
+      placeholder: 'Your question to Ada …'
+      disclaimer: 'Ada is an AI and can be wrong. [Our support](t3://page?uid=34) helps.'
+```
+
+Example questions carry their language and are maintained in the site
+settings module. A click sends the question at once. Colours, font, corner
+radius and sizes are CSS custom properties on `.ws-meilisearch-chat`
+(`--wsms-chat-primary`, `--wsms-chat-accent`, `--wsms-chat-radius`,
+`--wsms-chat-width`, … — see the head of `ChatWidget.css`). A site package
+overrides them in its own stylesheet. Inside the panel, the answer uses a chat
+layout: the question is a bubble, the answer has no frame, the media cards
+show a large still and a grid. The plugin page keeps its cards.
+
+Answers are rendered as blocks on both the server and the client: paragraphs,
+numbered and bulleted lists, and callout boxes for a paragraph opening with
+"Important", "Note", "Wichtig" and similar words. A media source
+(`RagCitationLabelsEvent::setMedia()`) may set `access`. The card then shows
+that text with a lock, e.g. for videos that need a customer login.
+
+**Visitor feedback.** `feedback.enabled` adds "Was this helpful?" with thumbs
+up and down under every streamed answer (needs `protocol.enabled`). The stream
+hands out a random key per turn, and the thumbs post it to
+`/_ws_meilisearch/rag/feedback`. The verdict is stored on the protocol row and
+shown, and filterable, in the backend tab "Chat protocol".
+`feedback.supportLink` adds a "Contact support" link next to the thumbs.
+`feedback.supportConversationParameter` lets that link carry the conversation
+id.
+
 ## Backend module (Phase 5)
 
 After installing the extension, an admin-only entry **System → Meilisearch**

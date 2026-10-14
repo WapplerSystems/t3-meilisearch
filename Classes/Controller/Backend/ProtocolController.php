@@ -74,6 +74,7 @@ final class ProtocolController
             : 30;
         $onlyEscalated = ($params['escalated'] ?? '') === '1';
         $onlyProblems = ($params['problems'] ?? '') === '1';
+        $onlyNegative = ($params['negative'] ?? '') === '1';
         $search = trim((string)($params['q'] ?? ''));
         $search = mb_substr($search, 0, 200);
         $conversationParam = strtolower(trim((string)($params['conversation'] ?? '')));
@@ -97,7 +98,7 @@ final class ProtocolController
                 'conversationId' => $conversationParam,
                 'siteIdentifier' => $detailSiteIdentifier,
                 'downloadUrl' => $this->context->route('protocolDownload', ['conversation' => $conversationParam]),
-                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $search),
+                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search),
                 ...$this->context->tabNavData(),
                 'protocolUrl' => $this->context->route('protocol'),
                 'active' => 'protocol',
@@ -118,6 +119,7 @@ final class ProtocolController
             siteIdentifier: $siteFilter !== '' ? $siteFilter : null,
             onlyEscalated: $onlyEscalated,
             onlyProblems: $onlyProblems,
+            onlyNegative: $onlyNegative,
             search: $search,
             since: $days > 0 ? time() - ($days * 86400) : 0,
         );
@@ -135,6 +137,7 @@ final class ProtocolController
                 $days,
                 $onlyEscalated,
                 $onlyProblems,
+                $onlyNegative,
                 $search,
                 ['conversation' => $row['conversationId']]
             );
@@ -142,10 +145,10 @@ final class ProtocolController
         }
 
         $prevUrl = $page > 1
-            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $search)
+            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search)
             : '';
         $nextUrl = $page < $pages
-            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $search)
+            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search)
             : '';
 
         $moduleTemplate->assignMultiple([
@@ -159,6 +162,7 @@ final class ProtocolController
             'days' => $days,
             'onlyEscalated' => $onlyEscalated,
             'onlyProblems' => $onlyProblems,
+            'onlyNegative' => $onlyNegative,
             'search' => $search,
             'conversationParam' => $conversationParam,
             'availableSites' => $availableSites,
@@ -218,6 +222,7 @@ final class ProtocolController
                 'status' => $entry->status,
                 'escalated' => $entry->escalated,
                 'channel' => $entry->channel,
+                'rating' => $entry->rating,
                 'isProblem' => in_array($entry->status, ProtocolFilter::PROBLEM_STATUSES, true)
                     || ($entry->status === 'ok' && $entry->citedIds === []),
                 'sources' => $sources,
@@ -280,6 +285,7 @@ final class ProtocolController
         int $days,
         bool $onlyEscalated,
         bool $onlyProblems,
+        bool $onlyNegative,
         string $search,
         array $additional = []
     ): string {
@@ -296,6 +302,9 @@ final class ProtocolController
         }
         if ($onlyProblems) {
             $extra['problems'] = '1';
+        }
+        if ($onlyNegative) {
+            $extra['negative'] = '1';
         }
         if ($search !== '') {
             $extra['q'] = $search;

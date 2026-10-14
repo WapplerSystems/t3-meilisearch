@@ -80,29 +80,16 @@ plugin.tx_wsmeilisearch_search {
     # so the embed document's own <f:asset.css> never travels along.
     page.includeCSS.wsMeilisearchRag = EXT:ws_meilisearch/Resources/Public/CSS/Rag.css
 
-    # Bubble markup. Target URL strategy, as two mutually exclusive branches
-    # of one COA (a second condition would end the block, see above):
-    #   1) chatWidget.pageUid > 0  -> TypoLink at render time, so the link
-    #      follows the active language overlay (DE -> /de/..., EN -> /en/...)
-    #      and survives slug renames.
-    #   2) chatWidget.pageUid == 0 -> legacy hardcoded chatWidget.url string,
-    #      kept for backwards compatibility.
-    page.footerData.1746000000 = COA
+    # Anchor of the widget. ChatWidgetRenderer resolves the target URL
+    # (chatWidget.pageUid via TypoLink, so it follows the language and slug
+    # renames; else the legacy chatWidget.url) and hands the branding — name,
+    # icon, texts, greeting, example questions — to ChatWidget.js as JSON.
+    page.footerData.1746000000 = USER
     page.footerData.1746000000 {
-        # "pageUid,typeNum" -> speaking URL of the chat page in the bare embed
-        # type, which renders only the RAG plugin without the site chrome.
-        10 = TEXT
-        10.typolink.parameter = {$meilisearch.rag.chatWidget.pageUid},{$meilisearch.rag.chatWidget.embedTypeNum}
-        10.typolink.returnLast = url
-        10.if.isTrue = {$meilisearch.rag.chatWidget.pageUid}
-
-        # Legacy URL: append the bare-embed type. Assumes the URL carries no
-        # query string of its own (prefer chatWidget.pageUid, which is robust).
-        20 = TEXT
-        20.value = {$meilisearch.rag.chatWidget.url}?type={$meilisearch.rag.chatWidget.embedTypeNum}
-        20.if.isFalse = {$meilisearch.rag.chatWidget.pageUid}
-
-        wrap = <div id="ws-meilisearch-chat-widget" data-url="|" data-label="{$meilisearch.rag.chatWidget.label}"></div>
+        userFunc = WapplerSystems\Meilisearch\Frontend\ChatWidgetRenderer->render
+        pageUid = {$meilisearch.rag.chatWidget.pageUid}
+        url = {$meilisearch.rag.chatWidget.url}
+        embedTypeNum = {$meilisearch.rag.chatWidget.embedTypeNum}
     }
 [END]
 

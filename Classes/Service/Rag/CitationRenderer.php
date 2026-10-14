@@ -23,6 +23,20 @@ final class CitationRenderer
     private const MAX_MEDIA_CARDS = 3;
 
     /**
+     * The brackets around a document reference are their own elements, so a
+     * chat layout that draws the number as a box can hide them.
+     */
+    private const BRACKET_OPEN = '<span class="ws-meilisearch-rag-citation__bracket">[</span>';
+    private const BRACKET_CLOSE = '<span class="ws-meilisearch-rag-citation__bracket">]</span>';
+
+    /**
+     * A paragraph opening with one of these words is a hint, not prose: it
+     * becomes a callout box together with a list that directly follows it.
+     * Mirrors CALLOUT in RagStream.js.
+     */
+    private const CALLOUT = '/^(?:<strong>|<em>)?\s*(?:Wichtig|Hinweis|Achtung|Tipp|Beachten Sie|Important|Note|Warning|Tip|Attention|Remarque|Belangrijk|Let op|Importante|Nota|Önemli|Uwaga|Ważne|Важно|Внимание|Примечание)\b/iu';
+
+    /**
      * Numbers are handed out in order of first appearance and reused, so a
      * document cited five times stays reference 1. Sources that would read
      * identically — the same topic per discipline, say — collapse onto one
@@ -40,7 +54,7 @@ final class CitationRenderer
     {
         $escaped = htmlspecialchars($answer, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if ($escaped === '' || $sources === []) {
-            return self::markdownLight($escaped);
+            return self::formatText($escaped);
         }
         $byId = [];
         foreach ($sources as $src) {
@@ -50,7 +64,7 @@ final class CitationRenderer
             }
         }
         if ($byId === []) {
-            return self::markdownLight($escaped);
+            return self::formatText($escaped);
         }
 
         /** @var array<string,array{number:int,text:string,uri:string,note:string,media:array<string,string>|null}> $refs keyed by display text */
@@ -102,7 +116,7 @@ final class CitationRenderer
                 $out = $block[1];
                 foreach ($numbers as $ref) {
                     $out .= $ref['media'] === null
-                        ? '[' . self::anchor($ref, (string)$ref['number']) . ']'
+                        ? self::BRACKET_OPEN . self::anchor($ref, (string)$ref['number']) . self::BRACKET_CLOSE
                         : self::mediaAnchor($ref);
                 }
 
@@ -114,7 +128,7 @@ final class CitationRenderer
         $media = array_filter($refs, static fn (array $ref): bool => $ref['media'] !== null);
         $docs = array_filter($refs, static fn (array $ref): bool => $ref['media'] === null);
 
-        return self::markdownLight($rewritten) . self::mediaBlock($media) . self::legend($docs);
+        return self::formatText($rewritten) . self::mediaBlock($media) . self::legend($docs);
     }
 
     /**
@@ -224,7 +238,7 @@ final class CitationRenderer
             . '<span class="ws-meilisearch-rag-media__title"><span class="ws-meilisearch-rag-media__number">' . $ref['number'] . '</span>' . $e($media['title'] ?? '') . '</span>'
             . (($media['context'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__context">' . $e($media['context']) . '</span>' : '')
             . ($primary && ($media['meta'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__meta">' . $e($media['meta']) . '</span>' : '')
-            . ($primary && ($media['cta'] ?? '') !== '' ? '<span class="ws-meilisearch-rag-media__cta">' . $e($media['cta']) . '</span>' : '')
+            . ($primary ? self::mediaFoot($media) : self::mediaAccess($media))
             . '</span>';
         if ($ref['uri'] === '') {
             return '<div class="' . $class . '">' . $inner . '</div>';
@@ -232,6 +246,37 @@ final class CitationRenderer
 
         return '<a class="' . $class . '" href="' . $e($ref['uri']) . '" target="_blank" rel="noopener">' . $inner . '</a>';
     }
+
+    /**
+     * Bottom line of the large card: the call to action and, for content that
+     * needs a login, the access hint with a lock (media field `access`).
+     *
+     * @param array<string,string> $media
+     */
+    private static function mediaFoot(array $media): string
+    {
+        $cta = ($media['cta'] ?? '') !== ''
+            ? '<span class="ws-meilisearch-rag-media__cta">' . htmlspecialchars($media['cta'], ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</span>'
+            : '';
+        $access = self::mediaAccess($media);
+
+        return ($cta . $access) === '' ? '' : '<span class="ws-meilisearch-rag-media__foot">' . $cta . $access . '</span>';
+    }
+
+    /**
+     * @param array<string,string> $media
+     */
+    private static function mediaAccess(array $media): string
+    {
+        if (($media['access'] ?? '') === '') {
+            return '';
+        }
+
+        return '<span class="ws-meilisearch-rag-media__access">' . self::LOCK_ICON
+            . htmlspecialchars($media['access'], ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</span>';
+    }
+
+    private const LOCK_ICON = '<svg class="ws-meilisearch-rag-media__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
     /**
      * Display without any citations, for a turn that kept no sources: the
@@ -273,7 +318,7 @@ final class CitationRenderer
             $answer,
         );
 
-        return self::markdownLight(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        return self::formatText(htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     /**
@@ -420,6 +465,107 @@ final class CitationRenderer
      * after the citation rewrite and after escaping, which leaves `#`, `*` and
      * backticks untouched — so nothing here can inject markup.
      */
+    private static function formatText(string $html): string
+    {
+        return self::blocks(self::markdownLight($html));
+    }
+
+    /**
+     * Block structure on top of markdown-light: paragraphs, numbered and
+     * bulleted lists (a bullet indented under a numbered step nests into it),
+     * and callouts — a paragraph opening with "Wichtig", "Note" … together
+     * with a list right after it. Line breaks inside a paragraph stay as <br>.
+     *
+     * Works on escaped text with inline tags only, so it cannot inject markup.
+     * No whitespace between the tags it writes. Mirrors blocks() in
+     * RagStream.js.
+     */
+    private static function blocks(string $html): string
+    {
+        $blocks = [];
+        $paragraph = [];
+        $list = null;
+        $flushParagraph = static function () use (&$paragraph, &$blocks): void {
+            if ($paragraph !== []) {
+                $blocks[] = ['p', implode('<br>', $paragraph)];
+                $paragraph = [];
+            }
+        };
+        $flushList = static function () use (&$list, &$blocks): void {
+            if ($list !== null) {
+                $blocks[] = ['list', $list];
+                $list = null;
+            }
+        };
+
+        foreach (preg_split('/\R/u', $html) ?: [] as $line) {
+            if (trim($line) === '') {
+                $flushParagraph();
+                $flushList();
+                continue;
+            }
+            $ordered = preg_match('/^[ \t]{0,3}(\d{1,3})[.)][ \t]+(.*)$/u', $line, $o) === 1;
+            $bullet = preg_match('/^([ \t]*)[-*•][ \t]+(.*)$/u', $line, $b) === 1;
+            if ($bullet && $list !== null && $list['tag'] === 'ol' && strlen($b[1]) >= 2) {
+                // Bullet under a numbered step: nests into the last step.
+                $list['items'][count($list['items']) - 1]['sub'][] = $b[2];
+                continue;
+            }
+            if ($ordered || $bullet) {
+                $tag = $ordered ? 'ol' : 'ul';
+                $flushParagraph();
+                if ($list !== null && $list['tag'] !== $tag) {
+                    $flushList();
+                }
+                $list ??= ['tag' => $tag, 'start' => $ordered ? (int)$o[1] : 1, 'items' => []];
+                $list['items'][] = ['text' => $ordered ? $o[2] : $b[2], 'sub' => []];
+                continue;
+            }
+            if ($list !== null && preg_match('/^[ \t]{2,}\S/u', $line) === 1) {
+                // Indented continuation of the last list item.
+                $list['items'][count($list['items']) - 1]['text'] .= '<br>' . trim($line);
+                continue;
+            }
+            $flushList();
+            $paragraph[] = trim($line);
+        }
+        $flushParagraph();
+        $flushList();
+
+        $out = '';
+        for ($i = 0, $n = count($blocks); $i < $n; $i++) {
+            [$type, $content] = $blocks[$i];
+            if ($type === 'p' && preg_match(self::CALLOUT, $content) === 1) {
+                $inner = '<p>' . $content . '</p>';
+                if (($blocks[$i + 1][0] ?? '') === 'list') {
+                    $inner .= self::listHtml($blocks[++$i][1]);
+                }
+                $out .= '<div class="ws-meilisearch-rag-callout">' . $inner . '</div>';
+                continue;
+            }
+            $out .= $type === 'p' ? '<p>' . $content . '</p>' : self::listHtml($content);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array{tag:string,start:int,items:list<array{text:string,sub:list<string>}>} $list
+     */
+    private static function listHtml(array $list): string
+    {
+        $html = '<' . $list['tag'] . ($list['tag'] === 'ol' && $list['start'] > 1 ? ' start="' . $list['start'] . '"' : '') . '>';
+        foreach ($list['items'] as $item) {
+            $html .= '<li>' . $item['text'];
+            if ($item['sub'] !== []) {
+                $html .= '<ul><li>' . implode('</li><li>', $item['sub']) . '</li></ul>';
+            }
+            $html .= '</li>';
+        }
+
+        return $html . '</' . $list['tag'] . '>';
+    }
+
     private static function markdownLight(string $html): string
     {
         $rules = [

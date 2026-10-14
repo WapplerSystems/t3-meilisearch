@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use WapplerSystems\Meilisearch\Middleware\KnowledgeResourceTopicMiddleware;
 use WapplerSystems\Meilisearch\Middleware\McpEndpoint;
+use WapplerSystems\Meilisearch\Middleware\RagFeedbackEndpoint;
 use WapplerSystems\Meilisearch\Middleware\RagStreamMiddleware;
 use WapplerSystems\Meilisearch\Middleware\SearchFragmentEndpoint;
 use WapplerSystems\Meilisearch\Middleware\SimilarEndpoint;
@@ -17,6 +18,15 @@ return [
             // resolved Site attribute; runs *before* page resolution and
             // *before* the base-redirect-resolver so the unprefixed paths
             // (/_ws_meilisearch/…) aren't 404'd as "no language base".
+            'after' => ['typo3/cms-frontend/site'],
+            'before' => [
+                'typo3/cms-frontend/page-resolver',
+                'typo3/cms-frontend/base-redirect-resolver',
+            ],
+        ],
+        'wapplersystems/meilisearch/rag-feedback' => [
+            // Thumbs under a chat answer; same slot as the stream.
+            'target' => RagFeedbackEndpoint::class,
             'after' => ['typo3/cms-frontend/site'],
             'before' => [
                 'typo3/cms-frontend/page-resolver',

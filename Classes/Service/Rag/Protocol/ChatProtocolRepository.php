@@ -37,6 +37,37 @@ final class ChatProtocolRepository
     }
 
     /**
+     * Stores a visitor's verdict on one turn. Only the visitor holds the key,
+     * and only for a day: an old key cannot rewrite history. Rating again
+     * replaces the earlier verdict. Returns whether a row was found.
+     */
+    public function rate(string $siteIdentifier, string $turnKey, int $rating): bool
+    {
+        if (preg_match(ChatProtocolRecorder::TURN_KEY_PATTERN, $turnKey) !== 1 || !in_array($rating, [-1, 1], true)) {
+            return false;
+        }
+        $qb = $this->connectionPool->getQueryBuilderForTable(ProtocolEntry::TABLE);
+        $qb->getRestrictions()->removeAll();
+        $uid = $qb->select('uid')
+            ->from(ProtocolEntry::TABLE)
+            ->where(
+                $qb->expr()->eq('turn_key', $qb->createNamedParameter($turnKey, Connection::PARAM_STR)),
+                $qb->expr()->eq('site_identifier', $qb->createNamedParameter($siteIdentifier, Connection::PARAM_STR)),
+                $qb->expr()->gt('crdate', $qb->createNamedParameter(time() - 86400, Connection::PARAM_INT)),
+            )
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchOne();
+        if ($uid === false) {
+            return false;
+        }
+        $this->connectionPool->getConnectionForTable(ProtocolEntry::TABLE)
+            ->update(ProtocolEntry::TABLE, ['rating' => $rating], ['uid' => (int)$uid]);
+
+        return true;
+    }
+
+    /**
      * @return list<ProtocolEntry>
      */
     public function findByConversation(string $conversationId, ?string $siteIdentifier = null): array
@@ -71,7 +102,7 @@ final class ChatProtocolRepository
     }
 
     /**
-     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int}>
+     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int,ratedUp:int,ratedDown:int}>
      */
     public function findConversations(ProtocolFilter $filter, int $limit = 50, int $offset = 0): array
     {
@@ -110,6 +141,8 @@ final class ChatProtocolRepository
                 'lastAt' => (int)$row['last_at'],
                 'escalated' => (bool)$row['escalated'],
                 'problems' => (int)$row['problems'],
+                'ratedUp' => (int)$row['rated_up'],
+                'ratedDown' => (int)$row['rated_down'],
             ];
         }
 
@@ -160,6 +193,8 @@ final class ChatProtocolRepository
             'MIN(site_identifier) AS site_identifier',
             'MIN(language_id) AS language_id',
             'SUM(' . $problemsExpression . ') AS problems',
+            'SUM(CASE WHEN rating > 0 THEN 1 ELSE 0 END) AS rated_up',
+            'SUM(CASE WHEN rating < 0 THEN 1 ELSE 0 END) AS rated_down',
         );
 
         $qb->groupBy('conversation_id');
@@ -191,6 +226,12 @@ final class ChatProtocolRepository
         if ($filter->onlyEscalated) {
             $qb->andHaving(
                 'MAX(escalated) = ' . $qb->createNamedParameter(1, Connection::PARAM_INT)
+            );
+        }
+
+        if ($filter->onlyNegative) {
+            $qb->andHaving(
+                'MIN(rating) < ' . $qb->createNamedParameter(0, Connection::PARAM_INT)
             );
         }
 

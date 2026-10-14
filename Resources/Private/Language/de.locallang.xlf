@@ -255,6 +255,58 @@
                 <source>Search without every word</source>
                 <target>Ohne jedes Wort suchen</target>
             </trans-unit>
+            <trans-unit id="chat.widget.newChat">
+                <source>New conversation</source>
+                <target>Neues Gespräch</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.expand">
+                <source>Expand</source>
+                <target>Vergrößern</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.shrink">
+                <source>Shrink</source>
+                <target>Verkleinern</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.close">
+                <source>Close chat</source>
+                <target>Chat schließen</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.closeTeaser">
+                <source>Close notice</source>
+                <target>Hinweis schließen</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.loading">
+                <source>Loading …</source>
+                <target>Wird geladen …</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.error">
+                <source>The chat could not be loaded.</source>
+                <target>Der Chat konnte nicht geladen werden.</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.send">
+                <source>Send question</source>
+                <target>Frage senden</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.question">
+                <source>Was this helpful?</source>
+                <target>War das hilfreich?</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.up">
+                <source>Yes, helpful</source>
+                <target>Ja, hilfreich</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.down">
+                <source>No, not helpful</source>
+                <target>Nein, nicht hilfreich</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.thanks">
+                <source>Thank you for your feedback.</source>
+                <target>Danke für Ihre Rückmeldung.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.support">
+                <source>Contact support</source>
+                <target>Support kontaktieren</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

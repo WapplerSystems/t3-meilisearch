@@ -40,10 +40,27 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
     public const CHANNEL_WEB = 'web';
     /** An AI client through the MCP endpoint. */
     public const CHANNEL_MCP = 'mcp';
+    /** Format of the key a visitor rates a turn with: 32 hex digits. */
+    public const TURN_KEY_PATTERN = '/^[0-9a-f]{32}$/';
 
     public function __construct(
         private readonly ChatProtocolRepository $repository,
     ) {}
+
+    /**
+     * Visitor feedback (thumbs under each answer) is on: it needs the
+     * protocol, which is where the verdict is stored.
+     */
+    public function isFeedbackEnabled(?Site $site): bool
+    {
+        return $this->isEnabled($site)
+            && (bool)$site->getSettings()->get('meilisearch.rag.feedback.enabled', false);
+    }
+
+    public static function newTurnKey(): string
+    {
+        return bin2hex(random_bytes(16));
+    }
 
     public function isEnabled(?Site $site): bool
     {
@@ -66,6 +83,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
         array $hits,
         bool $escalated,
         string $channel = self::CHANNEL_WEB,
+        string $turnKey = '',
     ): void {
         if (!$this->isEnabled($site) || preg_match(Conversation::ID_PATTERN, $conversationId) !== 1) {
             return;
@@ -100,6 +118,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
                 sources: $sources,
                 escalated: $escalated,
                 channel: $channel,
+                turnKey: preg_match(self::TURN_KEY_PATTERN, $turnKey) === 1 ? $turnKey : '',
             ));
         } catch (\Throwable $e) {
             // A protocol that cannot be written must never cost the visitor
