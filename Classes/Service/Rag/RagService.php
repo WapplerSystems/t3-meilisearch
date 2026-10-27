@@ -19,6 +19,7 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmException;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\Escalation;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
+use WapplerSystems\Meilisearch\Service\Llm\LlmOptions;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
 
@@ -577,27 +578,7 @@ final class RagService implements LoggerAwareInterface
      */
     private function buildLlmOptions(object $settings, array $overrides = []): array
     {
-        $llmOptions = [
-            'model' => (string)$settings->get('meilisearch.rag.model', ''),
-            'apiKey' => (string)$settings->get('meilisearch.rag.apiKey', ''),
-            'url' => (string)$settings->get('meilisearch.rag.url', ''),
-            'temperature' => (float)$settings->get('meilisearch.rag.temperature', 0.2),
-            'timeout' => (int)$settings->get('meilisearch.rag.timeout', 60),
-            // Tenant id for vendor-specific providers (currently Infomaniak).
-            // Generic providers ignore it.
-            'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
-            'scalewayProjectId' => (string)$settings->get('meilisearch.scaleway.projectId', ''),
-        ];
-        $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
-        if ($maxTokens > 0) {
-            $llmOptions['maxTokens'] = $maxTokens;
-        }
-        // Caller overrides win over the site settings.
-        foreach ($overrides as $key => $value) {
-            $llmOptions[$key] = $value;
-        }
-
-        return $llmOptions;
+        return LlmOptions::fromSettings($settings, $overrides);
     }
 
     public function ask(Site $site, string $question, array $options = []): RagAnswer
