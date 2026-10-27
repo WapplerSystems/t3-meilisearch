@@ -97,7 +97,7 @@ plugin.tx_wsmeilisearch_search {
 # Dedicated typeNum the chat-widget iframe loads. Independent PAGE object
 # (does NOT inherit the site's `page` template), so it renders a minimal
 # self-contained document containing ONLY the wsmeilisearch_rag plugin —
-# no header/nav/footer. Styled by RagEmbed.css; the plugin's own JS/CSS
+# no header/nav/footer, and no content element needed on the page. Styled by RagEmbed.css; the plugin's own JS/CSS
 # assets are emitted via the normal asset collector. RagController keeps
 # this type sticky across the plugin's GET form submit + action links.
 wsMeilisearchRagEmbed = PAGE
@@ -111,13 +111,13 @@ wsMeilisearchRagEmbed {
     }
     bodyTag = <body class="ws-meilisearch-rag-embed">
     includeCSS.ragEmbed = EXT:ws_meilisearch/Resources/Public/CSS/RagEmbed.css
-    10 = CONTENT
+    # The plugin itself, not the page's RAG content elements: the plugin has
+    # no FlexForm, so nothing on the element configures it, and reading the
+    # elements tied the chat to them - hiding the element on the target page
+    # (or keeping that page out of the index) took the chat offline with it.
+    10 = EXTBASEPLUGIN
     10 {
-        table = tt_content
-        select {
-            pidInList = this
-            orderBy = sorting
-            where = CType = 'wsmeilisearch_rag'
-        }
+        extensionName = WsMeilisearch
+        pluginName = Rag
     }
 }
