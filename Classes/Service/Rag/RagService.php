@@ -219,6 +219,21 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
+     * The text the semantic half of the retrieval is embedded from. On the
+     * first turn that is the question as asked (see withVectorQuery()). In a
+     * follow-up the visitor's wording is elliptical — "verstehe ich nicht"
+     * embeds next to nothing that is about the subject, and with a high
+     * semanticRatio that vector decided the context: the rewrite had found the
+     * subject again, the vector pulled in unrelated pages anyway (LINEAR test
+     * group, fb-17). There the rewritten, self-contained query is the better
+     * text to embed.
+     */
+    private function vectorQuestion(Conversation $conversation, string $question, string $retrievalQuestion): string
+    {
+        return $conversation->isEmpty() ? $question : $retrievalQuestion;
+    }
+
+    /**
      * Hand the retrieval the visitor's original wording alongside the
      * condensed keyword query, so the semantic half is embedded from the
      * question as asked. See SearchService::vectorQueryFor() for why the two
@@ -631,7 +646,7 @@ final class RagService implements LoggerAwareInterface
         $hits = $this->searchForContext(
             $site,
             $retrievalQuestion,
-            $this->withVectorQuery($event->options, $event->question),
+            $this->withVectorQuery($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
@@ -830,7 +845,7 @@ final class RagService implements LoggerAwareInterface
         $hits = $this->searchForContext(
             $site,
             $retrievalQuestion,
-            $this->withVectorQuery($event->options, $event->question),
+            $this->withVectorQuery($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
