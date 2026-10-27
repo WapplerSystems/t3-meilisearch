@@ -11,7 +11,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use WapplerSystems\Meilisearch\Service\Rag\Conversation;
+use WapplerSystems\Meilisearch\Service\Rag\RagAnswer;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
+use WapplerSystems\Meilisearch\Service\Rag\Turn;
 
 /**
  * Ad-hoc CLI for the RAG pipeline. Useful for verifying provider connectivity
@@ -50,6 +53,14 @@ final class AskCommand extends Command
                 InputOption::VALUE_NONE,
                 'Print the result as one JSON object (status, answer, cited ids, topic, '
                 . 'out-of-scope flag, notes, suggestions) — for scripted test runs over a question catalogue.',
+            )
+            ->addOption(
+                'follow-up',
+                null,
+                InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'Ask this in the same conversation after the question (repeatable), like a visitor '
+                . 'who replies to the answer. Only the last answer is printed; with --json every '
+                . 'round is printed as one JSON object per line.',
             );
     }
 
@@ -80,24 +91,32 @@ final class AskCommand extends Command
             $options['language'] = (int)$languageOption;
         }
 
-        $answer = $this->ragService->ask($site, $question, ['internal' => true] + $options);
+        // Follow-ups run in one conversation, carried the way the controller
+        // carries it between requests, so test catalogues can check how a
+        // reply to an answer ("verstehe ich nicht") is handled.
+        $questions = array_merge([$question], array_values(array_filter(
+            (array)$input->getOption('follow-up'),
+            static fn ($q): bool => trim((string)$q) !== '',
+        )));
+        $conversation = Conversation::empty()->withId();
+        $maxTurns = max(1, (int)$site->getSettings()->get('meilisearch.rag.conversation.maxTurns', 3));
+        foreach ($questions as $index => $current) {
+            $answer = $this->ragService->ask($site, (string)$current, ['internal' => true, 'conversation' => $conversation] + $options);
+            if (($answer->status === 'ok' || $answer->status === 'clarify') && $index < count($questions) - 1) {
+                $conversation = $conversation->withTurn(new Turn(
+                    (string)$current,
+                    $answer->answer,
+                    $answer->citedIds,
+                    $answer->status === 'clarify' ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER,
+                ), $maxTurns);
+            }
+            if ($input->getOption('json') && $index < count($questions) - 1) {
+                $output->writeln($this->toJson((string)$current, $answer));
+            }
+            $question = (string)$current;
+        }
         if ($input->getOption('json')) {
-            $output->writeln(json_encode([
-                'question' => $question,
-                'status' => $answer->status,
-                'error' => $answer->error,
-                'answer' => $answer->answer,
-                'citedIds' => $answer->citedIds,
-                'sources' => array_map(static fn (array $hit): array => [
-                    'id' => (string)($hit['id'] ?? ''),
-                    'type' => (string)($hit['type'] ?? ''),
-                    'title' => (string)($hit['title'] ?? ''),
-                ], $answer->sources),
-                'topic' => $answer->topic,
-                'outOfScope' => $answer->outOfScope,
-                'notes' => $answer->notes,
-                'suggestions' => $answer->suggestions,
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+            $output->writeln($this->toJson($question, $answer));
             return $answer->status === 'failed' ? Command::FAILURE : Command::SUCCESS;
         }
         if ($answer->status === 'clarify') {
@@ -128,5 +147,25 @@ final class AskCommand extends Command
             }
         }
         return Command::SUCCESS;
+    }
+
+    private function toJson(string $question, RagAnswer $answer): string
+    {
+        return json_encode([
+            'question' => $question,
+            'status' => $answer->status,
+            'error' => $answer->error,
+            'answer' => $answer->answer,
+            'citedIds' => $answer->citedIds,
+            'sources' => array_map(static fn (array $hit): array => [
+                'id' => (string)($hit['id'] ?? ''),
+                'type' => (string)($hit['type'] ?? ''),
+                'title' => (string)($hit['title'] ?? ''),
+            ], $answer->sources),
+            'topic' => $answer->topic,
+            'outOfScope' => $answer->outOfScope,
+            'notes' => $answer->notes,
+            'suggestions' => $answer->suggestions,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }

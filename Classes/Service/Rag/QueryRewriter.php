@@ -45,7 +45,15 @@ final class QueryRewriter implements LoggerAwareInterface
      */
     private const KEYWORD_PROMPT = 'You turn a question into a short search query for a document search engine. Keep the topic noun and the action, with the verb in the infinitive: "Wie gebe ich eine Lizenz wieder frei?" becomes "Lizenz freigeben", and "How do I install software packages?" becomes "install software packages". Drop question words, articles, pronouns and filler. Keep domain and product terms verbatim, but drop a product name when it is not part of what is being asked about. Two to four words is usually right. Output ONLY the query text — no quotes, no labels, no explanation.';
 
-    private const SYSTEM_PROMPT = 'You rewrite the user\'s latest message into a single, self-contained search query for a document search engine. Use the conversation so far only to resolve pronouns, ellipsis and the implicit subject. Keep the user\'s domain/product terms verbatim. Output ONLY the query text — no quotes, no labels, no explanation. If the latest message is already self-contained, output it unchanged.';
+    /**
+     * The last sentence covers replies that react to the previous answer
+     * without naming a subject ("verstehe ich nicht", "genauer bitte"). Left
+     * to "output it unchanged", the model searched for "verstehe ich nicht",
+     * retrieved unrelated pages and the answer fell back to "nothing found"
+     * (LINEAR test group, 16.10.2026). Searching the previous subject again
+     * gives the answer model the context it needs to explain it more simply.
+     */
+    private const SYSTEM_PROMPT = 'You rewrite the user\'s latest message into a single, self-contained search query for a document search engine. Use the conversation so far only to resolve pronouns, ellipsis and the implicit subject. Keep the user\'s domain/product terms verbatim. Output ONLY the query text — no quotes, no labels, no explanation. If the latest message is already self-contained, output it unchanged. If the latest message only reacts to the previous answer without naming a subject of its own (it says it did not understand, asks for simpler words, more detail or an example, or just thanks), output the search query for the previous user question instead.';
 
     /**
      * Appended to both prompts when the caller names the retrieval language.
