@@ -293,6 +293,18 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.chatWidget.badge:
+    label: 'Chat widget: badge next to the title'
+    description: 'Short label in a small box next to the title in the panel head, e.g. "Beta". Empty: no badge. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
+  meilisearch.rag.chatWidget.greetingNote:
+    label: 'Chat widget: note under the greeting text'
+    description: 'Smaller, muted line under the greeting text, e.g. that the assistant is new and the team is available in person. Empty: none. Plain text or LLL:EXT:… reference.'
+    type: string
+    default: ''
+
   meilisearch.rag.chatWidget.launcherText:
     label: 'Chat widget: text on the launcher button'
     description: 'Text next to the icon on the closed widget. Empty: a round icon-only button. Plain text or LLL:EXT:… reference.'

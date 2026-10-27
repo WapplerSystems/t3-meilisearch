@@ -71,6 +71,7 @@ final class ChatWidgetRenderer
         $config = [
             'title' => $this->text($site, $lang, 'title') ?: $label,
             'subtitle' => $this->text($site, $lang, 'subtitle'),
+            'badge' => $this->text($site, $lang, 'badge'),
             'launcherText' => $this->text($site, $lang, 'launcherText'),
             'icon' => $this->iconUrl((string)$site->getSettings()->get(self::PREFIX . 'icon', '')),
             'teaser' => [
@@ -83,6 +84,7 @@ final class ChatWidgetRenderer
                 'title' => $this->text($site, $lang, 'greetingTitle'),
                 'text' => $this->text($site, $lang, 'greetingText'),
                 'hint' => $this->text($site, $lang, 'greetingHint'),
+                'note' => $this->text($site, $lang, 'greetingNote'),
                 'groups' => $this->exampleGroups($site, $langCode),
             ],
             'placeholder' => $this->text($site, $lang, 'placeholder'),

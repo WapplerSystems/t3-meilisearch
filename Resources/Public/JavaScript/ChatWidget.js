@@ -156,7 +156,9 @@
             '<div class="ws-meilisearch-chat-panel__header">'
             + iconHtml('ws-meilisearch-chat-panel__icon')
             + '<div class="ws-meilisearch-chat-panel__titles">'
-            + '<span class="ws-meilisearch-chat-panel__heading">' + escapeHtml(title) + '</span>'
+            + '<span class="ws-meilisearch-chat-panel__heading">' + escapeHtml(title)
+            + (cfg.badge ? ' <span class="ws-meilisearch-chat-panel__badge">' + escapeHtml(cfg.badge) + '</span>' : '')
+            + '</span>'
             + (cfg.subtitle ? '<span class="ws-meilisearch-chat-panel__subtitle">' + escapeHtml(cfg.subtitle) + '</span>' : '')
             + '</div>'
             + '<button type="button" class="ws-meilisearch-chat-panel__btn" data-wsms-action="new" aria-label="' + escapeHtml(labels.newChat) + '" title="' + escapeHtml(labels.newChat) + '">' + svg('newChat') + '</button>'
@@ -212,6 +214,7 @@
             let html = '';
             if (g.title) { html += '<h2 class="ws-meilisearch-chat-greeting__title">' + escapeHtml(g.title) + '</h2>'; }
             if (g.text) { html += '<p class="ws-meilisearch-chat-greeting__text">' + escapeHtml(g.text) + '</p>'; }
+            if (g.note) { html += '<p class="ws-meilisearch-chat-greeting__note">' + escapeHtml(g.note) + '</p>'; }
             if (groups.length && g.hint) { html += '<p class="ws-meilisearch-chat-greeting__hint">' + escapeHtml(g.hint) + '</p>'; }
             groups.forEach(function (grp) {
                 const key = String(grp.key || '').replace(/[^a-z0-9_-]/gi, '');
