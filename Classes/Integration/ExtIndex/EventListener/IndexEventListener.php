@@ -91,7 +91,18 @@ final class IndexEventListener implements LoggerAwareInterface
         // The queue is processed asynchronously: a page an editor hid or
         // deleted after it was queued would otherwise come right back. And
         // EXT:index knows nothing of meilisearch.index.excludedPageTrees.
+        // EXT:index's DataHandler hook queues a saved page translation under
+        // the uid of the translation record, as if it were a page of its
+        // own: a "pages-<translation uid>" document in the default language,
+        // without content (the content elements sit on the default page) and
+        // with the description of the other language. Asked "Wer ist mein
+        // Berater", the chat cited such a document and answered in Dutch.
+        // The translation is indexed under its default page; drop this one.
         $this->pageIndexEligibility->forgetCache();
+        if ($this->isTranslationRecord($event->pageUid)) {
+            $engine->deleteDocument($indexName, $docId);
+            return;
+        }
         if ($this->pageIndexEligibility->ineligibleReason($event->pageUid, $event->language, $event->site) !== null) {
             $engine->deleteDocument($indexName, $docId);
             return;
@@ -405,6 +416,22 @@ final class IndexEventListener implements LoggerAwareInterface
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function isTranslationRecord(int $pageUid): bool
+    {
+        if ($pageUid <= 0) {
+            return false;
+        }
+        $qb = $this->connectionPool->getQueryBuilderForTable('pages');
+        $qb->getRestrictions()->removeAll();
+        $language = $qb->select('sys_language_uid')
+            ->from('pages')
+            ->where($qb->expr()->eq('uid', $qb->createNamedParameter($pageUid, \Doctrine\DBAL\ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchOne();
+
+        return $language !== false && (int)$language > 0;
     }
 
     /**
