@@ -841,7 +841,7 @@ settings:
 
   meilisearch.rag.retrievalLanes:
     label: 'RAG: retrieval lanes'
-    description: 'Fill the context from several separate retrievals instead of one ranked list, each entry "<hits>:<filter expression>", e.g. ["3:type = \"page\"", "3:type = \"elearning\""]. Every lane adds its filter to meilisearch.rag.retrievalFilters and contributes its best hits; the context is their round-robin merge (maxContextHits does not apply). Use it when one corpus is much larger than another and would otherwise crowd it out of the context. Empty = one list (default).'
+    description: 'Fill the context from several separate retrievals instead of one ranked list, each entry "<hits>:<filter expression>", e.g. ["3:type = \"page\"", "3:type = \"elearning\""]. Every lane adds its filter to meilisearch.rag.retrievalFilters and contributes its best hits; the context is their round-robin merge (maxContextHits does not apply). Use it when one corpus is much larger than another and would otherwise crowd it out of the context. "<hits>@<word>,<word*>:<filter>" runs a lane only when the question contains one of the words ("*" = prefix), e.g. "2@seit wann,release*:type = \"whatsnew\"". Empty = one list (default).'
     type: stringlist
     default: []
 

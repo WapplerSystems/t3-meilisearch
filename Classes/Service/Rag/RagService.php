@@ -14,6 +14,7 @@ use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Event\RagClarificationEvent;
+use WapplerSystems\Meilisearch\Event\RagContextEntriesEvent;
 use WapplerSystems\Meilisearch\Event\RagAnswerNotesEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
@@ -636,7 +637,7 @@ final class RagService implements LoggerAwareInterface
         // Before the empty check: with fixed facts the model still sees a
         // context and answers — an off-topic question finds nothing in the
         // index, and "no context" would hand it the contact card.
-        $hits = $this->withFixedFacts($site, $event->question, $hits);
+        $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
@@ -835,7 +836,7 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
             true,
         );
-        $hits = $this->withFixedFacts($site, $event->question, $hits);
+        $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [], $questionTopic)) {
@@ -1336,10 +1337,15 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
-     * meilisearch.rag.retrievalLanes as [filter, hits] pairs, empty when unset.
-     * Entries read "<hits>:<filter expression>", e.g. '3:type = "elearning"'.
+     * meilisearch.rag.retrievalLanes as [filter, hits, triggers], empty when
+     * unset. Entries read "<hits>:<filter expression>", e.g.
+     * '3:type = "elearning"', or "<hits>@<triggers>:<filter expression>" for a
+     * lane that only runs when the question contains one of the
+     * comma-separated trigger words (same matching as the fact sheet
+     * triggers), e.g. '2@seit wann,release*:type = "whatsnew"'. Release notes
+     * in every context got cited next to answers on how to operate a dialog.
      *
-     * @return list<array{0:string,1:int}>
+     * @return list<array{0:string,1:int,2:list<string>}>
      */
     private function retrievalLanes(Site $site): array
     {
@@ -1349,8 +1355,9 @@ final class RagService implements LoggerAwareInterface
         }
         $lanes = [];
         foreach ($raw as $entry) {
-            if (preg_match('/^\s*(\d+)\s*:\s*(.+)$/s', (string)$entry, $m) === 1 && (int)$m[1] > 0) {
-                $lanes[] = [trim($m[2]), min(20, (int)$m[1])];
+            if (preg_match('/^\s*(\d+)\s*(?:@([^:]*))?:\s*(.+)$/s', (string)$entry, $m) === 1 && (int)$m[1] > 0) {
+                $triggers = array_values(array_filter(array_map('trim', explode(',', (string)$m[2])), static fn (string $t): bool => $t !== ''));
+                $lanes[] = [trim($m[3]), min(20, (int)$m[1]), $triggers];
             }
         }
 
@@ -1370,7 +1377,7 @@ final class RagService implements LoggerAwareInterface
      * questions when searched on its own, 12 of 24 in the joint list.
      *
      * @param array<string,mixed> $searchOptions
-     * @param list<array{0:string,1:int}> $lanes
+     * @param list<array{0:string,1:int,2:list<string>}> $lanes
      * @return list<array<string,mixed>>
      */
     private function searchLanes(
@@ -1383,7 +1390,10 @@ final class RagService implements LoggerAwareInterface
         bool $collapseByTitle,
     ): array {
         $perLane = [];
-        foreach ($lanes as [$filter, $count]) {
+        foreach ($lanes as [$filter, $count, $triggers]) {
+            if ($triggers !== [] && !$this->touchesTriggers($askedAs, $triggers)) {
+                continue;
+            }
             $laneOptions = $searchOptions;
             $existing = $laneOptions['filters']['__rawFilters'] ?? [];
             $laneOptions['filters']['__rawFilters'] = array_merge(is_array($existing) ? $existing : [], [$filter]);
@@ -1399,7 +1409,7 @@ final class RagService implements LoggerAwareInterface
 
         $merged = [];
         $seen = [];
-        for ($rank = 0, $max = max(array_map('count', $perLane)); $rank < $max; $rank++) {
+        for ($rank = 0, $max = $perLane === [] ? 0 : max(array_map('count', $perLane)); $rank < $max; $rank++) {
             foreach ($perLane as $laneHits) {
                 $hit = $laneHits[$rank] ?? null;
                 $id = (string)($hit['id'] ?? '');
@@ -1741,15 +1751,6 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
-     * Fixed notes for under the answer, from RagAnswerNotesEvent listeners.
-     * A failing listener costs the notes, never the answer.
-     *
-     * @param list<array<string,mixed>> $hits
-     * @param list<string> $citedIds
-     * @param array<string,mixed> $options
-     * @return list<string>
-     */
-    /**
      * Lets listeners withdraw a finished answer (RagAnswerGuardEvent). Returns
      * the answer and its citations — unchanged, or the expanded replacement
      * without citations. A failing listener leaves the answer as it was.
@@ -1793,6 +1794,15 @@ final class RagService implements LoggerAwareInterface
         }
     }
 
+    /**
+     * Fixed notes for under the answer, from RagAnswerNotesEvent listeners.
+     * A failing listener costs the notes, never the answer.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param list<string> $citedIds
+     * @param array<string,mixed> $options
+     * @return list<string>
+     */
     private function answerNotes(Site $site, string $question, string $answer, array $hits, array $citedIds, array $options): array
     {
         if (trim($answer) === '') {
@@ -1940,6 +1950,42 @@ final class RagService implements LoggerAwareInterface
         $system = array_slice($currentTurnMessages, 0, 1);
         $rest = array_slice($currentTurnMessages, 1);
         return array_merge($system, $conversation->toMessages(), $rest);
+    }
+
+    /**
+     * Entries listeners add after retrieval (RagContextEntriesEvent), e.g.
+     * the result of a lookup no search can do. An entry whose id is already
+     * in the context is skipped. A failing listener costs its entries only.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,mixed> $options
+     * @return list<array<string,mixed>>
+     */
+    private function withContextEntries(Site $site, string $question, array $hits, array $options): array
+    {
+        try {
+            $conversation = $options['conversation'] ?? null;
+            $event = new RagContextEntriesEvent(
+                $site,
+                $question,
+                $this->resolveLanguageId($options),
+                $conversation instanceof Conversation ? $conversation : null,
+            );
+            $this->eventDispatcher->dispatch($event);
+        } catch (\Throwable $e) {
+            $this->logger?->error('RAG context entries failed: {message}', ['message' => $e->getMessage(), 'exception' => $e]);
+
+            return $hits;
+        }
+        $known = array_flip(array_map(static fn (array $hit): string => (string)($hit['id'] ?? ''), $hits));
+        foreach ($event->getEntries() as $entry) {
+            if (!isset($known[(string)$entry['id']])) {
+                $hits[] = $entry;
+                $known[(string)$entry['id']] = true;
+            }
+        }
+
+        return $hits;
     }
 
     /**
