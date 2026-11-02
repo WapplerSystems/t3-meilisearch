@@ -9,6 +9,7 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Event\AfterRagAnswerEvent;
+use WapplerSystems\Meilisearch\Event\RagAnswerGuardEvent;
 use WapplerSystems\Meilisearch\Event\BeforeLlmCallEvent;
 use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
@@ -706,6 +707,9 @@ final class RagService implements LoggerAwareInterface
         $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
+        if (!$outOfScope) {
+            [$responseText, $citedIds] = $this->guardAnswer($site, $event->question, $responseText, $hits, $citedIds, $topic, $options);
+        }
         $answer = new RagAnswer(
             answer: trim($responseText),
             sources: $hits,
@@ -914,8 +918,11 @@ final class RagService implements LoggerAwareInterface
             $cachedText = $this->expandFixedReplies($site, $cachedText);
             $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
             $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
-            yield RagStreamChunk::token($cachedText);
             $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $cachedText, $hits);
+            if (!$outOfScope) {
+                [$cachedText, $citedIds] = $this->guardAnswer($site, $event->question, $cachedText, $hits, $citedIds, $topic, $options);
+            }
+            yield RagStreamChunk::token($cachedText);
             if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds, $topic)) {
                 yield $chunk;
             }
@@ -963,6 +970,10 @@ final class RagService implements LoggerAwareInterface
         }
 
         $accumulated = '';
+        // Nothing reaches the screen before the answer guard has run: the
+        // visitor waits for the whole answer, but never reads one that is
+        // then withdrawn (see RagAnswerGuardEvent).
+        $holdBack = (bool)$settings->get('meilisearch.rag.stream.holdBack', false);
         // Start of the reply, held back until it is clear whether it carries
         // reply tags — see OUT_OF_SCOPE_MARKER and TOPIC_TAG_FORMAT.
         $head = '';
@@ -974,6 +985,9 @@ final class RagService implements LoggerAwareInterface
                     continue;
                 }
                 $accumulated .= $delta;
+                if ($holdBack) {
+                    continue;
+                }
                 if (!$headDecided) {
                     $head .= $delta;
                     if (self::mayStillBeTags($head)) {
@@ -993,7 +1007,7 @@ final class RagService implements LoggerAwareInterface
                 }
                 yield RagStreamChunk::token($delta);
             }
-            if (!$headDecided && trim(self::splitReplyTags($head)[0]) !== '') {
+            if (!$holdBack && !$headDecided && trim(self::splitReplyTags($head)[0]) !== '') {
                 yield RagStreamChunk::token($this->expandFixedReplies($site, self::splitReplyTags($head)[0]));
             }
         } catch (LlmException $e) {
@@ -1019,6 +1033,12 @@ final class RagService implements LoggerAwareInterface
         $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
+        if (!$outOfScope) {
+            [$accumulated, $citedIds] = $this->guardAnswer($site, $event->question, $accumulated, $hits, $citedIds, $topic, $options);
+        }
+        if ($holdBack && trim($accumulated) !== '') {
+            yield RagStreamChunk::token(trim($accumulated));
+        }
         // Before `done`, because `done` is the terminal frame the client may
         // close on — see RagStreamChunk. An answer that cited nothing is the
         // "ok but ungrounded" case the contact card exists for; an off-topic
@@ -1729,6 +1749,50 @@ final class RagService implements LoggerAwareInterface
      * @param array<string,mixed> $options
      * @return list<string>
      */
+    /**
+     * Lets listeners withdraw a finished answer (RagAnswerGuardEvent). Returns
+     * the answer and its citations — unchanged, or the expanded replacement
+     * without citations. A failing listener leaves the answer as it was.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param list<string> $citedIds
+     * @return array{0:string,1:list<string>}
+     */
+    private function guardAnswer(Site $site, string $question, string $answer, array $hits, array $citedIds, string $topic, array $options): array
+    {
+        if (trim($answer) === '') {
+            return [$answer, $citedIds];
+        }
+        try {
+            $conversation = $options['conversation'] ?? null;
+            $event = new RagAnswerGuardEvent(
+                $site,
+                $question,
+                $answer,
+                $hits,
+                array_values(array_map('strval', $citedIds)),
+                $topic,
+                $this->resolveLanguageId($options),
+                $conversation instanceof Conversation ? $conversation : null,
+            );
+            $this->eventDispatcher->dispatch($event);
+            $replacement = $event->getReplacement();
+            if ($replacement === null) {
+                return [$answer, $citedIds];
+            }
+            $this->logger?->notice('RAG answer withdrawn ({reason}): {question}', [
+                'reason' => $event->getReason(),
+                'question' => mb_substr($question, 0, 200),
+            ]);
+
+            return [$this->expandFixedReplies($site, $replacement), []];
+        } catch (\Throwable $e) {
+            $this->logger?->error('RAG answer guard failed: {message}', ['message' => $e->getMessage(), 'exception' => $e]);
+
+            return [$answer, $citedIds];
+        }
+    }
+
     private function answerNotes(Site $site, string $question, string $answer, array $hits, array $citedIds, array $options): array
     {
         if (trim($answer) === '') {

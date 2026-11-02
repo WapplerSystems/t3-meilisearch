@@ -524,6 +524,12 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.stream.holdBack:
+    label: 'Chat: show the answer only when it is complete'
+    description: 'When true, the streamed chat sends the answer in one piece after it has been generated and checked (RagAnswerGuardEvent) instead of word by word. The visitor waits longer for the first word, but never sees an answer that a check then withdraws. Off: the answer streams, a withdrawn one is swapped for its replacement when it is complete.'
+    type: bool
+    default: false
+
   meilisearch.rag.stopWords:
     label: 'RAG-specific stop-words'
     description: 'Override the index-wide stopWords for RAG-retrieval stripping. Use this to keep brand / product / domain-verb tokens in the query while still removing generic question / function words ("wie", "kann", "ich", "der", "die", …). Leave empty to reuse the index-side list. The override is consulted only when meilisearch.rag.stripStopWords is on.'
