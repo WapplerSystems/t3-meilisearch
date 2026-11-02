@@ -11,12 +11,14 @@ use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use TYPO3\CMS\Core\Http\NullResponse;
 use TYPO3\CMS\Core\Http\Response;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
+use WapplerSystems\Meilisearch\Service\Rag\Protection\RagRequestGuard;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
 use WapplerSystems\Meilisearch\Service\Rag\RagStreamChunk;
@@ -50,6 +52,8 @@ final class RagStreamMiddleware implements MiddlewareInterface
         private readonly ConversationStore $conversationStore,
         private readonly AccessControlFilter $accessControlFilter,
         private readonly ChatProtocolRecorder $protocolRecorder,
+        private readonly RagRequestGuard $requestGuard,
+        private readonly LanguageServiceFactory $languageServiceFactory,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -86,16 +90,25 @@ final class RagStreamMiddleware implements MiddlewareInterface
         // The id exists before the answer does: the escalation card that may
         // come with it links to this conversation's protocol.
         $conversation = $this->loadConversation($site, $request)->withId();
-        // Pin the LLM answer language to the active FE language so the
-        // model doesn't drift to English when context excerpts span
-        // multiple languages — matches the non-streaming controller.
-        $askOptions = ['conversation' => $conversation];
+
         $language = $request->getAttribute('language');
         // Belt and braces: if site resolution did not attach the language for
         // this non-page path, derive it from the base prefix we just matched.
         if (!$language instanceof SiteLanguage) {
             $language = $this->languageForPrefix($site, $prefix);
         }
+        $refusal = $this->requestGuard->refuse($site, $request, $question, $conversation->id);
+        if ($refusal === RagRequestGuard::NOT_A_BROWSER) {
+            return $this->jsonError('forbidden', 403);
+        }
+        if ($refusal !== null) {
+            $this->writeRefusal($site, $language, $refusal);
+            return new NullResponse();
+        }
+        // Pin the LLM answer language to the active FE language so the
+        // model doesn't drift to English when context excerpts span
+        // multiple languages — matches the non-streaming controller.
+        $askOptions = ['conversation' => $conversation];
         if ($language instanceof SiteLanguage) {
             $askOptions['language'] = $language->getLanguageId();
             $restrict = (bool)$site->getSettings()->get('meilisearch.restrictToCurrentLanguage', true);
@@ -133,6 +146,34 @@ final class RagStreamMiddleware implements MiddlewareInterface
         }
 
         return null;
+    }
+
+    /**
+     * A refused question (RagRequestGuard) still gets an answer the visitor
+     * can read — a fixed sentence as the `done` frame, nothing streamed, no
+     * protocol entry, no model call. An HTTP error would surface as the
+     * chat's generic "connection lost".
+     */
+    private function writeRefusal(Site $site, ?SiteLanguage $language, string $reason): void
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        $lang = $this->languageServiceFactory->createFromSiteLanguage($language ?? $site->getDefaultLanguage());
+        $key = match ($reason) {
+            RagRequestGuard::TOO_LONG => 'rag.protection.tooLong',
+            RagRequestGuard::SITE_LIMIT => 'rag.protection.unavailable',
+            default => 'rag.protection.rateLimited',
+        };
+        $message = sprintf(
+            $lang->sL('LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:' . $key),
+            (int)$site->getSettings()->get('meilisearch.rag.protection.maxQuestionLength', 0),
+        );
+        header('Content-Type: text/event-stream; charset=UTF-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('X-Accel-Buffering: no');
+        $this->emitFrame(RagStreamChunk::done($message, []));
+        $this->emitFrame(RagStreamChunk::end());
     }
 
     /**

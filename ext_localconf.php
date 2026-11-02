@@ -77,6 +77,17 @@ $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilise
     'groups' => ['system'],
 ];
 
+// Chat protection counters (RagRequestGuard): one small entry per client
+// hash, conversation and site, each expiring with its window. FileBackend for
+// the lifetime, like the query-vector cache; flushed with everything else,
+// which resets the counters on a deploy.
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['ws_meilisearch_ratelimit'] ??= [
+    'backend' => \TYPO3\CMS\Core\Cache\Backend\FileBackend::class,
+    'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+    'options' => ['defaultLifetime' => 86400],
+    'groups' => ['system'],
+];
+
 // Per-site Meilisearch metadata cache (doc count + active embedder). 60s
 // TTL keeps the Overview / Diagnostics BE tabs snappy on multi-site
 // installs without burning a roundtrip per site per page render. Cache

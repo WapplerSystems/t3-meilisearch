@@ -14,7 +14,9 @@ use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
+use WapplerSystems\Meilisearch\Service\Rag\Protection\RagRequestGuard;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
+use WapplerSystems\Meilisearch\Service\Rag\RagAnswer;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\Turn;
@@ -37,6 +39,7 @@ final class RagController extends ActionController
         private readonly AccessControlFilter $accessControlFilter,
         private readonly EscalationResolver $escalationResolver,
         private readonly ChatProtocolRecorder $protocolRecorder,
+        private readonly RagRequestGuard $requestGuard,
     ) {}
 
     private function resolveSite(): ?Site
@@ -104,6 +107,33 @@ final class RagController extends ActionController
         }
 
         $conversation = $this->loadConversation($site)->withId();
+
+        // Same limits as the streamed chat (RagRequestGuard): a refused
+        // question shows a fixed sentence and costs no model call.
+        $psrRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $refusal = $psrRequest instanceof ServerRequestInterface && trim($q) !== ''
+            ? $this->requestGuard->refuse($site, $psrRequest, trim($q), $conversation->id)
+            : null;
+        if ($refusal !== null) {
+            $key = match ($refusal) {
+                RagRequestGuard::TOO_LONG => 'rag.protection.tooLong',
+                RagRequestGuard::SITE_LIMIT => 'rag.protection.unavailable',
+                default => 'rag.protection.rateLimited',
+            };
+            $message = sprintf(
+                (string)\TYPO3\CMS\Extbase\Utility\LocalizationUtility::translate('LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang.xlf:' . $key),
+                (int)$site->getSettings()->get('meilisearch.rag.protection.maxQuestionLength', 0),
+            );
+            $this->view->assignMultiple([
+                'question' => $q,
+                'answer' => new RagAnswer($message, [], [], 'ok'),
+                'conversation' => [],
+                'conversationEnabled' => false,
+                'pageType' => $this->currentPageType(),
+                'streamEndpoint' => $this->streamEndpoint(),
+            ]);
+            return $this->htmlResponse();
+        }
         $options = ['conversation' => $conversation];
 
         // Scope retrieval to the active site language. Without it, FileSchema-

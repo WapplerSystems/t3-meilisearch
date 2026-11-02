@@ -524,6 +524,54 @@ settings:
     type: bool
     default: true
 
+  meilisearch.rag.protection.enabled:
+    label: 'Chat protection: on'
+    description: 'Checks every chat question before it reaches the model (RagRequestGuard): it has to come from a page of this site (Sec-Fetch-Site, or Origin/Referer), its user agent must not be a crawler or HTTP library, it must not exceed maxQuestionLength, and the client, the conversation and the site must be within their limits. A refused question gets a fixed sentence and costs no model call. Clients are kept as a keyed hash of the address (IPv6 by /64) for at most a day, never the address itself.'
+    type: bool
+    default: false
+
+  meilisearch.rag.protection.perClient:
+    label: 'Chat protection: questions per client and window'
+    description: '"<limit>/<interval>" as a sliding window per client, e.g. "20/10 minutes". Empty = no limit.'
+    type: string
+    default: '20/10 minutes'
+
+  meilisearch.rag.protection.perClientDaily:
+    label: 'Chat protection: questions per client and day'
+    description: '0 = no limit.'
+    type: int
+    default: 100
+
+  meilisearch.rag.protection.perConversation:
+    label: 'Chat protection: questions per conversation and day'
+    description: '0 = no limit. A new conversation starts fresh, so this only bounds one long session; the client limits are what holds.'
+    type: int
+    default: 50
+
+  meilisearch.rag.protection.perSiteDaily:
+    label: 'Chat protection: questions per site and day (cost cap)'
+    description: 'All visitors together. Once reached, the chat answers with the "unavailable" sentence until the day window ends, and one warning is logged. Each question costs about two model calls. 0 = no limit.'
+    type: int
+    default: 3000
+
+  meilisearch.rag.protection.maxQuestionLength:
+    label: 'Chat protection: maximum question length (characters)'
+    description: 'Longer questions are refused before they reach the model. 0 = no limit.'
+    type: int
+    default: 1000
+
+  meilisearch.rag.protection.requireSameOrigin:
+    label: 'Chat protection: only questions from pages of this site'
+    description: 'Refuses (HTTP 403) a question whose request does not come from a page of this host: Sec-Fetch-Site must be "same-origin"; without that header, Origin or Referer must name this host.'
+    type: bool
+    default: true
+
+  meilisearch.rag.protection.blockedUserAgents:
+    label: 'Chat protection: blocked user agents'
+    description: 'Case-insensitive substrings; a request whose User-Agent contains one is refused (HTTP 403). An empty User-Agent is always refused.'
+    type: stringlist
+    default: ['bot', 'crawl', 'spider', 'slurp', 'curl/', 'wget', 'python-requests', 'python-urllib', 'aiohttp', 'httpx', 'go-http-client', 'java/', 'okhttp', 'libwww', 'scrapy', 'httpclient', 'node-fetch', 'axios']
+
   meilisearch.rag.stream.holdBack:
     label: 'Chat: show the answer only when it is complete'
     description: 'When true, the streamed chat sends the answer in one piece after it has been generated and checked (RagAnswerGuardEvent) instead of word by word. The visitor waits longer for the first word, but never sees an answer that a check then withdraws. Off: the answer streams, a withdrawn one is swapped for its replacement when it is complete.'
