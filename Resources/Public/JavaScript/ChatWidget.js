@@ -246,17 +246,24 @@
 
         function buildDisclaimer() {
             const d = cfg.disclaimer;
-            if (!d || !(d.before || d.linkText)) return null;
+            // parts: text and links in order (any number of links); the
+            // before/linkText/href/after fields are the older one-link shape.
+            const parts = d && Array.isArray(d.parts) ? d.parts
+                : d ? [{text: d.before || ''}, {text: d.linkText || '', href: d.href || ''}, {text: d.after || ''}] : [];
+            if (!parts.some(function (p) { return p.text; })) return null;
             const el = document.createElement('p');
             el.className = 'ws-meilisearch-chat-disclaimer';
-            el.appendChild(document.createTextNode(d.before || ''));
-            if (d.linkText && d.href) {
-                const a = document.createElement('a');
-                a.href = d.href;
-                a.textContent = d.linkText;
-                el.appendChild(a);
-            }
-            el.appendChild(document.createTextNode(d.after || ''));
+            parts.forEach(function (p) {
+                if (!p.text) return;
+                if (p.href) {
+                    const a = document.createElement('a');
+                    a.href = p.href;
+                    a.textContent = p.text;
+                    el.appendChild(a);
+                } else {
+                    el.appendChild(document.createTextNode(p.text));
+                }
+            });
             return el;
         }
 

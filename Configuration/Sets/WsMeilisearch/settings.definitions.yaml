@@ -379,7 +379,7 @@ settings:
 
   meilisearch.rag.chatWidget.disclaimer:
     label: 'Chat widget: note under the input'
-    description: 'Small centred line under the input field, e.g. an AI notice: "<name> is an AI and can make mistakes. If in doubt, [our support](t3://page?uid=12) will help." One [text](link) is turned into a link; the link may be a t3:// reference, a URL or a mail address. Plain text or LLL:EXT:… reference.'
+    description: 'Small centred line under the input field, e.g. an AI notice: "<name> is an AI and can make mistakes. If in doubt, [our support](t3://page?uid=12) will help. [Privacy](t3://page?uid=34#chat)" Every [text](link) is turned into a link; the link may be a t3:// reference (with #anchor), a URL or a mail address. Plain text or LLL:EXT:… reference.'
     type: string
     default: ''
 

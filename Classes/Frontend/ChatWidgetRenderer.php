@@ -189,24 +189,45 @@ final class ChatWidgetRenderer
     }
 
     /**
-     * Splits "… [text](link) …" into the parts around one link; the link is
-     * resolved through TypoLink so t3:// references, URLs and mail addresses
-     * all work.
+     * Splits "… [text](link) … [text](link) …" into text and link parts; each
+     * link is resolved through TypoLink so t3:// references (with #anchor),
+     * URLs and mail addresses all work. A link that does not resolve stays as
+     * plain text. before/linkText/href/after describe the first link only,
+     * for a ChatWidget.js from before `parts` that a browser still caches.
      *
-     * @return array{before: string, linkText: string, href: string, after: string}|null
+     * @return array{parts: list<array{text: string, href?: string}>, before: string, linkText: string, href: string, after: string}|null
      */
     private function disclaimer(string $text): ?array
     {
         if ($text === '') {
             return null;
         }
-        if (preg_match('/^(.*?)\[([^\]]+)\]\(([^)\s]+)\)(.*)$/s', $text, $m) !== 1) {
-            return ['before' => $text, 'linkText' => '', 'href' => '', 'after' => ''];
+        preg_match_all('/\[([^\]]+)\]\(([^)\s]+)\)/', $text, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
+        $parts = [];
+        $offset = 0;
+        foreach ($matches as $match) {
+            [$whole, $start] = $match[0];
+            if ($start > $offset) {
+                $parts[] = ['text' => substr($text, $offset, $start - $offset)];
+            }
+            $href = $this->cObj->typoLink_URL(['parameter' => $match[2][0]]);
+            $parts[] = $href !== '' ? ['text' => $match[1][0], 'href' => $href] : ['text' => $match[1][0]];
+            $offset = $start + strlen($whole);
         }
-        $href = $this->cObj->typoLink_URL(['parameter' => $m[3]]);
+        if ($offset < strlen($text)) {
+            $parts[] = ['text' => substr($text, $offset)];
+        }
 
-        return $href === ''
-            ? ['before' => $m[1] . $m[2] . $m[4], 'linkText' => '', 'href' => '', 'after' => '']
-            : ['before' => $m[1], 'linkText' => $m[2], 'href' => $href, 'after' => $m[4]];
+        $legacy = ['before' => '', 'linkText' => '', 'href' => '', 'after' => ''];
+        foreach ($parts as $part) {
+            if ($legacy['href'] === '' && isset($part['href'])) {
+                $legacy['linkText'] = $part['text'];
+                $legacy['href'] = $part['href'];
+            } else {
+                $legacy[$legacy['href'] === '' ? 'before' : 'after'] .= $part['text'];
+            }
+        }
+
+        return ['parts' => $parts] + $legacy;
     }
 }
