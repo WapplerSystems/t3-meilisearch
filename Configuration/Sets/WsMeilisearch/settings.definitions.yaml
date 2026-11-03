@@ -526,7 +526,7 @@ settings:
 
   meilisearch.rag.protection.enabled:
     label: 'Chat protection: on'
-    description: 'Checks every chat question before it reaches the model (RagRequestGuard): it has to come from a page of this site (Sec-Fetch-Site, or Origin/Referer), its user agent must not be a crawler or HTTP library, it must not exceed maxQuestionLength, and the client, the conversation and the site must be within their limits. A refused question gets a fixed sentence and costs no model call. Clients are kept as a keyed hash of the address (IPv6 by /64) for at most a day, never the address itself.'
+    description: 'Checks every chat question before it reaches the model (RagRequestGuard): it has to come from a page of this site (Sec-Fetch-Site, or Origin/Referer), its user agent must not be a crawler or HTTP library, it must not exceed maxQuestionLength, and the client, the conversation and the site must be within their limits. A refused question gets a fixed sentence and costs no model call. Clients are kept as an HMAC of the address (IPv6 by /64) with a random key that changes every day and is discarded after two days, for at most a day, never the address itself.'
     type: bool
     default: false
 

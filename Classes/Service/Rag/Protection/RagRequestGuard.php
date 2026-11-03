@@ -31,9 +31,15 @@ use TYPO3\CMS\Core\Site\Entity\SiteSettings;
  *    against many addresses at once.
  *
  * The client is the remote address, an IPv6 address by its /64 network (one
- * connection usually owns the whole prefix), hashed with the installation's
- * encryption key. Only that hash is kept, in the cache ws_meilisearch_ratelimit,
- * for at most the longest window — no address is stored.
+ * connection usually owns the whole prefix), as an HMAC-SHA256 with a random
+ * key of the day. The key is generated on the first question of a day, kept
+ * in the cache ws_meilisearch_ratelimit and expires after two days; nothing
+ * derives it. An IPv4 address has only 2^32 values, so a hash with a fixed
+ * key can be reversed by anyone who has that key. With the key of the day
+ * gone, the hashes of earlier days cannot be traced back to an address, not
+ * even from the server. The price: the daily counters start afresh at
+ * midnight. Only the hashes are kept, for at most the longest window — no
+ * address is stored.
  *
  * Off unless meilisearch.rag.protection.enabled. A limit of 0 is no limit.
  */
@@ -48,6 +54,9 @@ final class RagRequestGuard implements LoggerAwareInterface
     public const SITE_LIMIT = 'site';
 
     private const CACHE = 'ws_meilisearch_ratelimit';
+
+    /** Lifetime of a key of the day: the day itself and the night after. */
+    private const KEY_LIFETIME = 172800;
 
     private ?FrontendInterface $cache = null;
 
@@ -164,7 +173,25 @@ final class RagRequestGuard implements LoggerAwareInterface
             $address = bin2hex(substr($packed, 0, 8)) . '::/64';
         }
 
-        return hash_hmac('sha256', $address, (string)($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] ?? ''));
+        return hash_hmac('sha256', $address, $this->keyOfTheDay());
+    }
+
+    /**
+     * Random, created on first use each day. Two requests creating it at the
+     * same moment may hash a few questions with different keys, which only
+     * means those count separately once.
+     */
+    private function keyOfTheDay(): string
+    {
+        $entry = 'client-key-' . date('Y-m-d');
+        $key = $this->cache()->get($entry);
+        if (is_string($key) && strlen($key) === 64) {
+            return $key;
+        }
+        $key = bin2hex(random_bytes(32));
+        $this->cache()->set($entry, $key, [], self::KEY_LIFETIME);
+
+        return $key;
     }
 
     /**
