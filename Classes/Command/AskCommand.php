@@ -161,6 +161,8 @@ final class AskCommand extends Command
                 'id' => (string)($hit['id'] ?? ''),
                 'type' => (string)($hit['type'] ?? ''),
                 'title' => (string)($hit['title'] ?? ''),
+                'uri' => (string)($hit['uri'] ?? ''),
+                'cited' => in_array((string)($hit['id'] ?? ''), $answer->citedIds, true),
             ], $answer->sources),
             'topic' => $answer->topic,
             'outOfScope' => $answer->outOfScope,
