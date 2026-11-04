@@ -62,6 +62,9 @@ final class RagService implements LoggerAwareInterface
     /** Hard ceiling so a large maxContextHits cannot turn into a huge query. */
     private const COLLAPSE_MAX_FETCH = 50;
 
+    /** Side queries per answer for swapping an older release copy for the current one. */
+    private const CURRENT_RELEASE_LOOKUPS = 5;
+
     use LoggerAwareTrait;
 
     /**
@@ -216,6 +219,9 @@ final class RagService implements LoggerAwareInterface
                 0,
                 $maxHits,
             ));
+        }
+        if ($collapseByTitle) {
+            $hits = $this->preferCurrentRelease($site, $hits, $askedAs, $searchOptions);
         }
 
         return $this->labelCitations($site, $hits);
@@ -397,6 +403,115 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $group[0];
+    }
+
+    /**
+     * Swap a copy of an older release for the current copy of the same topic,
+     * unless the question names that older release.
+     *
+     * collapseReleaseCopies() can only choose among the copies retrieval
+     * returned. The copies of a topic carry the same text and score almost
+     * alike, so which of them lands within the fetched candidates is chance:
+     * on a production knowledge base a question about the parameter manager
+     * retrieved only the release-24 copy of a page that exists in 24, 25 and
+     * 26, and the answer cited 24 to a visitor working with 26.
+     *
+     * The current copy is looked up by title, product and type with the
+     * filters of the retrieval (language, access) kept. Without a current copy
+     * — the topic was dropped in a later release — the older one stays: it is
+     * still the best source there is. At most CURRENT_RELEASE_LOOKUPS side
+     * queries per answer; they are keyword-only and stay out of the analytics.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,mixed> $searchOptions
+     * @return list<array<string,mixed>>
+     */
+    private function preferCurrentRelease(Site $site, array $hits, string $askedAs, array $searchOptions): array
+    {
+        $wanted = $this->versionsNamedIn($askedAs, $hits);
+        $currentKeys = [];
+        foreach ($hits as $hit) {
+            if (!empty($hit['kbIsCurrent'])) {
+                $currentKeys[$this->releaseCopyKey($hit)] = true;
+            }
+        }
+        $ids = array_fill_keys(array_map(static fn (array $hit): string => (string)($hit['id'] ?? ''), $hits), true);
+
+        $lookups = 0;
+        $kept = [];
+        foreach ($hits as $hit) {
+            $version = (int)($hit['kbVersion'] ?? 0);
+            $title = trim((string)($hit['title'] ?? ''));
+            if ($version === 0 || !empty($hit['kbIsCurrent']) || in_array($version, $wanted, true) || $title === '') {
+                $kept[] = $hit;
+                continue;
+            }
+            $key = $this->releaseCopyKey($hit);
+            if (isset($currentKeys[$key])) {
+                // The current copy is in the context already; this one only
+                // repeats it.
+                continue;
+            }
+            $current = $lookups < self::CURRENT_RELEASE_LOOKUPS ? $this->findCurrentCopy($site, $hit, $searchOptions) : null;
+            $lookups++;
+            if ($current === null || isset($ids[(string)($current['id'] ?? '')])) {
+                $kept[] = $hit;
+                continue;
+            }
+            $currentKeys[$key] = true;
+            $ids[(string)$current['id']] = true;
+            $kept[] = $current;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * @param array<string,mixed> $hit a copy of an older release
+     * @param array<string,mixed> $searchOptions
+     * @return array<string,mixed>|null the current copy of the same topic
+     */
+    private function findCurrentCopy(Site $site, array $hit, array $searchOptions): ?array
+    {
+        $quote = static fn (mixed $value): string => '"' . str_replace(['"', '\\'], '', (string)$value) . '"';
+        $filters = is_array($searchOptions['filters'] ?? null) ? $searchOptions['filters'] : [];
+        $raw = is_array($filters['__rawFilters'] ?? null) ? $filters['__rawFilters'] : [];
+        $raw[] = 'kbIsCurrent = true';
+        $raw[] = 'type = ' . $quote($hit['type'] ?? 'page');
+        if (trim((string)($hit['kbProduct'] ?? '')) !== '') {
+            $raw[] = 'kbProduct = ' . $quote($hit['kbProduct']);
+        }
+        $filters['__rawFilters'] = $raw;
+        $options = $searchOptions;
+        unset($options['vectorQuery']);
+        $result = $this->searchService->search($site, (string)$hit['title'], array_merge($options, [
+            'filters' => $filters,
+            'hybrid' => false,
+            'recover' => false,
+            'matchingStrategy' => 'all',
+            'perPage' => 5,
+            'page' => 1,
+            '__skipAnalytics' => true,
+        ]));
+        $key = $this->releaseCopyKey($hit);
+        foreach ($result->hits as $candidate) {
+            $candidate = (array)$candidate;
+            if (!empty($candidate['kbIsCurrent']) && $this->releaseCopyKey($candidate) === $key) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Title and product: the key collapseReleaseCopies() groups copies by.
+     *
+     * @param array<string,mixed> $hit
+     */
+    private function releaseCopyKey(array $hit): string
+    {
+        return mb_strtolower(trim((string)($hit['title'] ?? ''))) . "\0" . (string)($hit['kbProduct'] ?? '');
     }
 
     /**
