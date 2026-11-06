@@ -15,6 +15,7 @@ use WapplerSystems\Meilisearch\Event\BeforeRagQueryEvent;
 use WapplerSystems\Meilisearch\Event\RagCitationLabelsEvent;
 use WapplerSystems\Meilisearch\Event\RagClarificationEvent;
 use WapplerSystems\Meilisearch\Event\RagContextEntriesEvent;
+use WapplerSystems\Meilisearch\Event\RagContextHitsEvent;
 use WapplerSystems\Meilisearch\Event\RagAnswerNotesEvent;
 use WapplerSystems\Meilisearch\Event\RagScopeOptionsEvent;
 use WapplerSystems\Meilisearch\Service\Llm\LlmException;
@@ -224,7 +225,32 @@ final class RagService implements LoggerAwareInterface
             $hits = $this->preferCurrentRelease($site, $hits, $askedAs, $searchOptions);
         }
 
-        return $this->labelCitations($site, $hits);
+        return $this->labelCitations($site, $this->adjustContextHits($site, $askedAs, $hits, $searchOptions));
+    }
+
+    /**
+     * Lets listeners swap or drop context documents (RagContextHitsEvent).
+     * A failing listener leaves the hits as retrieval found them.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,mixed> $searchOptions
+     * @return list<array<string,mixed>>
+     */
+    private function adjustContextHits(Site $site, string $askedAs, array $hits, array $searchOptions): array
+    {
+        if ($hits === []) {
+            return $hits;
+        }
+        try {
+            $event = new RagContextHitsEvent($site, $askedAs, $hits, $searchOptions);
+            $this->eventDispatcher->dispatch($event);
+        } catch (\Throwable $e) {
+            $this->logger?->error('RAG context hits listener failed: {message}', ['message' => $e->getMessage(), 'exception' => $e]);
+
+            return $hits;
+        }
+
+        return $event->getHits();
     }
 
     /**
@@ -701,6 +727,7 @@ final class RagService implements LoggerAwareInterface
     public function ask(Site $site, string $question, array $options = []): RagAnswer
     {
         $question = trim($question);
+        $options = $this->withKnowledgeLanguage($site, $options);
         if ($question === '') {
             return RagAnswer::noContext();
         }
@@ -730,6 +757,11 @@ final class RagService implements LoggerAwareInterface
             $options,
         ), $site);
         $this->eventDispatcher->dispatch($event);
+
+        if (($previous = $this->previousSourcesAnswer($site, $event->question, $conversation, $options)) !== null) {
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+            return $previous;
+        }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         // Fold conversation history into the *retrieval* query so a follow-up
@@ -765,8 +797,8 @@ final class RagService implements LoggerAwareInterface
         // question back instead of guessing. Skips the answer call entirely.
         // A price or training question needs no product: asking "edition A
         // or B?" back only delays the visitor on the way to sales.
-        $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
-            ? $this->queryClassifier->classify(
+        $clarification = $questionTopic === ''
+            ? $this->clarification($site, $event->question, $conversation, $hits, $options) ?? $this->queryClassifier->classify(
                 $provider,
                 $settings,
                 $conversation,
@@ -795,6 +827,7 @@ final class RagService implements LoggerAwareInterface
             $maxChars,
             $this->resolveLanguageId($options),
             $this->resolvePromptMetaFields($settings),
+            is_int($options['retrievalLanguage'] ?? null) ? $options['retrievalLanguage'] : null,
         );
 
         // Splice prior turns between the system prompt and the current
@@ -891,6 +924,7 @@ final class RagService implements LoggerAwareInterface
     public function askStreaming(Site $site, string $question, array $options = []): iterable
     {
         $question = trim($question);
+        $options = $this->withKnowledgeLanguage($site, $options);
         if ($question === '') {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
                 yield $chunk;
@@ -931,6 +965,15 @@ final class RagService implements LoggerAwareInterface
             $options,
         ), $site);
         $this->eventDispatcher->dispatch($event);
+
+        if (($previous = $this->previousSourcesAnswer($site, $event->question, $conversation, $options)) !== null) {
+            yield RagStreamChunk::sources($previous->sources);
+            yield RagStreamChunk::token($previous->answer);
+            yield RagStreamChunk::done($previous->answer, $previous->citedIds);
+            yield RagStreamChunk::end();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+            return;
+        }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         // Conversational rewrite for retrieval only (see ask()); the streamed
@@ -973,8 +1016,8 @@ final class RagService implements LoggerAwareInterface
         // "found N documents" preview it then has to pivot away from.
         // A price or training question needs no product: asking "edition A
         // or B?" back only delays the visitor on the way to sales.
-        $clarification = $questionTopic === '' && $this->clarificationAllowed($site, $event->question, $conversation, $hits)
-            ? $this->queryClassifier->classify(
+        $clarification = $questionTopic === ''
+            ? $this->clarification($site, $event->question, $conversation, $hits, $options) ?? $this->queryClassifier->classify(
                 $provider,
                 $settings,
                 $conversation,
@@ -1020,6 +1063,7 @@ final class RagService implements LoggerAwareInterface
             $maxChars,
             $this->resolveLanguageId($options),
             $this->resolvePromptMetaFields($settings),
+            is_int($options['retrievalLanguage'] ?? null) ? $options['retrievalLanguage'] : null,
         );
         $messages = $this->withConversation($currentTurnMessages, $conversation);
 
@@ -1444,9 +1488,47 @@ final class RagService implements LoggerAwareInterface
      * no 'language'. Retrieval is then unfiltered, and pinning the rewrite to
      * an arbitrary language would contradict it. null means "do not pin".
      */
-    private function resolveLanguageLabel(Site $site, array $options): ?string
+    /**
+     * Retrieval in another language than the page (meilisearch.rag.knowledgeLanguages,
+     * entries "<page language id>:<knowledge language id>", e.g. "7:1").
+     *
+     * A site whose knowledge exists in German and English only still wants
+     * the chat on its Polish and Dutch pages (LINEAR 2026-11-02). There the
+     * search runs on the English documents and the keyword rewrite writes
+     * the query in English; the answer stays in the page language, which
+     * `language` keeps deciding. Without an entry nothing changes.
+     *
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function withKnowledgeLanguage(Site $site, array $options): array
     {
         $languageId = $this->resolveLanguageId($options);
+        if ($languageId === null) {
+            return $options;
+        }
+        foreach ((array)$site->getSettings()->get('meilisearch.rag.knowledgeLanguages', []) as $entry) {
+            $parts = array_map('trim', explode(':', (string)$entry, 2));
+            if (count($parts) !== 2 || !ctype_digit($parts[0]) || !ctype_digit($parts[1]) || (int)$parts[0] !== $languageId) {
+                continue;
+            }
+            $knowledge = (int)$parts[1];
+            $options['retrievalLanguage'] = $knowledge;
+            if (isset($options['filters']['language'])) {
+                $options['filters']['language'] = [$knowledge];
+            }
+
+            return $options;
+        }
+
+        return $options;
+    }
+
+    private function resolveLanguageLabel(Site $site, array $options): ?string
+    {
+        $languageId = is_int($options['retrievalLanguage'] ?? null)
+            ? $options['retrievalLanguage']
+            : $this->resolveLanguageId($options);
 
         return $languageId === null ? null : $this->promptBuilder->resolveLanguageLabel($site, $languageId);
     }
@@ -1578,12 +1660,23 @@ final class RagService implements LoggerAwareInterface
      *
      * @param list<array<string,mixed>> $hits
      */
-    private function clarificationAllowed(Site $site, string $question, Conversation $conversation, array $hits): bool
+    /**
+     * What RagClarificationEvent listeners decided: a clarification they ask
+     * for, answerable() when they ruled the question out, or null to leave it
+     * to the classifier (which still honours meilisearch.rag.clarify.enabled).
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,mixed> $options
+     */
+    private function clarification(Site $site, string $question, Conversation $conversation, array $hits, array $options): ?Clarification
     {
-        $event = new RagClarificationEvent($site, $question, $conversation, $hits);
+        $event = new RagClarificationEvent($site, $question, $conversation, $hits, true, $this->resolveLanguageId($options));
         $this->eventDispatcher->dispatch($event);
+        if ($event->clarification !== null) {
+            return $event->clarification;
+        }
 
-        return $event->allowed;
+        return $event->allowed ? null : Clarification::answerable();
     }
 
     /**
@@ -2185,6 +2278,85 @@ final class RagService implements LoggerAwareInterface
      * Whole words, so "mac" finds "Mac?" but not "machen"; a trailing "*"
      * makes a prefix ("modul*" finds "Modul", "Module", "Modulen").
      */
+    /**
+     * The answer to "Woher weißt du das?": the sources the previous answer
+     * cited, without a new search. Null when the question is no such request
+     * (meilisearch.rag.sourceQuestion.triggers, empty = off) or there is no
+     * previous answer.
+     *
+     * Retrieval cannot answer it. The rewrite turns the question into one
+     * about the previous subject at best, and the model then cites what this
+     * turn found — not what the previous answer was based on. At worst
+     * nothing is found and the visitor reads "nichts gefunden" right under an
+     * answer (LINEAR 2026-11-05). The previous turn's citations are what the
+     * answer demonstrably used, so they are repeated as they were.
+     *
+     * Only sources the visitor can open count: a knowledge resource is
+     * internal grounding and never shown. Without a visible one the reply is
+     * the configured "previous-sources-none" sentence (fixedReplies).
+     *
+     * @param array<string,mixed> $options
+     */
+    private function previousSourcesAnswer(Site $site, string $question, Conversation $conversation, array $options): ?RagAnswer
+    {
+        $settings = $site->getSettings();
+        $triggers = $settings->get('meilisearch.rag.sourceQuestion.triggers', []);
+        $maxChars = max(1, (int)$settings->get('meilisearch.rag.sourceQuestion.maxChars', 80));
+        if (!is_array($triggers) || $triggers === [] || mb_strlen($question) > $maxChars
+            || !$this->touchesTriggers($question, $triggers)) {
+            return null;
+        }
+        $previous = null;
+        foreach (array_reverse($conversation->turns) as $turn) {
+            if ($turn instanceof Turn && !$turn->isClarification()) {
+                $previous = $turn;
+                break;
+            }
+        }
+        if ($previous === null) {
+            return null;
+        }
+        $visible = array_values(array_filter(
+            $previous->citations,
+            static fn (array $citation): bool => (string)($citation['type'] ?? '') !== 'knowledge_resource'
+                && trim((string)($citation['uri'] ?? '')) !== '',
+        ));
+        $language = $this->languageCode($site, $options);
+        if ($visible === []) {
+            return new RagAnswer(
+                answer: $this->expandFixedReplies($site, '[reply:previous-sources-none:' . $language . ']'),
+                sources: [],
+                citedIds: [],
+                status: 'ok',
+            );
+        }
+        $ids = array_map(static fn (array $citation): string => (string)$citation['id'], $visible);
+
+        return new RagAnswer(
+            answer: $this->expandFixedReplies($site, '[reply:previous-sources:' . $language . ']') . ' [' . implode(', ', $ids) . ']',
+            sources: $visible,
+            citedIds: $ids,
+            status: 'ok',
+        );
+    }
+
+    /**
+     * Two-letter code of the language the visitor asks in: the page language.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function languageCode(Site $site, array $options): string
+    {
+        $languageId = $this->resolveLanguageId($options);
+        try {
+            $language = $languageId !== null ? $site->getLanguageById($languageId) : $site->getDefaultLanguage();
+        } catch (\InvalidArgumentException) {
+            $language = $site->getDefaultLanguage();
+        }
+
+        return strtolower($language->getLocale()->getLanguageCode());
+    }
+
     private function touchesTriggers(string $question, mixed $triggers): bool
     {
         if (!is_array($triggers) || $triggers === []) {

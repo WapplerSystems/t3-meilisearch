@@ -989,6 +989,24 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.knowledgeLanguages:
+    label: 'RAG: search the knowledge of another language'
+    description: 'Entries "<page language id>:<knowledge language id>", e.g. "7:1": on pages of language 7 the chat searches the documents of language 1, and the keyword rewrite writes the search query in that language. The answer stays in the language of the page (or of the question). For languages the knowledge base does not exist in.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.sourceQuestion.triggers:
+    label: 'RAG: questions for the sources of the previous answer'
+    description: 'Phrases like "woher weißt du", "welche quelle*" (word beginnings with *, case-insensitive). A question of at most meilisearch.rag.sourceQuestion.maxChars characters that contains one is answered without a search: the fixed reply "previous-sources" followed by the visible sources the previous answer cited, or "previous-sources-none" when it cited none the visitor can open (see meilisearch.rag.fixedReplies). Empty = off.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.sourceQuestion.maxChars:
+    label: 'RAG: longest question for the sources of the previous answer'
+    description: 'Longer questions containing a trigger phrase ask something new and get a normal answer.'
+    type: int
+    default: 80
+
   meilisearch.rag.factSheet:
     label: 'RAG: fact sheet'
     description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'

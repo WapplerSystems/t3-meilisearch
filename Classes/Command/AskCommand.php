@@ -14,6 +14,7 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\RagAnswer;
 use WapplerSystems\Meilisearch\Service\Rag\RagService;
+use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\Turn;
 
 /**
@@ -108,6 +109,7 @@ final class AskCommand extends Command
                     $answer->answer,
                     $answer->citedIds,
                     $answer->status === 'clarify' ? Turn::KIND_CLARIFICATION : Turn::KIND_ANSWER,
+                    CitationRenderer::citationsFor($answer->sources, $answer->citedIds),
                 ), $maxTurns);
             }
             if ($input->getOption('json') && $index < count($questions) - 1) {

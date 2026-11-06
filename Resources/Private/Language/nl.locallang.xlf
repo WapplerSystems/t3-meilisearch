@@ -11,6 +11,18 @@
                 <source>Search</source>
                 <target>Zoeken</target>
             </trans-unit>
+            <trans-unit id="search.form.placeholder.scoped">
+                <source>Search in %s…</source>
+                <target>Zoeken in %s…</target>
+            </trans-unit>
+            <trans-unit id="search.scope.label">
+                <source>Scope: %s</source>
+                <target>Bereik: %s</target>
+            </trans-unit>
+            <trans-unit id="search.scope.clear">
+                <source>Remove filter</source>
+                <target>Filter verwijderen</target>
+            </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
                 <target>Geen resultaten voor "%s".</target>
@@ -35,6 +47,10 @@
                 <source>Ask</source>
                 <target>Vragen</target>
             </trans-unit>
+            <trans-unit id="rag.form.loading">
+                <source>Generating answer…</source>
+                <target>Antwoord wordt gegenereerd…</target>
+            </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
                 <target>Opnieuw beginnen</target>
@@ -46,6 +62,22 @@
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
                 <target>Bronnen</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.loading">
+                <source>Generating answer…</source>
+                <target>Antwoord wordt gegenereerd…</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.interrupted">
+                <source>Connection to the server was interrupted.</source>
+                <target>De verbinding met de server is verbroken.</target>
+            </trans-unit>
+            <trans-unit id="rag.suggestions.heading">
+                <source>Suggestions</source>
+                <target>Suggesties</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.lowConfidence">
+                <source>&lt;strong&gt;Heads up:&lt;/strong&gt; the assistant didn't cite any of the retrieved documents — the answer above may not be directly grounded in the indexed content. Try rephrasing with more specific terms.</source>
+                <target>&lt;strong&gt;Let op:&lt;/strong&gt; de assistent heeft geen van de gevonden documenten als bron vermeld — het antwoord hierboven is mogelijk niet direct gebaseerd op de geïndexeerde inhoud. Probeer uw vraag met specifiekere termen te formuleren.</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
@@ -59,6 +91,10 @@
                 <source>Sorry, something went wrong: %s</source>
                 <target>Sorry, er ging iets mis: %s</target>
             </trans-unit>
+            <trans-unit id="rag.status.clarify.heading">
+                <source>One quick question</source>
+                <target>Een korte vraag</target>
+            </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
                 <target>Jij</target>
@@ -66,6 +102,30 @@
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
                 <target>Assistent</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.heading">
+                <source>Still have questions?</source>
+                <target>Nog vragen?</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.intro">
+                <source>If your question wasn't answered, reach a human:</source>
+                <target>Is uw vraag niet beantwoord? Neem dan direct contact met ons op:</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email">
+                <source>Email</source>
+                <target>E-mail</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email.subject">
+                <source>Question from the website chat</source>
+                <target>Vraag via de websitechat</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.phone">
+                <source>Phone</source>
+                <target>Telefoon</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.ticket">
+                <source>Open a ticket</source>
+                <target>Ticket aanmaken</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
@@ -107,37 +167,145 @@
                 <source>Content element</source>
                 <target>Inhoudselement</target>
             </trans-unit>
-            <trans-unit id="search.recovery.applied">
+            <trans-unit id="facet.value.type.knowledge_resource">
+                <source>Knowledge resource</source>
+                <target>Kennisbron</target>
+            </trans-unit>
+            <trans-unit id="search.sort.label">
+                <source>Sort by</source>
+                <target>Sorteren op</target>
+            </trans-unit>
+            <trans-unit id="search.sort.relevance">
+                <source>Relevance</source>
+                <target>Relevantie</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.desc">
+                <source>Newest first</source>
+                <target>Nieuwste eerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.asc">
+                <source>Oldest first</source>
+                <target>Oudste eerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.desc">
+                <source>Largest file first</source>
+                <target>Grootste bestand eerst</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.asc">
+                <source>Smallest file first</source>
+                <target>Kleinste bestand eerst</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.label">
+                <source>Semantic search</source>
+                <target>Semantisch zoeken</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.help">
+                <source>Combine keyword and vector matching for fuzzy-meaning queries.</source>
+                <target>Combineert zoeken op trefwoorden en vectoren, zodat u op betekenis vindt in plaats van op exacte woorden.</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.label">
+                <source>Result pages</source>
+                <target>Resultaatpagina's</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.previous">
+                <source>Previous</source>
+                <target>Vorige</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.next">
+                <source>Next</source>
+                <target>Volgende</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.position">
+                <source>Page %d of %d</source>
+                <target>Pagina %d van %d</target>
+            </trans-unit>
+            <trans-unit id="search.loading">
+                <source>Loading…</source>
+                <target>Laden…</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.applied" resname="search.recovery.applied">
                 <source>No exact match for "%1$s" — showing results for "%2$s".</source>
                 <target>Geen exacte resultaten voor „%1$s" — resultaten voor „%2$s" worden weergegeven.</target>
             </trans-unit>
-            <trans-unit id="search.recovery.suggestions">
+            <trans-unit id="search.recovery.suggestions" resname="search.recovery.suggestions">
                 <source>Did you mean:</source>
                 <target>Bedoelde u:</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.corrected">
+            <trans-unit id="search.recovery.kind.corrected" resname="search.recovery.kind.corrected">
                 <source>Spelling corrected to the word used in the content</source>
                 <target>Spelling aangepast aan het woord in de inhoud</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.split">
+            <trans-unit id="search.recovery.kind.split" resname="search.recovery.kind.split">
                 <source>Compound split into separate words</source>
                 <target>Samenstelling in losse woorden gesplitst</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.join">
+            <trans-unit id="search.recovery.kind.join" resname="search.recovery.kind.join">
                 <source>Words joined into one compound</source>
                 <target>Woorden samengevoegd tot één samenstelling</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.dropped">
+            <trans-unit id="search.recovery.kind.dropped" resname="search.recovery.kind.dropped">
                 <source>Terms that appear nowhere were left out</source>
                 <target>Termen die nergens voorkomen zijn weggelaten</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.relaxed">
+            <trans-unit id="search.recovery.kind.relaxed" resname="search.recovery.kind.relaxed">
                 <source>Search relaxed: not every word has to match</source>
                 <target>Zoekopdracht verruimd: niet elk woord hoeft te matchen</target>
             </trans-unit>
-            <trans-unit id="search.recovery.chip.relaxed">
+            <trans-unit id="search.recovery.chip.relaxed" resname="search.recovery.chip.relaxed">
                 <source>Search without every word</source>
                 <target>Zoeken zonder elk woord</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.newChat">
+                <source>New conversation</source>
+                <target>Nieuw gesprek</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.expand">
+                <source>Expand</source>
+                <target>Vergroten</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.shrink">
+                <source>Shrink</source>
+                <target>Verkleinen</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.close">
+                <source>Close chat</source>
+                <target>Chat sluiten</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.closeTeaser">
+                <source>Close notice</source>
+                <target>Melding sluiten</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.loading">
+                <source>Loading …</source>
+                <target>Laden …</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.error">
+                <source>The chat could not be loaded.</source>
+                <target>De chat kon niet worden geladen.</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.send">
+                <source>Send question</source>
+                <target>Vraag versturen</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.question">
+                <source>Was this helpful?</source>
+                <target>Was dit nuttig?</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.up">
+                <source>Yes, helpful</source>
+                <target>Ja, nuttig</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.down">
+                <source>No, not helpful</source>
+                <target>Nee, niet nuttig</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.thanks">
+                <source>Thank you for your feedback.</source>
+                <target>Bedankt voor uw feedback.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.support">
+                <source>Contact support</source>
+                <target>Contact opnemen met support</target>
             </trans-unit>
             <trans-unit id="rag.protection.rateLimited">
                 <source>You have asked a lot of questions in a short time. Please try again in a few minutes.</source>

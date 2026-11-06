@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+    <file source-language="en" target-language="tr" datatype="plaintext" original="messages" date="2026-11-06T00:00:00Z" product-name="ws_meilisearch">
+        <header/>
+        <body>
+            <trans-unit id="search.form.placeholder">
+                <source>Search…</source>
+                <target>Ara…</target>
+            </trans-unit>
+            <trans-unit id="search.form.submit">
+                <source>Search</source>
+                <target>Ara</target>
+            </trans-unit>
+            <trans-unit id="search.form.placeholder.scoped">
+                <source>Search in %s…</source>
+                <target>%s içinde ara…</target>
+            </trans-unit>
+            <trans-unit id="search.scope.label">
+                <source>Scope: %s</source>
+                <target>Kapsam: %s</target>
+            </trans-unit>
+            <trans-unit id="search.scope.clear">
+                <source>Remove filter</source>
+                <target>Filtreyi kaldır</target>
+            </trans-unit>
+            <trans-unit id="search.results.empty">
+                <source>No matches for "%s".</source>
+                <target>“%s” için sonuç bulunamadı.</target>
+            </trans-unit>
+            <trans-unit id="search.results.count">
+                <source>%d results for "%s"</source>
+                <target>%d sonuç bulundu: “%s”</target>
+            </trans-unit>
+            <trans-unit id="search.facets.heading">
+                <source>Filter</source>
+                <target>Filtre</target>
+            </trans-unit>
+            <trans-unit id="rag.form.heading">
+                <source>Ask the site</source>
+                <target>Web sitesine sorun</target>
+            </trans-unit>
+            <trans-unit id="rag.form.placeholder">
+                <source>Type your question…</source>
+                <target>Sorunuzu yazın…</target>
+            </trans-unit>
+            <trans-unit id="rag.form.submit">
+                <source>Ask</source>
+                <target>Sor</target>
+            </trans-unit>
+            <trans-unit id="rag.form.loading">
+                <source>Generating answer…</source>
+                <target>Yanıt oluşturuluyor…</target>
+            </trans-unit>
+            <trans-unit id="rag.form.reset">
+                <source>Start over</source>
+                <target>Baştan başla</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.heading">
+                <source>Answer</source>
+                <target>Yanıt</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.sources">
+                <source>Sources</source>
+                <target>Kaynaklar</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.loading">
+                <source>Generating answer…</source>
+                <target>Yanıt oluşturuluyor…</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.interrupted">
+                <source>Connection to the server was interrupted.</source>
+                <target>Sunucuyla bağlantı kesildi.</target>
+            </trans-unit>
+            <trans-unit id="rag.suggestions.heading">
+                <source>Suggestions</source>
+                <target>Öneriler</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.lowConfidence">
+                <source>&lt;strong&gt;Heads up:&lt;/strong&gt; the assistant didn't cite any of the retrieved documents — the answer above may not be directly grounded in the indexed content. Try rephrasing with more specific terms.</source>
+                <target>&lt;strong&gt;Dikkat:&lt;/strong&gt; Asistan, bulunan belgelerin hiçbirini kaynak olarak göstermedi — yukarıdaki yanıt doğrudan dizine eklenmiş içeriğe dayanmıyor olabilir. Lütfen sorunuzu daha belirgin terimlerle yeniden ifade edin.</target>
+            </trans-unit>
+            <trans-unit id="rag.status.disabled">
+                <source>The site assistant is not configured.</source>
+                <target>Site asistanı yapılandırılmamış.</target>
+            </trans-unit>
+            <trans-unit id="rag.status.no_context">
+                <source>No matching documents found for this question.</source>
+                <target>Bu soruyla eşleşen belge bulunamadı.</target>
+            </trans-unit>
+            <trans-unit id="rag.status.failed">
+                <source>Sorry, something went wrong: %s</source>
+                <target>Üzgünüz, bir hata oluştu: %s</target>
+            </trans-unit>
+            <trans-unit id="rag.status.clarify.heading">
+                <source>One quick question</source>
+                <target>Kısa bir soru</target>
+            </trans-unit>
+            <trans-unit id="rag.conversation.you">
+                <source>You</source>
+                <target>Siz</target>
+            </trans-unit>
+            <trans-unit id="rag.conversation.assistant">
+                <source>Assistant</source>
+                <target>Asistan</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.heading">
+                <source>Still have questions?</source>
+                <target>Başka sorunuz var mı?</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.intro">
+                <source>If your question wasn't answered, reach a human:</source>
+                <target>Sorunuz yanıtlanmadıysa bize doğrudan ulaşın:</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email">
+                <source>Email</source>
+                <target>E-posta</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email.subject">
+                <source>Question from the website chat</source>
+                <target>Web sitesi sohbetinden soru</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.phone">
+                <source>Phone</source>
+                <target>Telefon</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.ticket">
+                <source>Open a ticket</source>
+                <target>Destek talebi oluştur</target>
+            </trans-unit>
+            <trans-unit id="suggest.recent.heading">
+                <source>Recent searches</source>
+                <target>Son aramalar</target>
+            </trans-unit>
+            <trans-unit id="suggest.more">
+                <source>%d more — submit to see all</source>
+                <target>%d sonuç daha — tümünü görmek için gönderin</target>
+            </trans-unit>
+            <trans-unit id="hit.language">
+                <source>Language</source>
+                <target>Dil</target>
+            </trans-unit>
+            <trans-unit id="facet.attr.type">
+                <source>Type</source>
+                <target>Tür</target>
+            </trans-unit>
+            <trans-unit id="facet.attr.language">
+                <source>Language</source>
+                <target>Dil</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.page">
+                <source>Page</source>
+                <target>Sayfa</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.news">
+                <source>News</source>
+                <target>Haberler</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.file">
+                <source>File</source>
+                <target>Dosya</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.event">
+                <source>Event</source>
+                <target>Etkinlik</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.tt_content">
+                <source>Content element</source>
+                <target>İçerik öğesi</target>
+            </trans-unit>
+            <trans-unit id="facet.value.type.knowledge_resource">
+                <source>Knowledge resource</source>
+                <target>Bilgi kaynağı</target>
+            </trans-unit>
+            <trans-unit id="search.sort.label">
+                <source>Sort by</source>
+                <target>Sırala</target>
+            </trans-unit>
+            <trans-unit id="search.sort.relevance">
+                <source>Relevance</source>
+                <target>İlgi düzeyi</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.desc">
+                <source>Newest first</source>
+                <target>Önce en yeni</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.asc">
+                <source>Oldest first</source>
+                <target>Önce en eski</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.desc">
+                <source>Largest file first</source>
+                <target>Önce en büyük dosya</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.asc">
+                <source>Smallest file first</source>
+                <target>Önce en küçük dosya</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.label">
+                <source>Semantic search</source>
+                <target>Anlamsal arama</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.help">
+                <source>Combine keyword and vector matching for fuzzy-meaning queries.</source>
+                <target>Tam kelime eşleşmesi yerine anlama göre sonuç bulmak için anahtar kelime ve vektör aramasını birleştirir.</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.label">
+                <source>Result pages</source>
+                <target>Sonuç sayfaları</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.previous">
+                <source>Previous</source>
+                <target>Önceki</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.next">
+                <source>Next</source>
+                <target>Sonraki</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.position">
+                <source>Page %d of %d</source>
+                <target>Sayfa %d / %d</target>
+            </trans-unit>
+            <trans-unit id="search.loading">
+                <source>Loading…</source>
+                <target>Yükleniyor…</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.applied" resname="search.recovery.applied">
+                <source>No exact match for "%1$s" — showing results for "%2$s".</source>
+                <target>“%1$s” için tam eşleşme yok — “%2$s” için sonuçlar gösteriliyor.</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.suggestions" resname="search.recovery.suggestions">
+                <source>Did you mean:</source>
+                <target>Bunu mu demek istediniz:</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.corrected" resname="search.recovery.kind.corrected">
+                <source>Spelling corrected to the word used in the content</source>
+                <target>Yazım, içerikte kullanılan kelimeye göre düzeltildi</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.split" resname="search.recovery.kind.split">
+                <source>Compound split into separate words</source>
+                <target>Birleşik kelime ayrı kelimelere bölündü</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.join" resname="search.recovery.kind.join">
+                <source>Words joined into one compound</source>
+                <target>Kelimeler tek bir birleşik kelimede birleştirildi</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.dropped" resname="search.recovery.kind.dropped">
+                <source>Terms that appear nowhere were left out</source>
+                <target>Hiçbir yerde geçmeyen terimler çıkarıldı</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.kind.relaxed" resname="search.recovery.kind.relaxed">
+                <source>Search relaxed: not every word has to match</source>
+                <target>Arama genişletildi: her kelimenin eşleşmesi gerekmiyor</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.chip.relaxed" resname="search.recovery.chip.relaxed">
+                <source>Search without every word</source>
+                <target>Tüm kelimeler olmadan ara</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.newChat">
+                <source>New conversation</source>
+                <target>Yeni sohbet</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.expand">
+                <source>Expand</source>
+                <target>Büyüt</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.shrink">
+                <source>Shrink</source>
+                <target>Küçült</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.close">
+                <source>Close chat</source>
+                <target>Sohbeti kapat</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.closeTeaser">
+                <source>Close notice</source>
+                <target>Bildirimi kapat</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.loading">
+                <source>Loading …</source>
+                <target>Yükleniyor …</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.error">
+                <source>The chat could not be loaded.</source>
+                <target>Sohbet yüklenemedi.</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.send">
+                <source>Send question</source>
+                <target>Soruyu gönder</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.question">
+                <source>Was this helpful?</source>
+                <target>Bu yanıt yardımcı oldu mu?</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.up">
+                <source>Yes, helpful</source>
+                <target>Evet, yardımcı oldu</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.down">
+                <source>No, not helpful</source>
+                <target>Hayır, yardımcı olmadı</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.thanks">
+                <source>Thank you for your feedback.</source>
+                <target>Geri bildiriminiz için teşekkür ederiz.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.support">
+                <source>Contact support</source>
+                <target>Destekle iletişime geçin</target>
+            </trans-unit>
+            <trans-unit id="rag.protection.rateLimited">
+                <source>You have asked a lot of questions in a short time. Please try again in a few minutes.</source>
+                <target>Kısa sürede çok sayıda soru sordunuz. Lütfen birkaç dakika sonra tekrar deneyin.</target>
+            </trans-unit>
+            <trans-unit id="rag.protection.unavailable">
+                <source>The assistant is not available at the moment. Please try again later or contact our support.</source>
+                <target>Asistan şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin veya destek ekibimize başvurun.</target>
+            </trans-unit>
+            <trans-unit id="rag.protection.tooLong">
+                <source>Your question is too long. Please keep it shorter (at most %d characters).</source>
+                <target>Sorunuz çok uzun. Lütfen daha kısa tutun (en fazla %d karakter).</target>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

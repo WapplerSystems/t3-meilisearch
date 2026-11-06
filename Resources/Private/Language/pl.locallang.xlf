@@ -11,6 +11,18 @@
                 <source>Search</source>
                 <target>Szukaj</target>
             </trans-unit>
+            <trans-unit id="search.form.placeholder.scoped">
+                <source>Search in %s…</source>
+                <target>Szukaj w: %s…</target>
+            </trans-unit>
+            <trans-unit id="search.scope.label">
+                <source>Scope: %s</source>
+                <target>Zakres: %s</target>
+            </trans-unit>
+            <trans-unit id="search.scope.clear">
+                <source>Remove filter</source>
+                <target>Usuń filtr</target>
+            </trans-unit>
             <trans-unit id="search.results.empty">
                 <source>No matches for "%s".</source>
                 <target>Brak wyników dla „%s".</target>
@@ -35,6 +47,10 @@
                 <source>Ask</source>
                 <target>Zapytaj</target>
             </trans-unit>
+            <trans-unit id="rag.form.loading">
+                <source>Generating answer…</source>
+                <target>Generowanie odpowiedzi…</target>
+            </trans-unit>
             <trans-unit id="rag.form.reset">
                 <source>Start over</source>
                 <target>Zacznij od nowa</target>
@@ -46,6 +62,22 @@
             <trans-unit id="rag.answer.sources">
                 <source>Sources</source>
                 <target>Źródła</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.loading">
+                <source>Generating answer…</source>
+                <target>Generowanie odpowiedzi…</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.interrupted">
+                <source>Connection to the server was interrupted.</source>
+                <target>Połączenie z serwerem zostało przerwane.</target>
+            </trans-unit>
+            <trans-unit id="rag.suggestions.heading">
+                <source>Suggestions</source>
+                <target>Sugestie</target>
+            </trans-unit>
+            <trans-unit id="rag.answer.lowConfidence">
+                <source>&lt;strong&gt;Heads up:&lt;/strong&gt; the assistant didn't cite any of the retrieved documents — the answer above may not be directly grounded in the indexed content. Try rephrasing with more specific terms.</source>
+                <target>&lt;strong&gt;Uwaga:&lt;/strong&gt; asystent nie powołał się na żaden z odnalezionych dokumentów — powyższa odpowiedź może nie wynikać bezpośrednio z zaindeksowanych treści. Proszę spróbować sformułować pytanie bardziej precyzyjnie.</target>
             </trans-unit>
             <trans-unit id="rag.status.disabled">
                 <source>The site assistant is not configured.</source>
@@ -59,6 +91,10 @@
                 <source>Sorry, something went wrong: %s</source>
                 <target>Przepraszamy, coś poszło nie tak: %s</target>
             </trans-unit>
+            <trans-unit id="rag.status.clarify.heading">
+                <source>One quick question</source>
+                <target>Krótkie pytanie</target>
+            </trans-unit>
             <trans-unit id="rag.conversation.you">
                 <source>You</source>
                 <target>Ty</target>
@@ -66,6 +102,30 @@
             <trans-unit id="rag.conversation.assistant">
                 <source>Assistant</source>
                 <target>Asystent</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.heading">
+                <source>Still have questions?</source>
+                <target>Mają Państwo jeszcze pytania?</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.intro">
+                <source>If your question wasn't answered, reach a human:</source>
+                <target>Jeśli nie otrzymali Państwo odpowiedzi na swoje pytanie, prosimy o bezpośredni kontakt:</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email">
+                <source>Email</source>
+                <target>E-mail</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.email.subject">
+                <source>Question from the website chat</source>
+                <target>Pytanie z czatu na stronie internetowej</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.phone">
+                <source>Phone</source>
+                <target>Telefon</target>
+            </trans-unit>
+            <trans-unit id="rag.fallback.ticket">
+                <source>Open a ticket</source>
+                <target>Utwórz zgłoszenie</target>
             </trans-unit>
             <trans-unit id="suggest.recent.heading">
                 <source>Recent searches</source>
@@ -107,37 +167,145 @@
                 <source>Content element</source>
                 <target>Element treści</target>
             </trans-unit>
-            <trans-unit id="search.recovery.applied">
+            <trans-unit id="facet.value.type.knowledge_resource">
+                <source>Knowledge resource</source>
+                <target>Zasób wiedzy</target>
+            </trans-unit>
+            <trans-unit id="search.sort.label">
+                <source>Sort by</source>
+                <target>Sortuj według</target>
+            </trans-unit>
+            <trans-unit id="search.sort.relevance">
+                <source>Relevance</source>
+                <target>Trafność</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.desc">
+                <source>Newest first</source>
+                <target>Od najnowszych</target>
+            </trans-unit>
+            <trans-unit id="search.sort.datetime.asc">
+                <source>Oldest first</source>
+                <target>Od najstarszych</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.desc">
+                <source>Largest file first</source>
+                <target>Od największego pliku</target>
+            </trans-unit>
+            <trans-unit id="search.sort.fileSize.asc">
+                <source>Smallest file first</source>
+                <target>Od najmniejszego pliku</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.label">
+                <source>Semantic search</source>
+                <target>Wyszukiwanie semantyczne</target>
+            </trans-unit>
+            <trans-unit id="search.hybrid.help">
+                <source>Combine keyword and vector matching for fuzzy-meaning queries.</source>
+                <target>Łączy wyszukiwanie według słów kluczowych i wektorowe, aby znajdować wyniki według znaczenia, a nie dokładnego brzmienia.</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.label">
+                <source>Result pages</source>
+                <target>Strony wyników</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.previous">
+                <source>Previous</source>
+                <target>Poprzednia</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.next">
+                <source>Next</source>
+                <target>Następna</target>
+            </trans-unit>
+            <trans-unit id="search.pagination.position">
+                <source>Page %d of %d</source>
+                <target>Strona %d z %d</target>
+            </trans-unit>
+            <trans-unit id="search.loading">
+                <source>Loading…</source>
+                <target>Ładowanie…</target>
+            </trans-unit>
+            <trans-unit id="search.recovery.applied" resname="search.recovery.applied">
                 <source>No exact match for "%1$s" — showing results for "%2$s".</source>
                 <target>Brak dokładnych wyników dla „%1$s" — pokazujemy wyniki dla „%2$s".</target>
             </trans-unit>
-            <trans-unit id="search.recovery.suggestions">
+            <trans-unit id="search.recovery.suggestions" resname="search.recovery.suggestions">
                 <source>Did you mean:</source>
                 <target>Czy chodziło o:</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.corrected">
+            <trans-unit id="search.recovery.kind.corrected" resname="search.recovery.kind.corrected">
                 <source>Spelling corrected to the word used in the content</source>
                 <target>Pisownię dopasowano do słowa użytego w treści</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.split">
+            <trans-unit id="search.recovery.kind.split" resname="search.recovery.kind.split">
                 <source>Compound split into separate words</source>
                 <target>Złożenie podzielono na osobne słowa</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.join">
+            <trans-unit id="search.recovery.kind.join" resname="search.recovery.kind.join">
                 <source>Words joined into one compound</source>
                 <target>Słowa połączono w jedno złożenie</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.dropped">
+            <trans-unit id="search.recovery.kind.dropped" resname="search.recovery.kind.dropped">
                 <source>Terms that appear nowhere were left out</source>
                 <target>Pominięto słowa, których nie ma w treści</target>
             </trans-unit>
-            <trans-unit id="search.recovery.kind.relaxed">
+            <trans-unit id="search.recovery.kind.relaxed" resname="search.recovery.kind.relaxed">
                 <source>Search relaxed: not every word has to match</source>
                 <target>Zapytanie poluzowane: nie każde słowo musi pasować</target>
             </trans-unit>
-            <trans-unit id="search.recovery.chip.relaxed">
+            <trans-unit id="search.recovery.chip.relaxed" resname="search.recovery.chip.relaxed">
                 <source>Search without every word</source>
                 <target>Szukaj bez każdego słowa</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.newChat">
+                <source>New conversation</source>
+                <target>Nowa rozmowa</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.expand">
+                <source>Expand</source>
+                <target>Powiększ</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.shrink">
+                <source>Shrink</source>
+                <target>Zmniejsz</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.close">
+                <source>Close chat</source>
+                <target>Zamknij czat</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.closeTeaser">
+                <source>Close notice</source>
+                <target>Zamknij komunikat</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.loading">
+                <source>Loading …</source>
+                <target>Ładowanie …</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.error">
+                <source>The chat could not be loaded.</source>
+                <target>Nie udało się załadować czatu.</target>
+            </trans-unit>
+            <trans-unit id="chat.widget.send">
+                <source>Send question</source>
+                <target>Wyślij pytanie</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.question">
+                <source>Was this helpful?</source>
+                <target>Czy ta odpowiedź była pomocna?</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.up">
+                <source>Yes, helpful</source>
+                <target>Tak, pomocna</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.down">
+                <source>No, not helpful</source>
+                <target>Nie, niepomocna</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.thanks">
+                <source>Thank you for your feedback.</source>
+                <target>Dziękujemy za opinię.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.support">
+                <source>Contact support</source>
+                <target>Kontakt z działem wsparcia</target>
             </trans-unit>
             <trans-unit id="rag.protection.rateLimited">
                 <source>You have asked a lot of questions in a short time. Please try again in a few minutes.</source>

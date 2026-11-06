@@ -97,6 +97,7 @@ final class PromptBuilder
         int $maxContextChars,
         ?int $forcedLanguageId = null,
         array $metaFields = [],
+        ?int $knowledgeLanguageId = null,
     ): array {
         if ($forcedLanguageId !== null) {
             $languageId = $forcedLanguageId;
@@ -136,6 +137,19 @@ final class PromptBuilder
         // visitor understands a knowledge base, not an excerpt.
         $userContent = "Knowledge base entries:\n\n" . $contextSection
             . "\n\n---\n\nQuestion: " . trim($question);
+        if ($knowledgeLanguageId !== null && $knowledgeLanguageId !== $languageId) {
+            // Knowledge from another language (meilisearch.rag.knowledgeLanguages).
+            // The rule in the system prompt alone was not enough: with English
+            // entries and German examples in the instructions, Polish and Dutch
+            // questions got German answers. Said again right next to the
+            // question, where the model reads it last.
+            $userContent .= "\n\n" . sprintf(
+                'The entries above are in %1$s; answer from them as usual. Write the whole answer in the language of the question (on this page: %2$s, code "%3$s"), not in %1$s and not in German.',
+                $this->resolveLanguageLabel($site, $knowledgeLanguageId),
+                $languageLabel,
+                $this->isoCode($site, $languageId),
+            );
+        }
 
         return [
             ['role' => 'system', 'content' => $resolvedSystem],
@@ -219,6 +233,15 @@ final class PromptBuilder
      * silently changes the query's language cannot match a retrieval filtered
      * to that language.
      */
+    private function isoCode(Site $site, int $languageId): string
+    {
+        try {
+            return strtolower((string)$site->getLanguageById($languageId)->getLocale()->getLanguageCode()) ?: 'en';
+        } catch (\Throwable) {
+            return 'en';
+        }
+    }
+
     public function resolveLanguageLabel(Site $site, int $languageId): string
     {
         try {
