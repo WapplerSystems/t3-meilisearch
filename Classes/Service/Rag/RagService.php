@@ -129,6 +129,9 @@ final class RagService implements LoggerAwareInterface
     private const REPLY_PATTERN = '/\[\s*reply\s*:\s*([a-z_-]+)\s*:\s*([a-z]{2})\s*\]/i';
     private const CITATION_TOKEN_PATTERN = '/[A-Za-z0-9_:.\-]+/';
 
+    /** Why the answer guard withdrew the last answer of ask() and what it said, for test runs (ws_meilisearch:ask --json). */
+    private ?string $lastWithdrawal = null;
+
     public function __construct(
         private readonly SearchService $searchService,
         private readonly LlmProviderRegistry $providerRegistry,
@@ -266,6 +269,45 @@ final class RagService implements LoggerAwareInterface
     private function vectorQuestion(Conversation $conversation, string $question, string $retrievalQuestion): string
     {
         return $conversation->isEmpty() ? $question : $retrievalQuestion;
+    }
+
+    /**
+     * The retrieval text without the words a BeforeRagQueryEvent listener
+     * already turned into a filter (`retrievalStripPatterns`, regex bodies,
+     * case-insensitive). "Wie installiere ich LINEAR Solutions für Revit?"
+     * filtered to Revit still searched for "Revit" and ranked every page
+     * about Revit above the installation pages (LINEAR 2026-11-09). Nothing
+     * left after stripping: the text as it was.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function withoutFilteredTerms(array $options, string $text): string
+    {
+        $patterns = $options['retrievalStripPatterns'] ?? [];
+        if (!is_array($patterns) || $patterns === []) {
+            return $text;
+        }
+        $stripped = $text;
+        foreach ($patterns as $pattern) {
+            $result = @preg_replace('/' . str_replace('/', '\\/', (string)$pattern) . '/iu', ' ', $stripped);
+            if (is_string($result)) {
+                $stripped = $result;
+            }
+        }
+        $stripped = trim((string)preg_replace('/\s+/u', ' ', $stripped));
+
+        return preg_match('/\p{L}/u', $stripped) === 1 ? $stripped : $text;
+    }
+
+    /**
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private static function withoutStripOption(array $options): array
+    {
+        unset($options['retrievalStripPatterns']);
+
+        return $options;
     }
 
     /**
@@ -455,6 +497,7 @@ final class RagService implements LoggerAwareInterface
     private function preferCurrentRelease(Site $site, array $hits, string $askedAs, array $searchOptions): array
     {
         $wanted = $this->versionsNamedIn($askedAs, $hits);
+        $dropOutdated = (bool)$site->getSettings()->get('meilisearch.rag.dropOutdatedReleases', false);
         $currentKeys = [];
         foreach ($hits as $hit) {
             if (!empty($hit['kbIsCurrent'])) {
@@ -478,9 +521,23 @@ final class RagService implements LoggerAwareInterface
                 // repeats it.
                 continue;
             }
-            $current = $lookups < self::CURRENT_RELEASE_LOOKUPS ? $this->findCurrentCopy($site, $hit, $searchOptions) : null;
+            if ($lookups >= self::CURRENT_RELEASE_LOOKUPS) {
+                $kept[] = $hit;
+                continue;
+            }
+            $current = $this->findCurrentCopy($site, $hit, $searchOptions);
             $lookups++;
-            if ($current === null || isset($ids[(string)($current['id'] ?? '')])) {
+            if ($current === null) {
+                // A topic the current release no longer has: by default the
+                // old copy stays, else such topics would have no source at
+                // all. LINEAR 2026-11-09: an old copy describes what the
+                // product no longer does ("Modul GEG/EnEV", V24 only) — off.
+                if (!$dropOutdated) {
+                    $kept[] = $hit;
+                }
+                continue;
+            }
+            if (isset($ids[(string)($current['id'] ?? '')])) {
                 $kept[] = $hit;
                 continue;
             }
@@ -688,8 +745,8 @@ final class RagService implements LoggerAwareInterface
 
         return $this->searchForContext(
             $site,
-            $query,
-            $this->withVectorQuery($event->options, $event->question),
+            $this->withoutFilteredTerms($event->options, $query),
+            $this->withVectorQuery(self::withoutStripOption($event->options), $this->withoutFilteredTerms($event->options, $event->question)),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
@@ -726,6 +783,7 @@ final class RagService implements LoggerAwareInterface
 
     public function ask(Site $site, string $question, array $options = []): RagAnswer
     {
+        $this->lastWithdrawal = null;
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $options);
         if ($question === '') {
@@ -775,8 +833,11 @@ final class RagService implements LoggerAwareInterface
 
         $hits = $this->searchForContext(
             $site,
-            $retrievalQuestion,
-            $this->withVectorQuery($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
+            $this->withoutFilteredTerms($event->options, $retrievalQuestion),
+            $this->withVectorQuery(
+                self::withoutStripOption($event->options),
+                $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
+            ),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
@@ -988,8 +1049,11 @@ final class RagService implements LoggerAwareInterface
         // streaming path cannot degrade differently on identical questions.
         $hits = $this->searchForContext(
             $site,
-            $retrievalQuestion,
-            $this->withVectorQuery($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
+            $this->withoutFilteredTerms($event->options, $retrievalQuestion),
+            $this->withVectorQuery(
+                self::withoutStripOption($event->options),
+                $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
+            ),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
@@ -1959,6 +2023,15 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
+     * Why the answer guard withdrew the answer of the last ask() call and the
+     * withdrawn text, or null.
+     */
+    public function lastWithdrawal(): ?string
+    {
+        return $this->lastWithdrawal;
+    }
+
+    /**
      * Lets listeners withdraw a finished answer (RagAnswerGuardEvent). Returns
      * the answer and its citations — unchanged, or the expanded replacement
      * without citations. A failing listener leaves the answer as it was.
@@ -1989,6 +2062,7 @@ final class RagService implements LoggerAwareInterface
             if ($replacement === null) {
                 return [$answer, $citedIds];
             }
+            $this->lastWithdrawal = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
             $this->logger?->notice('RAG answer withdrawn ({reason}): {question}', [
                 'reason' => $event->getReason(),
                 'question' => mb_substr($question, 0, 200),

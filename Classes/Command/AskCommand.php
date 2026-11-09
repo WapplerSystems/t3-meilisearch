@@ -170,6 +170,7 @@ final class AskCommand extends Command
             'outOfScope' => $answer->outOfScope,
             'notes' => $answer->notes,
             'suggestions' => $answer->suggestions,
+            'withdrawn' => $this->ragService->lastWithdrawal(),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }

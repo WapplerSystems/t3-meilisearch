@@ -881,6 +881,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.dropOutdatedReleases:
+    label: 'RAG: leave out older documentation releases the current one no longer has'
+    description: 'Versioned documentation (kbVersion/kbIsCurrent): an older copy in the context is swapped for the current copy of the same topic. When the current release has no such topic, the older copy stays by default. On, it is left out, unless the question names that release — an old page can describe a feature the product no longer has.'
+    type: bool
+    default: false
+
   meilisearch.search.excludedTypes:
     label: 'Search: document types hidden from the site search'
     description: 'Document types (the index field "type") that the visitor-facing search, its facets and suggestions leave out, in addition to knowledge_resource. They stay available to the chat assistant. Example: ["elearning"] keeps course excerpts in the chat only.'
