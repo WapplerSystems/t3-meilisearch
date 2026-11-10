@@ -214,6 +214,7 @@
             if (!more) return;
             if (rating !== '-1') {
                 more.innerHTML = '';
+                showRowSupport(row, true);
                 return;
             }
             if (feedback.reasons.length || feedback.commentMaxLength > 0) {
@@ -222,6 +223,7 @@
                 if (first) first.focus();
             } else {
                 more.innerHTML = supportCard(row.getAttribute('data-rag-support-href'), labels.feedbackSupportText, labels.feedbackSupport);
+                showRowSupport(row, false);
             }
         });
 
@@ -245,6 +247,7 @@
                 }
                 // The thanks already stands next to the thumbs.
                 more.innerHTML = supportCard(row.getAttribute('data-rag-support-href'), labels.feedbackSupportText, labels.feedbackSupport);
+                showRowSupport(row, false);
             });
         });
 
@@ -565,6 +568,13 @@
     }
 
     // "Contact support" as a card after "not helpful", so the visitor gets on.
+    // While the support card stands below, the same link in the thumbs row
+    // would be offered twice.
+    function showRowSupport(row, show) {
+        const link = row.querySelector('.ws-meilisearch-rag-feedback__support');
+        if (link) link.hidden = !show;
+    }
+
     function supportCard(href, text, linkLabel) {
         if (!href) return '';
         return '<div class="card ws-meilisearch-rag-feedback-card"><div class="card-body py-2">'
