@@ -307,6 +307,26 @@
                 <source>Contact support</source>
                 <target>Destekle iletişime geçin</target>
             </trans-unit>
+            <trans-unit id="rag.feedback.reasons">
+                <source>What was wrong? (optional, multiple choice)</source>
+                <target>Ne uygun değildi? (isteğe bağlı, birden fazla seçilebilir)</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.comment">
+                <source>What did you expect instead? (optional)</source>
+                <target>Bunun yerine ne bekliyordunuz? (isteğe bağlı)</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.commentHint">
+                <source>Please do not enter any personal data.</source>
+                <target>Lütfen kişisel veri girmeyin.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.send">
+                <source>Send feedback</source>
+                <target>Geri bildirimi gönder</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.supportText">
+                <source>Our support team will be glad to help you.</source>
+                <target>Destek ekibimiz size memnuniyetle yardımcı olur.</target>
+            </trans-unit>
             <trans-unit id="rag.protection.rateLimited">
                 <source>You have asked a lot of questions in a short time. Please try again in a few minutes.</source>
                 <target>Kısa sürede çok sayıda soru sordunuz. Lütfen birkaç dakika sonra tekrar deneyin.</target>

@@ -37,6 +37,9 @@ final class ProtocolEntry
         public readonly string $turnKey = '',
         /** 1 helpful, -1 not helpful, 0 not rated. */
         public readonly int $rating = 0,
+        /** @var list<string> reason keys ticked after "not helpful" */
+        public readonly array $feedbackReasons = [],
+        public readonly string $feedbackComment = '',
     ) {}
 
     /**
@@ -59,6 +62,8 @@ final class ProtocolEntry
             channel: (string)($row['channel'] ?? 'web'),
             turnKey: (string)($row['turn_key'] ?? ''),
             rating: (int)($row['rating'] ?? 0),
+            feedbackReasons: self::decodeReasons((string)($row['feedback_reasons'] ?? '')),
+            feedbackComment: (string)($row['feedback_comment'] ?? ''),
         );
     }
 
@@ -81,12 +86,32 @@ final class ProtocolEntry
             'channel' => mb_substr($this->channel, 0, 16),
             'turn_key' => $this->turnKey,
             'rating' => max(-1, min(1, $this->rating)),
+            'feedback_reasons' => self::encodeReasons($this->feedbackReasons),
+            'feedback_comment' => $this->feedbackComment,
         ];
     }
 
     public function wasCited(string $sourceId): bool
     {
         return in_array($sourceId, $this->citedIds, true);
+    }
+
+    /**
+     * @param list<string> $reasons
+     */
+    public static function encodeReasons(array $reasons): string
+    {
+        $reasons = array_values(array_unique(array_filter(array_map('strval', $reasons), static fn (string $r): bool => $r !== '')));
+
+        return $reasons === [] ? '' : mb_substr(',' . implode(',', $reasons) . ',', 0, 255);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function decodeReasons(string $stored): array
+    {
+        return array_values(array_filter(explode(',', $stored), static fn (string $r): bool => $r !== ''));
     }
 
     /**

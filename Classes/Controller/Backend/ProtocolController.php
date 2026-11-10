@@ -14,6 +14,7 @@ use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRepository;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolTranscript;
+use WapplerSystems\Meilisearch\Service\Rag\FeedbackReasons;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ProtocolFilter;
 
 /**
@@ -77,6 +78,12 @@ final class ProtocolController
         $onlyNegative = ($params['negative'] ?? '') === '1';
         $search = trim((string)($params['q'] ?? ''));
         $search = mb_substr($search, 0, 200);
+        $reasonOptions = $this->reasonOptions($siteFilter);
+        $reason = strtolower(trim((string)($params['reason'] ?? '')));
+        if (!isset($reasonOptions[$reason])) {
+            $reason = '';
+        }
+        $onlyWithComment = ($params['comment'] ?? '') === '1';
         $conversationParam = strtolower(trim((string)($params['conversation'] ?? '')));
         $page = max(1, (int)($params['page'] ?? 1));
 
@@ -98,7 +105,7 @@ final class ProtocolController
                 'conversationId' => $conversationParam,
                 'siteIdentifier' => $detailSiteIdentifier,
                 'downloadUrl' => $this->context->route('protocolDownload', ['conversation' => $conversationParam]),
-                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search),
+                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment),
                 ...$this->context->tabNavData(),
                 'protocolUrl' => $this->context->route('protocol'),
                 'active' => 'protocol',
@@ -122,6 +129,8 @@ final class ProtocolController
             onlyNegative: $onlyNegative,
             search: $search,
             since: $days > 0 ? time() - ($days * 86400) : 0,
+            feedbackReason: $reason,
+            onlyWithComment: $onlyWithComment,
         );
 
         $total = $this->repository->countConversations($filter);
@@ -139,16 +148,18 @@ final class ProtocolController
                 $onlyProblems,
                 $onlyNegative,
                 $search,
+                $reason,
+                $onlyWithComment,
                 ['conversation' => $row['conversationId']]
             );
             $rows[] = $row;
         }
 
         $prevUrl = $page > 1
-            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search)
+            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment)
             : '';
         $nextUrl = $page < $pages
-            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search)
+            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment)
             : '';
 
         $moduleTemplate->assignMultiple([
@@ -163,6 +174,9 @@ final class ProtocolController
             'onlyEscalated' => $onlyEscalated,
             'onlyProblems' => $onlyProblems,
             'onlyNegative' => $onlyNegative,
+            'reason' => $reason,
+            'reasonOptions' => $reasonOptions,
+            'onlyWithComment' => $onlyWithComment,
             'search' => $search,
             'conversationParam' => $conversationParam,
             'availableSites' => $availableSites,
@@ -223,6 +237,11 @@ final class ProtocolController
                 'escalated' => $entry->escalated,
                 'channel' => $entry->channel,
                 'rating' => $entry->rating,
+                'feedbackReasons' => array_map(
+                    fn (string $key): string => $this->reasonLabel($entry->siteIdentifier, $key),
+                    $entry->feedbackReasons,
+                ),
+                'feedbackComment' => $entry->feedbackComment,
                 'isProblem' => in_array($entry->status, ProtocolFilter::PROBLEM_STATUSES, true)
                     || ($entry->status === 'ok' && $entry->citedIds === []),
                 'sources' => $sources,
@@ -275,6 +294,51 @@ final class ProtocolController
     }
 
     /**
+     * Reasons of meilisearch.rag.feedback.reasons for the filter, labelled in
+     * the backend user's language (else English). Without a site filter the
+     * reasons of all sites are offered.
+     *
+     * @return array<string, string> key → label
+     */
+    private function reasonOptions(string $siteFilter): array
+    {
+        $options = [];
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            if ($siteFilter !== '' && $site->getIdentifier() !== $siteFilter) {
+                continue;
+            }
+            foreach (FeedbackReasons::forLanguage($site, $this->backendLanguage()) as $reason) {
+                $options[$reason['key']] ??= $reason['label'];
+            }
+        }
+
+        return $options;
+    }
+
+    private function reasonLabel(string $siteIdentifier, string $key): string
+    {
+        try {
+            $site = $this->siteFinder->getSiteByIdentifier($siteIdentifier);
+        } catch (\Throwable) {
+            return $key;
+        }
+        foreach (FeedbackReasons::forLanguage($site, $this->backendLanguage()) as $reason) {
+            if ($reason['key'] === $key) {
+                return $reason['label'];
+            }
+        }
+
+        return $key;
+    }
+
+    private function backendLanguage(): string
+    {
+        $lang = (string)($GLOBALS['BE_USER']->user['lang'] ?? '');
+
+        return $lang === '' || $lang === 'default' ? 'en' : $lang;
+    }
+
+    /**
      * Builds a list URL while keeping the current filter values.
      *
      * @param array<string, string> $additional
@@ -287,6 +351,8 @@ final class ProtocolController
         bool $onlyProblems,
         bool $onlyNegative,
         string $search,
+        string $reason,
+        bool $onlyWithComment,
         array $additional = []
     ): string {
         $extra = [
@@ -308,6 +374,12 @@ final class ProtocolController
         }
         if ($search !== '') {
             $extra['q'] = $search;
+        }
+        if ($reason !== '') {
+            $extra['reason'] = $reason;
+        }
+        if ($onlyWithComment) {
+            $extra['comment'] = '1';
         }
 
         return $this->context->route('protocol', array_merge($extra, $additional));

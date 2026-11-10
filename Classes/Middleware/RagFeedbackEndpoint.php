@@ -9,6 +9,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Service\Rag\FeedbackReasons;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRepository;
 
@@ -18,6 +19,10 @@ use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRepository;
  *
  * Path:  POST /_ws_meilisearch/rag/feedback   (also under a language base)
  * Body:  turn=<32 hex digits>&rating=1|-1     (form-encoded or JSON)
+ *        with rating -1 optionally reasons[]=<key> (keys from
+ *        meilisearch.rag.feedback.reasons, unknown ones are dropped) and
+ *        comment=<text> (cut to meilisearch.rag.feedback.commentMaxLength,
+ *        ignored when that is 0)
  *
  * The turn key is handed out by the stream (frame "turn") and stored with the
  * protocol row; it is random and known only to the visitor who got the
@@ -60,7 +65,21 @@ final class RagFeedbackEndpoint implements MiddlewareInterface
             return new JsonResponse(['error' => 'turn and rating (1 or -1) required'], 400);
         }
 
-        return $this->repository->rate($site->getIdentifier(), $turnKey, $rating)
+        $reasons = [];
+        $comment = '';
+        if ($rating < 0) {
+            $submitted = $body['reasons'] ?? [];
+            $submitted = is_array($submitted) ? $submitted : explode(',', (string)$submitted);
+            $reasons = FeedbackReasons::filter($site, array_values($submitted));
+            $maxLength = FeedbackReasons::commentMaxLength($site);
+            if ($maxLength > 0 && is_scalar($body['comment'] ?? null)) {
+                // Control characters out, line breaks kept.
+                $comment = trim((string)preg_replace('/[^\P{C}\n]+/u', '', (string)$body['comment']));
+                $comment = mb_substr($comment, 0, $maxLength);
+            }
+        }
+
+        return $this->repository->rate($site->getIdentifier(), $turnKey, $rating, $reasons, $comment)
             ? new JsonResponse(null, 204)
             : new JsonResponse(['error' => 'unknown turn'], 404);
     }

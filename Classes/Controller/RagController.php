@@ -14,6 +14,7 @@ use WapplerSystems\Meilisearch\Service\AccessControlFilter;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\ConversationStore;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
+use WapplerSystems\Meilisearch\Service\Rag\FeedbackReasons;
 use WapplerSystems\Meilisearch\Service\Rag\Protection\RagRequestGuard;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\RagAnswer;
@@ -273,7 +274,10 @@ final class RagController extends ActionController
      * Thumbs under each streamed answer (meilisearch.rag.feedback.*): the
      * endpoint shares the stream's language prefix.
      *
-     * @return array{enabled: bool, endpoint: string, supportLink: string, conversationParameter: string}
+     * Reasons and comment field for "not helpful" come in the language of the
+     * page.
+     *
+     * @return array{enabled: bool, endpoint: string, supportLink: string, conversationParameter: string, reasonsJson: string, commentMaxLength: int}
      */
     private function feedbackConfig(?Site $site): array
     {
@@ -287,7 +291,18 @@ final class RagController extends ActionController
             'endpoint' => substr($this->streamEndpoint(), 0, -strlen('/stream')) . '/feedback',
             'supportLink' => $enabled ? trim((string)$settings->get('meilisearch.rag.feedback.supportLink', '')) : '',
             'conversationParameter' => $enabled ? trim((string)$settings->get('meilisearch.rag.feedback.supportConversationParameter', '')) : '',
+            'reasonsJson' => $enabled
+                ? (string)json_encode(FeedbackReasons::forLanguage($site, $this->currentLanguageCode()), JSON_UNESCAPED_UNICODE)
+                : '[]',
+            'commentMaxLength' => $enabled ? FeedbackReasons::commentMaxLength($site) : 0,
         ];
+    }
+
+    private function currentLanguageCode(): string
+    {
+        $language = $this->request->getAttribute('language') ?? ($GLOBALS['TYPO3_REQUEST'] ?? null)?->getAttribute('language');
+
+        return $language instanceof SiteLanguage ? $language->getLocale()->getLanguageCode() : 'en';
     }
 
     private function currentPageType(): int

@@ -60,6 +60,16 @@
                         <a href="{entry.knowledgeUrl}" class="btn btn-sm btn-outline-primary ms-auto"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.addAsKnowledge"/></a>
                     </div>
                     <div class="card-body">
+                        <f:if condition="{entry.feedbackReasons} || {entry.feedbackComment}">
+                            <div class="alert alert-danger py-2">
+                                <f:if condition="{entry.feedbackReasons}">
+                                    <p class="mb-1"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.feedbackReasons"/></strong> <f:for each="{entry.feedbackReasons}" as="reasonLabel" iteration="ri">{reasonLabel}<f:if condition="{ri.isLast}"><f:else> · </f:else></f:if></f:for></p>
+                                </f:if>
+                                <f:if condition="{entry.feedbackComment}">
+                                    <p class="mb-0"><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.feedbackComment"/></strong> <f:format.nl2br>{entry.feedbackComment}</f:format.nl2br></p>
+                                </f:if>
+                            </div>
+                        </f:if>
                         <p><strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.questionLabel"/></strong> {entry.question}</p>
                         <div>
                             <strong><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.answerLabel"/></strong>
@@ -139,6 +149,21 @@
                         <div class="mb-2 form-check">
                             <input type="checkbox" name="negative" value="1" id="negative" class="form-check-input" {f:if(condition: '{onlyNegative}', then: 'checked="checked"')} />
                             <label class="form-check-label" for="negative"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.onlyNegative"/></label>
+                        </div>
+                        <f:if condition="{reasonOptions}">
+                            <div class="mb-2">
+                                <label class="form-label" for="reason"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.feedbackReasonFilter"/></label>
+                                <select name="reason" id="reason" class="form-select form-select-sm w-auto">
+                                    <option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.feedbackReasonAny"/></option>
+                                    <f:for each="{reasonOptions}" as="reasonLabel" key="reasonKey">
+                                        <option value="{reasonKey}" {f:if(condition: '{reason} == {reasonKey}', then: 'selected="selected"')}>{reasonLabel}</option>
+                                    </f:for>
+                                </select>
+                            </div>
+                        </f:if>
+                        <div class="mb-2 form-check">
+                            <input type="checkbox" name="comment" value="1" id="comment" class="form-check-input" {f:if(condition: '{onlyWithComment}', then: 'checked="checked"')} />
+                            <label class="form-check-label" for="comment"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.onlyWithComment"/></label>
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.filter"/></button>
                     </form>

@@ -75,14 +75,23 @@
             feedbackUp: root.dataset.labelFeedbackUp || 'Yes, helpful',
             feedbackDown: root.dataset.labelFeedbackDown || 'No, not helpful',
             feedbackThanks: root.dataset.labelFeedbackThanks || 'Thank you for your feedback.',
-            feedbackSupport: root.dataset.labelFeedbackSupport || 'Contact support'
+            feedbackSupport: root.dataset.labelFeedbackSupport || 'Contact support',
+            feedbackReasons: root.dataset.labelFeedbackReasons || 'What was wrong? (optional)',
+            feedbackComment: root.dataset.labelFeedbackComment || 'What did you expect instead? (optional)',
+            feedbackCommentHint: root.dataset.labelFeedbackCommentHint || 'Please do not enter any personal data.',
+            feedbackSend: root.dataset.labelFeedbackSend || 'Send feedback',
+            feedbackSupportText: root.dataset.labelFeedbackSupportText || 'Our support team will be glad to help you.'
         };
         // Thumbs under each answer (meilisearch.rag.feedback.enabled): the
         // endpoint is empty when the feature is off.
         const feedback = {
             endpoint: root.dataset.feedbackEndpoint || '',
             supportUrl: root.dataset.feedbackSupportUrl || '',
-            conversationParameter: root.dataset.feedbackConversationParameter || ''
+            conversationParameter: root.dataset.feedbackConversationParameter || '',
+            // Asked after "not helpful" (meilisearch.rag.feedback.reasons /
+            // commentMaxLength); both empty: the support card follows directly.
+            reasons: parseReasons(root.dataset.feedbackReasons),
+            commentMaxLength: parseInt(root.dataset.feedbackCommentMaxLength || '0', 10) || 0
         };
         const inputEl = form.querySelector('input[name="tx_wsmeilisearch_rag[q]"], input[name="q"]');
         const submitBtn = form.querySelector('[data-ws-meilisearch-rag-submit], button[type="submit"]');
@@ -165,22 +174,25 @@
         function renderFeedback(turn) {
             if (!turn.feedbackEl || !feedback.endpoint || !turn.key) return;
             let support = '';
+            let supportHref = '';
             if (feedback.supportUrl) {
-                let href = feedback.supportUrl;
+                supportHref = feedback.supportUrl;
                 if (feedback.conversationParameter && turn.conversation) {
-                    href += (href.indexOf('?') === -1 ? '?' : '&')
+                    supportHref += (supportHref.indexOf('?') === -1 ? '?' : '&')
                         + encodeURIComponent(feedback.conversationParameter) + '=' + encodeURIComponent(turn.conversation);
                 }
-                support = '<a class="ws-meilisearch-rag-feedback__support" href="' + escapeAttr(href) + '">' + escapeText(labels.feedbackSupport) + '</a>';
+                support = '<a class="ws-meilisearch-rag-feedback__support" href="' + escapeAttr(supportHref) + '">' + escapeText(labels.feedbackSupport) + '</a>';
             }
             turn.feedbackEl.innerHTML =
-                '<div class="ws-meilisearch-rag-feedback" data-rag-feedback="' + escapeAttr(turn.key) + '">'
+                '<div class="ws-meilisearch-rag-feedback" data-rag-feedback="' + escapeAttr(turn.key) + '"'
+                + ' data-rag-support-href="' + escapeAttr(supportHref) + '">'
                 + '<span class="ws-meilisearch-rag-feedback__question">' + escapeText(labels.feedbackQuestion) + '</span>'
                 + feedbackButton(1, labels.feedbackUp)
                 + feedbackButton(-1, labels.feedbackDown)
                 + '<span class="ws-meilisearch-rag-feedback__thanks" role="status"></span>'
                 + support
-                + '</div>';
+                + '</div>'
+                + '<div class="ws-meilisearch-rag-feedback-more" data-rag-feedback-more></div>';
         }
 
         thread.addEventListener('click', function (e) {
@@ -192,20 +204,83 @@
             row.querySelectorAll('[data-rag-rating]').forEach(function (b) {
                 b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
             });
-            sendRating(row.getAttribute('data-rag-feedback'), rating, 1, function (ok) {
+            const more = row.parentNode.querySelector('[data-rag-feedback-more]');
+            // The thumb counts at once; reasons and text, if given, follow
+            // with a second request that replaces the verdict.
+            sendRating(row.getAttribute('data-rag-feedback'), { rating: rating }, 1, function (ok) {
                 const thanks = row.querySelector('.ws-meilisearch-rag-feedback__thanks');
                 if (thanks && ok) thanks.textContent = labels.feedbackThanks;
             });
+            if (!more) return;
+            if (rating !== '-1') {
+                more.innerHTML = '';
+                return;
+            }
+            if (feedback.reasons.length || feedback.commentMaxLength > 0) {
+                more.innerHTML = feedbackForm(row.getAttribute('data-rag-feedback'));
+                const first = more.querySelector('input, textarea');
+                if (first) first.focus();
+            } else {
+                more.innerHTML = supportCard(row.getAttribute('data-rag-support-href'), labels.feedbackSupportText, labels.feedbackSupport);
+            }
         });
+
+        thread.addEventListener('submit', function (e) {
+            const formEl = e.target.closest('[data-rag-feedback-form]');
+            if (!formEl) return;
+            e.preventDefault();
+            const more = formEl.closest('[data-rag-feedback-more]');
+            const row = more ? more.parentNode.querySelector('[data-rag-feedback]') : null;
+            if (!row) return;
+            const data = { rating: '-1', reasons: [], comment: '' };
+            formEl.querySelectorAll('input[name="reasons[]"]:checked').forEach(function (c) { data.reasons.push(c.value); });
+            const text = formEl.querySelector('textarea');
+            if (text) data.comment = text.value;
+            const sendBtn = formEl.querySelector('button[type="submit"]');
+            if (sendBtn) sendBtn.disabled = true;
+            sendRating(row.getAttribute('data-rag-feedback'), data, 1, function (ok) {
+                if (!ok) {
+                    if (sendBtn) sendBtn.disabled = false;
+                    return;
+                }
+                // The thanks already stands next to the thumbs.
+                more.innerHTML = supportCard(row.getAttribute('data-rag-support-href'), labels.feedbackSupportText, labels.feedbackSupport);
+            });
+        });
+
+        // Reasons (checkboxes) and free text after "not helpful", both optional.
+        function feedbackForm(key) {
+            const id = 'wsm-fb-' + key;
+            let html = '<form class="ws-meilisearch-rag-feedback-form" data-rag-feedback-form>';
+            if (feedback.reasons.length) {
+                html += '<fieldset class="mb-2"><legend class="ws-meilisearch-rag-feedback-form__legend">' + escapeText(labels.feedbackReasons) + '</legend>';
+                feedback.reasons.forEach(function (reason, i) {
+                    html += '<div class="form-check">'
+                        + '<input class="form-check-input" type="checkbox" name="reasons[]" value="' + escapeAttr(reason.key) + '" id="' + id + '-' + i + '">'
+                        + '<label class="form-check-label" for="' + id + '-' + i + '">' + escapeText(reason.label) + '</label>'
+                        + '</div>';
+                });
+                html += '</fieldset>';
+            }
+            if (feedback.commentMaxLength > 0) {
+                html += '<label class="form-label ws-meilisearch-rag-feedback-form__legend" for="' + id + '-text">' + escapeText(labels.feedbackComment) + '</label>'
+                    + '<textarea class="form-control form-control-sm" id="' + id + '-text" rows="3" maxlength="' + feedback.commentMaxLength + '" aria-describedby="' + id + '-hint"></textarea>'
+                    + '<div class="form-text" id="' + id + '-hint">' + escapeText(labels.feedbackCommentHint) + '</div>';
+            }
+            html += '<button type="submit" class="btn btn-sm btn-primary mt-2">' + escapeText(labels.feedbackSend) + '</button></form>';
+            return html;
+        }
 
         // The protocol row is written when the stream ends, a moment after the
         // answer is on screen; a quick click may beat it (404) and is retried.
-        function sendRating(key, rating, attempt, done) {
-            const body = new URLSearchParams({ turn: key, rating: rating });
+        function sendRating(key, data, attempt, done) {
+            const body = new URLSearchParams({ turn: key, rating: data.rating });
+            (data.reasons || []).forEach(function (r) { body.append('reasons[]', r); });
+            if (data.comment) body.append('comment', data.comment);
             fetch(feedback.endpoint, { method: 'POST', credentials: 'include', body: body })
                 .then(function (r) {
                     if (r.status === 404 && attempt < 4) {
-                        setTimeout(function () { sendRating(key, rating, attempt + 1, done); }, 1500 * attempt);
+                        setTimeout(function () { sendRating(key, data, attempt + 1, done); }, 1500 * attempt);
                         return;
                     }
                     done(r.ok);
@@ -479,6 +554,24 @@
 
     const THUMB_UP = '<path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/>';
     const THUMB_DOWN = '<path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 5.4 3H17"/>';
+
+    function parseReasons(json) {
+        try {
+            const list = JSON.parse(json || '[]');
+            return Array.isArray(list) ? list.filter(function (r) { return r && r.key && r.label; }) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // "Contact support" as a card after "not helpful", so the visitor gets on.
+    function supportCard(href, text, linkLabel) {
+        if (!href) return '';
+        return '<div class="card ws-meilisearch-rag-feedback-card"><div class="card-body py-2">'
+            + '<p class="small mb-2">' + escapeText(text) + '</p>'
+            + '<a class="btn btn-sm btn-primary" href="' + escapeAttr(href) + '">' + escapeText(linkLabel) + '</a>'
+            + '</div></div>';
+    }
 
     function feedbackButton(rating, label) {
         return '<button type="button" class="ws-meilisearch-rag-feedback__btn" data-rag-rating="' + rating + '"'

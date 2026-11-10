@@ -656,6 +656,17 @@
 .ws-meilisearch-chat .ws-meilisearch-rag-feedback__support {
     color: var(--wsms-chat-accent);
 }
+/* Support card after "not helpful": the link above colours every anchor in
+ * the embed with the accent, which would make the button text vanish. */
+.ws-meilisearch-chat .ws-meilisearch-rag-embed .ws-meilisearch-rag-feedback-card a.btn {
+    background: var(--wsms-chat-accent);
+    border-color: var(--wsms-chat-accent);
+    color: var(--wsms-chat-on-accent);
+}
+.ws-meilisearch-chat .ws-meilisearch-rag-feedback-form .form-check-input:checked {
+    background-color: var(--wsms-chat-accent);
+    border-color: var(--wsms-chat-accent);
+}
 
 /* --- Input ----------------------------------------------------------- */
 

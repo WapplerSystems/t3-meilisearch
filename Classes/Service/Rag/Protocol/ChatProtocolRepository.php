@@ -39,9 +39,13 @@ final class ChatProtocolRepository
     /**
      * Stores a visitor's verdict on one turn. Only the visitor holds the key,
      * and only for a day: an old key cannot rewrite history. Rating again
-     * replaces the earlier verdict. Returns whether a row was found.
+     * replaces the earlier verdict, including reasons and comment — they
+     * belong to "not helpful" and are dropped with a later "helpful".
+     * Returns whether a row was found.
+     *
+     * @param list<string> $reasons
      */
-    public function rate(string $siteIdentifier, string $turnKey, int $rating): bool
+    public function rate(string $siteIdentifier, string $turnKey, int $rating, array $reasons = [], string $comment = ''): bool
     {
         if (preg_match(ChatProtocolRecorder::TURN_KEY_PATTERN, $turnKey) !== 1 || !in_array($rating, [-1, 1], true)) {
             return false;
@@ -62,7 +66,11 @@ final class ChatProtocolRepository
             return false;
         }
         $this->connectionPool->getConnectionForTable(ProtocolEntry::TABLE)
-            ->update(ProtocolEntry::TABLE, ['rating' => $rating], ['uid' => (int)$uid]);
+            ->update(ProtocolEntry::TABLE, [
+                'rating' => $rating,
+                'feedback_reasons' => $rating < 0 ? ProtocolEntry::encodeReasons($reasons) : '',
+                'feedback_comment' => $rating < 0 ? $comment : '',
+            ], ['uid' => (int)$uid]);
 
         return true;
     }
@@ -232,6 +240,19 @@ final class ChatProtocolRepository
         if ($filter->onlyNegative) {
             $qb->andHaving(
                 'MIN(rating) < ' . $qb->createNamedParameter(0, Connection::PARAM_INT)
+            );
+        }
+
+        if ($filter->feedbackReason !== '') {
+            $reasonParam = $qb->createNamedParameter('%,' . $qb->escapeLikeWildcards($filter->feedbackReason) . ',%', Connection::PARAM_STR);
+            $qb->andHaving(
+                'SUM(CASE WHEN feedback_reasons LIKE ' . $reasonParam . ' THEN 1 ELSE 0 END) > 0'
+            );
+        }
+
+        if ($filter->onlyWithComment) {
+            $qb->andHaving(
+                "SUM(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment <> '' THEN 1 ELSE 0 END) > 0"
             );
         }
 

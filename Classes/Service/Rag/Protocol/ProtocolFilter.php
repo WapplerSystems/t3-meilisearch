@@ -32,5 +32,9 @@ final class ProtocolFilter
         public readonly string $conversationId = '',
         /** Only conversations with a turn at or after this timestamp. */
         public readonly int $since = 0,
+        /** Only conversations with a turn rated down for this reason key. */
+        public readonly string $feedbackReason = '',
+        /** Only conversations with a free-text comment after "not helpful". */
+        public readonly bool $onlyWithComment = false,
     ) {}
 }

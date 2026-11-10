@@ -2433,6 +2433,26 @@
                 <source>only rated "not helpful"</source>
                 <target>nur „nicht hilfreich“ bewertete</target>
             </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasons" resname="be.protocol.feedbackReasons">
+                <source>Reasons for "not helpful":</source>
+                <target>Gründe für „nicht hilfreich“:</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackComment" resname="be.protocol.feedbackComment">
+                <source>Visitor expected instead:</source>
+                <target>Erwartet hätte der Besucher:</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasonFilter" resname="be.protocol.feedbackReasonFilter">
+                <source>Reason for "not helpful"</source>
+                <target>Grund für „nicht hilfreich“</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasonAny" resname="be.protocol.feedbackReasonAny">
+                <source>any</source>
+                <target>beliebig</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.onlyWithComment" resname="be.protocol.onlyWithComment">
+                <source>only with feedback text</source>
+                <target>nur mit Freitext</target>
+            </trans-unit>
             <trans-unit id="be.protocol.ratedUp" resname="be.protocol.ratedUp">
                 <source>Visitor: helpful</source>
                 <target>Besucher: hilfreich</target>

@@ -1824,6 +1824,21 @@
             <trans-unit id="be.protocol.onlyNegative" resname="be.protocol.onlyNegative">
                 <source>only rated "not helpful"</source>
             </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasons" resname="be.protocol.feedbackReasons">
+                <source>Reasons for "not helpful":</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackComment" resname="be.protocol.feedbackComment">
+                <source>Visitor expected instead:</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasonFilter" resname="be.protocol.feedbackReasonFilter">
+                <source>Reason for "not helpful"</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.feedbackReasonAny" resname="be.protocol.feedbackReasonAny">
+                <source>any</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.onlyWithComment" resname="be.protocol.onlyWithComment">
+                <source>only with feedback text</source>
+            </trans-unit>
             <trans-unit id="be.protocol.ratedUp" resname="be.protocol.ratedUp">
                 <source>Visitor: helpful</source>
             </trans-unit>

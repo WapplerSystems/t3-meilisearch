@@ -989,6 +989,18 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.feedback.reasons:
+    label: 'RAG: reasons to tick after "not helpful"'
+    description: 'Entries "<key>:<lang>:<label>", e.g. "unclear:de:Schwer verständlich bzw. zu allgemein" (unknown language: the English label). After a thumbs down the visitor may tick any of them; the keys are stored with the turn and can be filtered in the backend tab "Chat protocol". Empty: no reasons are asked.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.feedback.commentMaxLength:
+    label: 'RAG: free text after "not helpful" (characters)'
+    description: 'Shows an optional text field "What did you expect instead?" after a thumbs down and stores the text with the turn, cut to this length. 0: no text field.'
+    type: int
+    default: 0
+
   meilisearch.rag.fixedReplies:
     label: 'RAG: fixed replies per language'
     description: 'Entries "<key>:<lang>:<sentence>", e.g. "no-answer:de:Dazu habe ich nichts gefunden." The system prompt asks the model for "[reply:<key>:<lang>]" at the start of its reply instead of a literal sentence, and the tag is replaced by the matching sentence (unknown language: the English one). With two literal sentences in the prompt a model picks the wrong language now and then; naming the language as a code it does reliably. List the sentences in meilisearch.rag.noAnswerPhrases as well if they mean "not answered".'

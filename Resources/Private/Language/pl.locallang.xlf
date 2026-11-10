@@ -307,6 +307,26 @@
                 <source>Contact support</source>
                 <target>Kontakt z działem wsparcia</target>
             </trans-unit>
+            <trans-unit id="rag.feedback.reasons">
+                <source>What was wrong? (optional, multiple choice)</source>
+                <target>Co było nie tak? (opcjonalnie, można wybrać kilka)</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.comment">
+                <source>What did you expect instead? (optional)</source>
+                <target>Czego oczekiwał(a) Pan/Pani zamiast tego? (opcjonalnie)</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.commentHint">
+                <source>Please do not enter any personal data.</source>
+                <target>Prosimy nie wpisywać danych osobowych.</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.send">
+                <source>Send feedback</source>
+                <target>Wyślij opinię</target>
+            </trans-unit>
+            <trans-unit id="rag.feedback.supportText">
+                <source>Our support team will be glad to help you.</source>
+                <target>Nasz zespół wsparcia chętnie pomoże.</target>
+            </trans-unit>
             <trans-unit id="rag.protection.rateLimited">
                 <source>You have asked a lot of questions in a short time. Please try again in a few minutes.</source>
                 <target>W krótkim czasie zadano bardzo wiele pytań. Spróbuj ponownie za kilka minut.</target>

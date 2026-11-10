@@ -241,6 +241,12 @@ CREATE TABLE tx_wsmeilisearch_rag_protocol (
     turn_key        CHAR(32) DEFAULT '' NOT NULL,
     -- Visitor's verdict: 1 helpful, -1 not helpful, 0 not rated.
     rating          TINYINT(1) DEFAULT 0 NOT NULL,
+    -- Reasons the visitor ticked after "not helpful" (keys from
+    -- meilisearch.rag.feedback.reasons), stored as ",key1,key2," so one
+    -- reason can be filtered with LIKE '%,key,%'.
+    feedback_reasons VARCHAR(255) DEFAULT '' NOT NULL,
+    -- Optional free text after "not helpful" (meilisearch.rag.feedback.commentMaxLength).
+    feedback_comment TEXT,
 
     PRIMARY KEY (uid),
     KEY conversation (conversation_id, crdate),

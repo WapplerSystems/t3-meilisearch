@@ -434,6 +434,36 @@
     margin-left: auto;
     font-weight: 600;
 }
+/* After "not helpful": optional reasons and text, then the support card. */
+.ws-meilisearch-rag-feedback-more:empty {
+    display: none;
+}
+.ws-meilisearch-rag-feedback-more {
+    margin-top: .75rem;
+    font-size: .93em;
+}
+.ws-meilisearch-rag-feedback-form fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+.ws-meilisearch-rag-feedback-form__legend {
+    font-size: inherit;
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+.ws-meilisearch-rag-feedback-form textarea {
+    width: 100%;
+}
+.ws-meilisearch-rag-feedback-card {
+    border-color: var(--wsm-border, #d7dbe0);
+}
+/* Themes colour links inside the chat; the button text must stay readable. */
+.ws-meilisearch-rag-feedback-card .btn,
+.ws-meilisearch-rag-feedback-card .btn:hover,
+.ws-meilisearch-rag-feedback-card .btn:focus {
+    color: #fff;
+}
 
 /* The finished answer is block HTML (CitationRenderer::blocks()): paragraphs,
  * lists, callouts. While tokens arrive it is raw text, whose line breaks only
