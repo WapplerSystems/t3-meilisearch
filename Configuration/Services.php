@@ -25,6 +25,7 @@ return static function (ContainerConfigurator $container, ContainerBuilder $cont
 
     if (interface_exists(IOperation::class)) {
         $services->set(Integration\ZabbixClient\GetRagUsage::class);
+        $services->set(Integration\ZabbixClient\GetMeilisearchHealth::class);
     }
 
     if (!class_exists(BarChartWidget::class)) {
