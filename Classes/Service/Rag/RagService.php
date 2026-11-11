@@ -2099,7 +2099,10 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch($event);
             $replacement = $event->getReplacement();
             if ($replacement === null) {
-                return [$event->getRevisedAnswer() ?? $answer, $citedIds];
+                $revised = $event->getRevisedAnswer();
+                // A revision may take out or add citation markers; the cited
+                // sources follow the text that is shown.
+                return $revised === null ? [$answer, $citedIds] : [$revised, $this->groundedCitations($site, $revised, $hits)];
             }
             $this->lastWithdrawal = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
             $this->usageCounter->increment($site->getIdentifier(), UsageCounter::WITHDRAWN);

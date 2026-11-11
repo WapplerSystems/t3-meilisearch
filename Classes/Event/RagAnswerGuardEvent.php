@@ -25,9 +25,10 @@ use WapplerSystems\Meilisearch\Service\Rag\Conversation;
  *
  * withdraw() takes the replacement as written, reply tags included
  * ("[reply:no-answer:de]" — expanded afterwards like the model's own) and
- * drops every citation. revise() instead keeps the answer and its citations
- * and only rewrites wording — a product or button name the model left in
- * the wrong language. A revision reaches the visitor as written only with
+ * drops every citation. revise() instead keeps the answer and rewrites it —
+ * a product or button name the model left in the wrong language, a block
+ * without a source taken out, a citation added; the cited sources are read
+ * from the revised text again. A revision reaches the visitor as written only with
  * holdBack; a streamed answer gets it with the `done` frame. Nothing
  * changes without a listener.
  */
