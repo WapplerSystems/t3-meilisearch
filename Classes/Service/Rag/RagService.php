@@ -927,7 +927,12 @@ final class RagService implements LoggerAwareInterface
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
         if (!$outOfScope) {
-            [$responseText, $citedIds] = $this->guardAnswer($site, $event->question, $responseText, $hits, $citedIds, $topic, $options);
+            [$responseText, $citedIds, $askBack] = $this->guardAnswer($site, $event->question, $responseText, $hits, $citedIds, $topic, $options) + [2 => null];
+            if ($askBack !== null) {
+                $answer = RagAnswer::clarification($askBack->question, $this->clarifyChoices($askBack->options, $event->question));
+                $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+                return $answer;
+            }
         }
         $answer = new RagAnswer(
             answer: trim($responseText),
@@ -1153,7 +1158,18 @@ final class RagService implements LoggerAwareInterface
             $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
             $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $cachedText, $hits);
             if (!$outOfScope) {
-                [$cachedText, $citedIds] = $this->guardAnswer($site, $event->question, $cachedText, $hits, $citedIds, $topic, $options);
+                [$cachedText, $citedIds, $askBack] = $this->guardAnswer($site, $event->question, $cachedText, $hits, $citedIds, $topic, $options) + [2 => null];
+                if ($askBack !== null) {
+                    $choices = $this->clarifyChoices($askBack->options, $event->question);
+                    yield RagStreamChunk::clarify($askBack->question, $choices);
+                    $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
+                        $event->question,
+                        RagAnswer::clarification($askBack->question, $choices),
+                        $site,
+                        $this->resolveLanguageId($options), $this->isInternal($options),
+                    ));
+                    return;
+                }
             }
             yield RagStreamChunk::token($cachedText);
             if ($chunk = $this->fallbackChunk($site, $options, $question, $outOfScope ? EscalationResolver::STATUS_OFF_TOPIC : 'ok', $citedIds, $topic)) {
@@ -1267,7 +1283,23 @@ final class RagService implements LoggerAwareInterface
         $outOfScope = $outOfScope && !$this->namesSubject($site, $event->question);
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
         if (!$outOfScope) {
-            [$accumulated, $citedIds] = $this->guardAnswer($site, $event->question, $accumulated, $hits, $citedIds, $topic, $options);
+            [$accumulated, $citedIds, $askBack] = $this->guardAnswer($site, $event->question, $accumulated, $hits, $citedIds, $topic, $options) + [2 => null];
+            if ($askBack !== null) {
+                // The answer was held back (or is replaced on screen by the
+                // clarify frame); the visitor sees the question instead.
+                if ($chunk = $this->fallbackChunk($site, $options, $question, 'clarify', [])) {
+                    yield $chunk;
+                }
+                $choices = $this->clarifyChoices($askBack->options, $event->question);
+                yield RagStreamChunk::clarify($askBack->question, $choices);
+                $this->eventDispatcher->dispatch(new AfterRagAnswerEvent(
+                    $event->question,
+                    RagAnswer::clarification($askBack->question, $choices),
+                    $site,
+                    $this->resolveLanguageId($options), $this->isInternal($options),
+                ));
+                return;
+            }
         }
         if ($holdBack && trim($accumulated) !== '') {
             yield RagStreamChunk::token(trim($accumulated));
@@ -2077,7 +2109,8 @@ final class RagService implements LoggerAwareInterface
      *
      * @param list<array<string,mixed>> $hits
      * @param list<string> $citedIds
-     * @return array{0:string,1:list<string>}
+     * @return array{0:string,1:list<string>,2:?Clarification} the third entry
+     *         when a listener asks back instead (RagAnswerGuardEvent::askInstead())
      */
     private function guardAnswer(Site $site, string $question, string $answer, array $hits, array $citedIds, string $topic, array $options): array
     {
@@ -2097,6 +2130,14 @@ final class RagService implements LoggerAwareInterface
                 $conversation instanceof Conversation ? $conversation : null,
             );
             $this->eventDispatcher->dispatch($event);
+            if (($clarification = $event->getClarification()) !== null) {
+                $this->logger?->info('RAG answer replaced by a question back ({reason}): {question}', [
+                    'reason' => $event->getReason(),
+                    'question' => mb_substr($question, 0, 200),
+                ]);
+
+                return [$answer, $citedIds, $clarification];
+            }
             $replacement = $event->getReplacement();
             if ($replacement === null) {
                 $revised = $event->getRevisedAnswer();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace WapplerSystems\Meilisearch\Event;
 
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Service\Rag\Clarification;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 
 /**
@@ -29,8 +30,11 @@ use WapplerSystems\Meilisearch\Service\Rag\Conversation;
  * a product or button name the model left in the wrong language, a block
  * without a source taken out, a citation added; the cited sources are read
  * from the revised text again. A revision reaches the visitor as written only with
- * holdBack; a streamed answer gets it with the `done` frame. Nothing
- * changes without a listener.
+ * holdBack; a streamed answer gets it with the `done` frame. askInstead()
+ * replaces the answer by a question back with buttons, for when the answer
+ * shows that it depends on something the visitor has not said — decided on
+ * the finished answer, where a decision before it can only guess from the
+ * retrieved documents. Nothing changes without a listener.
  */
 final class RagAnswerGuardEvent
 {
@@ -39,6 +43,8 @@ final class RagAnswerGuardEvent
     private string $reason = '';
 
     private ?string $revised = null;
+
+    private ?Clarification $clarification = null;
 
     /**
      * @param list<array<string,mixed>> $sources the documents the model saw
@@ -80,7 +86,7 @@ final class RagAnswerGuardEvent
      */
     public function revise(string $answer): void
     {
-        if ($this->replacement === null) {
+        if (!$this->isWithdrawn()) {
             $this->revised = $answer;
         }
     }
@@ -150,7 +156,7 @@ final class RagAnswerGuardEvent
      */
     public function withdraw(string $replacement, string $reason): void
     {
-        if ($this->replacement !== null) {
+        if ($this->isWithdrawn()) {
             return;
         }
         $this->replacement = $replacement;
@@ -159,7 +165,27 @@ final class RagAnswerGuardEvent
 
     public function isWithdrawn(): bool
     {
-        return $this->replacement !== null;
+        return $this->replacement !== null || $this->clarification !== null;
+    }
+
+    /**
+     * Ask back instead of answering ("AutoCAD or Revit?"). Like withdraw(),
+     * the first listener wins.
+     *
+     * @param string $reason short id for the log
+     */
+    public function askInstead(Clarification $clarification, string $reason): void
+    {
+        if ($this->isWithdrawn() || !$clarification->needed) {
+            return;
+        }
+        $this->clarification = $clarification;
+        $this->reason = $reason;
+    }
+
+    public function getClarification(): ?Clarification
+    {
+        return $this->clarification;
     }
 
     public function getReplacement(): ?string
