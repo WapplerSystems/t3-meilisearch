@@ -1019,6 +1019,42 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.questionLanguage.enabled:
+    label: 'RAG: follow the language of the question'
+    description: 'A question written clearly in another site language than the page is answered as on that language''s pages: its knowledge (with its knowledgeLanguages entry), its citation and contact cards. The first clear question decides for the whole conversation. Short or mixed questions keep the page language.'
+    type: bool
+    default: false
+
+  meilisearch.rag.questionLanguage.keep:
+    label: 'RAG: question languages that never switch'
+    description: 'ISO codes, e.g. "de": a question in one of these languages stays with the page language.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.questionLanguage.fallbackLanguageId:
+    label: 'RAG: site language for other question languages'
+    description: 'Site language id for a question clearly in one of questionLanguage.otherLanguages. -1 keeps the page language.'
+    type: int
+    default: -1
+
+  meilisearch.rag.questionLanguage.otherLanguages:
+    label: 'RAG: further question languages to detect'
+    description: 'ISO codes beyond the site languages, e.g. "fr, es, it". Such a question goes to fallbackLanguageId. Each extra candidate makes short questions a little less certain.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.questionLanguage.ignoreTerms:
+    label: 'RAG: words ignored when detecting the question language'
+    description: 'Product and brand names, which read as any language and tip short questions the wrong way (e.g. "LINEAR", "Revit").'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.questionLanguage.minWords:
+    label: 'RAG: minimum words for detecting the question language'
+    description: 'Fewer words (after ignoreTerms) keep the page language.'
+    type: int
+    default: 4
+
   meilisearch.rag.sourceQuestion.triggers:
     label: 'RAG: questions for the sources of the previous answer'
     description: 'Phrases like "woher weißt du", "welche quelle*" (word beginnings with *, case-insensitive). A question of at most meilisearch.rag.sourceQuestion.maxChars characters that contains one is answered without a search: the fixed reply "previous-sources" followed by the visible sources the previous answer cited, or "previous-sources-none" when it cited none the visitor can open (see meilisearch.rag.fixedReplies). Empty = off.'

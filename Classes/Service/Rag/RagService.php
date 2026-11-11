@@ -146,6 +146,7 @@ final class RagService implements LoggerAwareInterface
         private readonly NeighbourSuggestions $neighbourSuggestions,
         private readonly PublishDateEnricher $publishDateEnricher,
         private readonly UsageCounter $usageCounter,
+        private readonly QuestionLanguage $questionLanguage,
     ) {}
 
     /**
@@ -793,7 +794,7 @@ final class RagService implements LoggerAwareInterface
     {
         $this->lastWithdrawal = null;
         $question = trim($question);
-        $options = $this->withKnowledgeLanguage($site, $options);
+        $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
         if ($question === '') {
             return RagAnswer::noContext();
         }
@@ -993,7 +994,7 @@ final class RagService implements LoggerAwareInterface
     public function askStreaming(Site $site, string $question, array $options = []): iterable
     {
         $question = trim($question);
-        $options = $this->withKnowledgeLanguage($site, $options);
+        $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
         if ($question === '') {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [])) {
                 yield $chunk;
@@ -1560,6 +1561,36 @@ final class RagService implements LoggerAwareInterface
      * no 'language'. Retrieval is then unfiltered, and pinning the rewrite to
      * an arbitrary language would contradict it. null means "do not pin".
      */
+    /**
+     * Answer a question written clearly in another site language than the
+     * page in that language: its knowledge, its cards (see QuestionLanguage).
+     * Runs before withKnowledgeLanguage(), so that language's knowledge
+     * mapping applies. The page language stays in `pageLanguage`.
+     *
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function withQuestionLanguage(Site $site, string $question, array $options): array
+    {
+        $conversation = $options['conversation'] ?? null;
+        $languageId = $this->questionLanguage->resolve(
+            $site,
+            $question,
+            $conversation instanceof Conversation ? $conversation : Conversation::empty(),
+            $this->resolveLanguageId($options),
+        );
+        if ($languageId === null || $languageId === $this->resolveLanguageId($options)) {
+            return $options;
+        }
+        $options['pageLanguage'] = $this->resolveLanguageId($options);
+        $options['language'] = $languageId;
+        if (isset($options['filters']['language'])) {
+            $options['filters']['language'] = [$languageId];
+        }
+
+        return $options;
+    }
+
     /**
      * Retrieval in another language than the page (meilisearch.rag.knowledgeLanguages,
      * entries "<page language id>:<knowledge language id>", e.g. "7:1").
