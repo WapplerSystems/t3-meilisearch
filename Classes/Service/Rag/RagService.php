@@ -663,6 +663,12 @@ final class RagService implements LoggerAwareInterface
      * those differ by design and the text does not. Hits without body text are
      * always kept — an empty key would fold unrelated documents onto each other.
      *
+     * One copy per product (kbProduct), though: the same topic is often written
+     * once and published for two CAD platforms. Keeping only the first left
+     * the model with a source for one platform while the question asked for
+     * none — it answered for both anyway, and the answer guard rightly found
+     * the second platform without a source and withdrew the whole answer.
+     *
      * @param iterable<array<string,mixed>> $hits
      * @return list<array<string,mixed>>
      */
@@ -681,7 +687,7 @@ final class RagService implements LoggerAwareInterface
                 $kept[] = $hit;
                 continue;
             }
-            $key = md5($body);
+            $key = md5($body) . "\0" . (string)($hit['kbProduct'] ?? '');
             if (isset($seen[$key])) {
                 continue;
             }
