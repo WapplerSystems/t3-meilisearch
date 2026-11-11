@@ -35,15 +35,24 @@ final class RagCitationLabelsEvent
 
     /**
      * @param list<array<string,mixed>> $sources documents about to be cited
+     * @param int|null $languageId site language the answer is written in —
+     *        labels and cards shown with the answer belong in that language
+     *        (the documents may come from another one, see knowledgeLanguages)
      */
     public function __construct(
         private readonly Site $site,
         private readonly array $sources,
+        private readonly ?int $languageId = null,
     ) {}
 
     public function getSite(): Site
     {
         return $this->site;
+    }
+
+    public function getLanguageId(): ?int
+    {
+        return $this->languageId;
     }
 
     /**

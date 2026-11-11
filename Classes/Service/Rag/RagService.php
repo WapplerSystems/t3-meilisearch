@@ -230,7 +230,7 @@ final class RagService implements LoggerAwareInterface
             $hits = $this->preferCurrentRelease($site, $hits, $askedAs, $searchOptions);
         }
 
-        return $this->labelCitations($site, $this->adjustContextHits($site, $askedAs, $hits, $searchOptions));
+        return $this->labelCitations($site, $this->adjustContextHits($site, $askedAs, $hits, $searchOptions), $this->resolveLanguageId($searchOptions));
     }
 
     /**
@@ -342,12 +342,12 @@ final class RagService implements LoggerAwareInterface
      * @param list<array<string,mixed>> $hits
      * @return list<array<string,mixed>>
      */
-    private function labelCitations(Site $site, array $hits): array
+    private function labelCitations(Site $site, array $hits, ?int $languageId = null): array
     {
         if ($hits === []) {
             return $hits;
         }
-        $event = new RagCitationLabelsEvent($site, $hits);
+        $event = new RagCitationLabelsEvent($site, $hits, $languageId);
         $this->eventDispatcher->dispatch($event);
         $labels = $event->getLabels();
         $media = $event->getMedia();
@@ -2068,7 +2068,7 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch($event);
             $replacement = $event->getReplacement();
             if ($replacement === null) {
-                return [$answer, $citedIds];
+                return [$event->getRevisedAnswer() ?? $answer, $citedIds];
             }
             $this->lastWithdrawal = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
             $this->usageCounter->increment($site->getIdentifier(), UsageCounter::WITHDRAWN);

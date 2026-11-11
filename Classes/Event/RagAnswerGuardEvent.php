@@ -25,13 +25,19 @@ use WapplerSystems\Meilisearch\Service\Rag\Conversation;
  *
  * withdraw() takes the replacement as written, reply tags included
  * ("[reply:no-answer:de]" — expanded afterwards like the model's own) and
- * drops every citation. Nothing changes without a listener.
+ * drops every citation. revise() instead keeps the answer and its citations
+ * and only rewrites wording — a product or button name the model left in
+ * the wrong language. A revision reaches the visitor as written only with
+ * holdBack; a streamed answer gets it with the `done` frame. Nothing
+ * changes without a listener.
  */
 final class RagAnswerGuardEvent
 {
     private ?string $replacement = null;
 
     private string $reason = '';
+
+    private ?string $revised = null;
 
     /**
      * @param list<array<string,mixed>> $sources the documents the model saw
@@ -63,7 +69,27 @@ final class RagAnswerGuardEvent
      */
     public function getAnswer(): string
     {
-        return $this->answer;
+        return $this->revised ?? $this->answer;
+    }
+
+    /**
+     * Rewrite the wording of the answer, keeping its citations. Later
+     * listeners see the revised text in getAnswer(). Ignored once the answer
+     * is withdrawn.
+     */
+    public function revise(string $answer): void
+    {
+        if ($this->replacement === null) {
+            $this->revised = $answer;
+        }
+    }
+
+    /**
+     * The revised answer, null when no listener revised it.
+     */
+    public function getRevisedAnswer(): ?string
+    {
+        return $this->revised !== null && $this->revised !== $this->answer ? $this->revised : null;
     }
 
     /**
