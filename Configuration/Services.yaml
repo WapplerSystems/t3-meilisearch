@@ -10,6 +10,9 @@ services:
       - '../Classes/Domain/Schema/SchemaProviderInterface.php'
       - '../Classes/Domain/RecordSource/PluginRecordSourceInterface.php'
       - '../Classes/Event/*'
+      # Optional integrations, registered in Services.php when the package exists.
+      - '../Classes/Integration/Dashboard/*'
+      - '../Classes/Integration/ZabbixClient/*'
       - '../Classes/Service/SearchResult.php'
       # Readonly DTO built by QueryRecoveryService; scalar-only constructor,
       # so autowiring it would break container compilation.

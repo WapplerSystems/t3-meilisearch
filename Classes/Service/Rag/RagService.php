@@ -25,6 +25,7 @@ use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
 use WapplerSystems\Meilisearch\Service\Llm\LlmOptions;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
 use WapplerSystems\Meilisearch\Service\SearchService;
+use WapplerSystems\Meilisearch\Service\Rag\Statistics\UsageCounter;
 
 /**
  * Retrieval-Augmented Generation orchestrator.
@@ -144,6 +145,7 @@ final class RagService implements LoggerAwareInterface
         private readonly Reranker $reranker,
         private readonly NeighbourSuggestions $neighbourSuggestions,
         private readonly PublishDateEnricher $publishDateEnricher,
+        private readonly UsageCounter $usageCounter,
     ) {}
 
     /**
@@ -2063,6 +2065,7 @@ final class RagService implements LoggerAwareInterface
                 return [$answer, $citedIds];
             }
             $this->lastWithdrawal = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
+            $this->usageCounter->increment($site->getIdentifier(), UsageCounter::WITHDRAWN);
             $this->logger?->notice('RAG answer withdrawn ({reason}): {question}', [
                 'reason' => $event->getReason(),
                 'question' => mb_substr($question, 0, 200),

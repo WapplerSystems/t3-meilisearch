@@ -12,6 +12,7 @@ use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteSettings;
+use WapplerSystems\Meilisearch\Service\Rag\Statistics\UsageCounter;
 
 /**
  * Decides whether a chat question may reach the model at all — before
@@ -62,6 +63,7 @@ final class RagRequestGuard implements LoggerAwareInterface
 
     public function __construct(
         private readonly CacheManager $cacheManager,
+        private readonly UsageCounter $usageCounter,
     ) {}
 
     /**
@@ -69,6 +71,17 @@ final class RagRequestGuard implements LoggerAwareInterface
      * Counts the question against every limit it passed.
      */
     public function refuse(Site $site, ServerRequestInterface $request, string $question, string $conversationId = ''): ?string
+    {
+        $reason = $this->check($site, $request, $question, $conversationId);
+        $this->usageCounter->increment(
+            $site->getIdentifier(),
+            $reason === null ? UsageCounter::ACCEPTED : UsageCounter::REFUSED_PREFIX . $reason,
+        );
+
+        return $reason;
+    }
+
+    private function check(Site $site, ServerRequestInterface $request, string $question, string $conversationId): ?string
     {
         $settings = $site->getSettings();
         if (!(bool)$settings->get('meilisearch.rag.protection.enabled', false)) {

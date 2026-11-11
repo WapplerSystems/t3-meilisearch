@@ -1845,6 +1845,69 @@
             <trans-unit id="be.protocol.ratedDown" resname="be.protocol.ratedDown">
                 <source>Visitor: not helpful</source>
             </trans-unit>
+            <trans-unit id="widget.group" resname="widget.group">
+                <source>Chat (RAG)</source>
+            </trans-unit>
+            <trans-unit id="widget.turnsPerDay.title" resname="widget.turnsPerDay.title">
+                <source>Chat: questions per day</source>
+            </trans-unit>
+            <trans-unit id="widget.turnsPerDay.description" resname="widget.turnsPerDay.description">
+                <source>Questions to the chat on the website over the last 30 days, answered and without an answer from the sources.</source>
+            </trans-unit>
+            <trans-unit id="widget.turnsPerDay.answered" resname="widget.turnsPerDay.answered">
+                <source>Answered</source>
+            </trans-unit>
+            <trans-unit id="widget.turnsPerDay.unanswered" resname="widget.turnsPerDay.unanswered">
+                <source>No answer</source>
+            </trans-unit>
+            <trans-unit id="widget.today.title" resname="widget.today.title">
+                <source>Chat: questions today</source>
+            </trans-unit>
+            <trans-unit id="widget.today.subtitle" resname="widget.today.subtitle">
+                <source>Questions from visitors since midnight</source>
+            </trans-unit>
+            <trans-unit id="widget.today.description" resname="widget.today.description">
+                <source>Number of questions visitors asked the chat today.</source>
+            </trans-unit>
+            <trans-unit id="widget.rating.title" resname="widget.rating.title">
+                <source>Chat: ratings (30 days)</source>
+            </trans-unit>
+            <trans-unit id="widget.rating.description" resname="widget.rating.description">
+                <source>How visitors rated the answers of the last 30 days.</source>
+            </trans-unit>
+            <trans-unit id="widget.rating.up" resname="widget.rating.up">
+                <source>Helpful</source>
+            </trans-unit>
+            <trans-unit id="widget.rating.down" resname="widget.rating.down">
+                <source>Not helpful</source>
+            </trans-unit>
+            <trans-unit id="widget.rating.none" resname="widget.rating.none">
+                <source>Not rated</source>
+            </trans-unit>
+            <trans-unit id="widget.topQuestions.title" resname="widget.topQuestions.title">
+                <source>Chat: frequent questions (7 days)</source>
+            </trans-unit>
+            <trans-unit id="widget.topQuestions.description" resname="widget.topQuestions.description">
+                <source>The questions visitors asked most often in the last 7 days.</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.title" resname="widget.problems.title">
+                <source>Chat: open problems (7 days)</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.description" resname="widget.problems.description">
+                <source>Latest questions without an answer from the sources, failures and answers rated not helpful.</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.no_context" resname="widget.problems.no_context">
+                <source>no answer</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.failed" resname="widget.problems.failed">
+                <source>failure</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.ratedDown" resname="widget.problems.ratedDown">
+                <source>not helpful</source>
+            </trans-unit>
+            <trans-unit id="widget.empty" resname="widget.empty">
+                <source>No questions in this period.</source>
+            </trans-unit>
     </body>
     </file>
 </xliff>
