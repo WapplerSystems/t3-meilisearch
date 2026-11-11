@@ -216,6 +216,12 @@ settings:
     type: int
     default: 0
 
+  meilisearch.rag.chatWidget.languageIds:
+    label: 'Chat widget: restrict to languages'
+    description: 'Comma-separated site language ids (e.g. "0,1", no spaces) on which the chat bubble appears. Empty (default) means every language of the site. Combines with the page and subtree gates. Use it to roll the chat out language by language while other languages are still being prepared.'
+    type: string
+    default: ''
+
   meilisearch.rag.chatWidget.embedTypeNum:
     label: 'Chat widget embed page type'
     description: 'Page typeNum used for the bare chat view the widget iframe loads — renders ONLY the wsmeilisearch_rag plugin without the site header/nav/footer (styled by RagEmbed.css). The widget URL is built with this type appended. Change only if it collides with another page type on the site.'

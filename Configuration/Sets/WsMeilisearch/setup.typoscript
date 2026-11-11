@@ -53,11 +53,13 @@ plugin.tx_wsmeilisearch_search {
 # plugin in a slide-up panel.
 #
 # Scope: by default EVERY FE page that includes this Set gets the bubble.
-# Two independent gates narrow that down. Each is inert at its default 0,
-# and a page must pass every active gate:
+# Three independent gates narrow that down. Each is inert at its default
+# (0 / empty), and a page must pass every active gate:
 #   1) chatWidget.restrictToPageUid    -> exactly that page, subpages excluded
 #   2) chatWidget.restrictToSubtreeUid -> that page plus everything below it
-# Set both only when you want the intersection; normally one is enough.
+#   3) chatWidget.languageIds          -> only these site language ids
+# Set 1 and 2 together only when you want the intersection; normally one is
+# enough. Gate 3 wraps the list in commas so "1" does not match "10".
 #
 # The scope lives in the condition rather than in PHP because a condition
 # verdict is part of the page-cache identifier: per-page differences cache
@@ -68,7 +70,7 @@ plugin.tx_wsmeilisearch_search {
 #     an outer wrapper, and assets + markup share a single condition.
 #   * `page` is populated only in a frontend request; in CLI/BE the uid gate
 #     evaluates to false, which is the safe direction (no bubble, no error).
-[site("settings").get("meilisearch.rag.chatWidget.enabled") && ({$meilisearch.rag.chatWidget.restrictToPageUid} == 0 || page["uid"] == {$meilisearch.rag.chatWidget.restrictToPageUid}) && ({$meilisearch.rag.chatWidget.restrictToSubtreeUid} == 0 || {$meilisearch.rag.chatWidget.restrictToSubtreeUid} in tree.rootLineIds)]
+[site("settings").get("meilisearch.rag.chatWidget.enabled") && ({$meilisearch.rag.chatWidget.restrictToPageUid} == 0 || page["uid"] == {$meilisearch.rag.chatWidget.restrictToPageUid}) && ({$meilisearch.rag.chatWidget.restrictToSubtreeUid} == 0 || {$meilisearch.rag.chatWidget.restrictToSubtreeUid} in tree.rootLineIds) && (site("settings").get("meilisearch.rag.chatWidget.languageIds") == "" || ("," ~ site("settings").get("meilisearch.rag.chatWidget.languageIds") ~ ",") contains ("," ~ siteLanguage("languageId") ~ ","))]
     page.includeJSFooter.wsMeilisearchChatWidget = EXT:ws_meilisearch/Resources/Public/JavaScript/ChatWidget.js
     # Inline chat (no iframe): the widget injects the RAG shell into the host
     # DOM, so RagStream.js (driver) and RagEmbed.css (scoped look) must load on
