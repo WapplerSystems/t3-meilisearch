@@ -68,6 +68,18 @@ final class QueryRewriter implements LoggerAwareInterface
      * worked. Naming the target language explicitly removes the guesswork; the
      * examples now cover both languages so neither anchors the other away.
      */
+    /**
+     * Help-page titles for a question, in the documentation's own wording.
+     * Visitors and documentation name the same task differently: "Wie
+     * übernehme ich das Gebäudemodell in die Heizlast?" against the page
+     * "Gebäude aus einem CAD-Programm erfassen". Keyword and vector search on
+     * the question both found "Überschlägige Leistungen aus Raumvorlagen
+     * übernehmen" first (LINEAR, 12.11.2026); a title written the way a help
+     * names the task closes that gap. %1$d = number of titles, %2$s = the
+     * site's own context sentence.
+     */
+    private const DOCUMENTATION_PROMPT = 'You help a search engine find the page of a software help that answers a question.%2$s Write the titles such help pages would have, in the documentation\'s own wording: the task as the help names it, with the verb in the infinitive at the end ("Gebäude aus einem CAD-Programm erfassen", "Lizenz freigeben", "install software packages"). Name what the help would name, including where something comes from or the step before the asked one when the question implies it. Write %1$d titles, one per line, nothing else.';
+
     private const LANGUAGE_SUFFIX = ' The query MUST be written in %s, whatever language the question uses — it is matched against documents in %s only.';
 
     /**
@@ -117,6 +129,53 @@ final class QueryRewriter implements LoggerAwareInterface
         // RAG answer settings; the provider connection bits (model, apiKey,
         // url, timeout) come from the caller's options.
         return $this->callProvider($provider, $messages, $baseLlmOptions, $question);
+    }
+
+    /**
+     * Further search queries for the question, written like help-page titles
+     * (meilisearch.rag.documentationQueries). Empty when switched off or when
+     * the model fails — retrieval then runs on the question alone.
+     *
+     * $question is the standalone question: the rewrite of a follow-up, the
+     * visitor's wording otherwise.
+     *
+     * @return list<string>
+     */
+    public function documentationQueries(
+        LlmProviderInterface $provider,
+        object $settings,
+        string $question,
+        array $baseLlmOptions,
+        ?string $languageLabel = null,
+    ): array {
+        if (!(bool)$settings->get('meilisearch.rag.documentationQueries.enabled', false) || trim($question) === '') {
+            return [];
+        }
+        $count = max(1, min(3, (int)$settings->get('meilisearch.rag.documentationQueries.count', 2)));
+        $context = trim((string)$settings->get('meilisearch.rag.documentationQueries.context', ''));
+        $pin = $languageLabel !== null && $languageLabel !== ''
+            ? sprintf(self::LANGUAGE_SUFFIX, $languageLabel, $languageLabel)
+            : '';
+        $messages = [
+            ['role' => 'system', 'content' => sprintf(self::DOCUMENTATION_PROMPT, $count, $context !== '' ? ' The software: ' . $context . '.' : '') . $pin],
+            ['role' => 'user', 'content' => $question],
+        ];
+        try {
+            $text = $provider->complete($messages, ['temperature' => 0.0, 'maxTokens' => 32 * $count] + $baseLlmOptions);
+        } catch (\Throwable $e) {
+            $this->logger?->info('RAG documentation queries failed: {message}', ['message' => $e->getMessage()]);
+            return [];
+        }
+        $queries = [];
+        foreach (preg_split('/\R/u', trim($text)) ?: [] as $line) {
+            // Bullets, numbering and quotes, Unicode-aware (trim() works on bytes).
+            $line = trim((string)preg_replace(['/^\s*(?:[-*•]|\d+[.)])\s*/u', '/^["\'`„“”]+|["\'`„“”]+$/u'], '', trim($line)));
+            if ($line !== '' && mb_strlen($line) <= 120 && mb_strtolower($line) !== mb_strtolower(trim($question))) {
+                $queries[mb_strtolower($line)] = $line;
+            }
+        }
+
+        return array_slice(array_values($queries), 0, $count);
     }
 
     /**

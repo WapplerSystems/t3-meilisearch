@@ -133,6 +133,9 @@ final class RagService implements LoggerAwareInterface
     /** Why the answer guard withdrew the last answer of ask() and what it said, for test runs (ws_meilisearch:ask --json). */
     private ?string $lastWithdrawal = null;
 
+    /** Reciprocal rank fusion constant (Cormack et al.): damps the top ranks' lead. */
+    private const FUSION_K = 60;
+
     public function __construct(
         private readonly SearchService $searchService,
         private readonly LlmProviderRegistry $providerRegistry,
@@ -208,8 +211,7 @@ final class RagService implements LoggerAwareInterface
                 $hits = $this->rerankHits($site, $askedAs, $hits);
             }
         } else {
-            $searchResult = $this->searchService->search($site, $query, $searchOptions);
-            $collapsed = $this->collapseContext($searchResult->hits, $askedAs, $collapseIdentical, $collapseByTitle);
+            $collapsed = $this->collapseContext($this->fusedSearch($site, $query, $searchOptions), $askedAs, $collapseIdentical, $collapseByTitle);
             if ($rerankCandidates > 0) {
                 $collapsed = $this->rerankHits($site, $askedAs, array_values(array_slice($collapsed, 0, $rerankCandidates)));
             }
@@ -752,10 +754,15 @@ final class RagService implements LoggerAwareInterface
             );
         }
 
+        $searchOptions = self::withoutStripOption($event->options);
+        if ($provider !== null) {
+            $searchOptions = $this->withDocumentationQueries($site, $provider, $searchOptions, $event->question, $this->buildLlmOptions($settings), $options);
+        }
+
         return $this->searchForContext(
             $site,
             $this->withoutFilteredTerms($event->options, $query),
-            $this->withVectorQuery(self::withoutStripOption($event->options), $this->withoutFilteredTerms($event->options, $event->question)),
+            $this->withVectorQuery($searchOptions, $this->withoutFilteredTerms($event->options, $event->question)),
             $maxHits,
             $this->collapsesIdentical($settings),
             true,
@@ -844,7 +851,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                self::withoutStripOption($event->options),
+                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $llmOptions, $options),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -1065,7 +1072,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                self::withoutStripOption($event->options),
+                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $llmOptions, $options),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -1697,6 +1704,76 @@ final class RagService implements LoggerAwareInterface
     }
 
     /**
+     * The search options plus help-page titles for the question
+     * (QueryRewriter::documentationQueries()), searched alongside it by
+     * fusedSearch().
+     *
+     * @param array<string,mixed> $searchOptions
+     * @param array<string,mixed> $llmOptions
+     * @param array<string,mixed> $options the ask options (language)
+     * @return array<string,mixed>
+     */
+    private function withDocumentationQueries(Site $site, LlmProviderInterface $provider, array $searchOptions, string $question, array $llmOptions, array $options): array
+    {
+        $queries = $this->queryRewriter->documentationQueries(
+            $provider,
+            $site->getSettings(),
+            $question,
+            $llmOptions,
+            $this->resolveLanguageLabel($site, $options),
+        );
+        if ($queries !== []) {
+            $searchOptions['documentationQueries'] = $queries;
+        }
+
+        return $searchOptions;
+    }
+
+    /**
+     * The search for the question, and for each of its documentation queries,
+     * merged by reciprocal rank fusion: a document many lists rank high comes
+     * first, one that only a documentation query finds still gets a place. The
+     * question's own list wins ties and supplies a document's data.
+     *
+     * @param array<string,mixed> $searchOptions
+     * @return list<array<string,mixed>>
+     */
+    private function fusedSearch(Site $site, string $query, array $searchOptions): array
+    {
+        $queries = array_values(array_filter(array_map('strval', (array)($searchOptions['documentationQueries'] ?? []))));
+        unset($searchOptions['documentationQueries']);
+        $lists = [array_map(static fn ($hit): array => (array)$hit, $this->searchService->search($site, $query, $searchOptions)->hits)];
+        foreach ($queries as $alternative) {
+            $alternativeOptions = $searchOptions;
+            $alternativeOptions['vectorQuery'] = $alternative;
+            $alternativeOptions['__skipAnalytics'] = true;
+            try {
+                $lists[] = array_map(static fn ($hit): array => (array)$hit, $this->searchService->search($site, $alternative, $alternativeOptions)->hits);
+            } catch (\Throwable $e) {
+                $this->logger?->info('RAG documentation query search failed: {message}', ['message' => $e->getMessage()]);
+            }
+        }
+        if (count($lists) === 1) {
+            return $lists[0];
+        }
+        $scores = [];
+        $byId = [];
+        foreach ($lists as $list) {
+            foreach (array_values($list) as $rank => $hit) {
+                $id = (string)($hit['id'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+                $scores[$id] = ($scores[$id] ?? 0.0) + 1.0 / (self::FUSION_K + $rank + 1);
+                $byId[$id] ??= $hit;
+            }
+        }
+        arsort($scores);
+
+        return array_values(array_map(static fn (string $id): array => $byId[$id], array_keys($scores)));
+    }
+
+    /**
      * One retrieval per lane, each with its own filter on top of the
      * configured ones, merged round-robin (best of every lane first).
      *
@@ -1731,9 +1808,8 @@ final class RagService implements LoggerAwareInterface
             $laneOptions['filters']['__rawFilters'] = array_merge(is_array($existing) ? $existing : [], [$filter]);
             $factor = $collapseByTitle ? self::TITLE_COLLAPSE_OVERFETCH : self::COLLAPSE_OVERFETCH;
             $laneOptions['perPage'] = min($count * $factor, self::COLLAPSE_MAX_FETCH);
-            $result = $this->searchService->search($site, $query, $laneOptions);
             $perLane[] = array_values(array_slice(
-                $this->collapseContext($result->hits, $askedAs, $collapseIdentical, $collapseByTitle),
+                $this->collapseContext($this->fusedSearch($site, $query, $laneOptions), $askedAs, $collapseIdentical, $collapseByTitle),
                 0,
                 $count,
             ));

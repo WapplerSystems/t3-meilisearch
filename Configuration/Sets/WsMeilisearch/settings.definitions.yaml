@@ -1019,6 +1019,24 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.documentationQueries.enabled:
+    label: 'RAG: also search for help-page titles'
+    description: 'The model writes how help pages answering the question would be titled ("Gebäude aus einem CAD-Programm erfassen" for "Wie übernehme ich das Gebäudemodell in die Heizlast?"); the question and these titles are searched and the hit lists merged (reciprocal rank fusion). Closes the gap between the visitor''s and the documentation''s wording. One short model call and a few more searches per question.'
+    type: bool
+    default: false
+
+  meilisearch.rag.documentationQueries.count:
+    label: 'RAG: number of help-page titles'
+    description: '1 to 3.'
+    type: int
+    default: 2
+
+  meilisearch.rag.documentationQueries.context:
+    label: 'RAG: what the software is, for the help-page titles'
+    description: 'One phrase, e.g. "LINEAR, building services design software for AutoCAD and Revit". Without it the model knows only the question.'
+    type: string
+    default: ''
+
   meilisearch.rag.questionLanguage.enabled:
     label: 'RAG: follow the language of the question'
     description: 'A question written clearly in another site language than the page is answered as on that language''s pages: its knowledge (with its knowledgeLanguages entry), its citation and contact cards. The first clear question decides for the whole conversation. Short or mixed questions keep the page language.'
