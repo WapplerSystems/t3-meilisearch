@@ -80,7 +80,7 @@ final class RagStreamChunk
      * @param bool $outOfScope the question was outside the assistant's subject
      * @param string $topic topic tag of the reply, '' for none
      */
-    public static function done(string $answer, array $citedIds, array $notes = [], bool $outOfScope = false, string $topic = ''): self
+    public static function done(string $answer, array $citedIds, array $notes = [], bool $outOfScope = false, string $topic = '', bool $withdrawn = false): self
     {
         return new self(self::TYPE_DONE, [
             'answer' => $answer,
@@ -88,6 +88,7 @@ final class RagStreamChunk
             'notes' => $notes,
             'outOfScope' => $outOfScope,
             'topic' => $topic,
+            'withdrawn' => $withdrawn,
         ]);
     }
 

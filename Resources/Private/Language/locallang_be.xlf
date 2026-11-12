@@ -738,6 +738,9 @@
             <trans-unit id="be.protocol.status.off_topic" resname="be.protocol.status.off_topic">
                 <source>off topic</source>
             </trans-unit>
+            <trans-unit id="be.protocol.status.withdrawn" resname="be.protocol.status.withdrawn">
+                <source>withdrawn by the answer check</source>
+            </trans-unit>
             <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
                 <source>assistant disabled</source>
             </trans-unit>
@@ -1901,6 +1904,9 @@
             </trans-unit>
             <trans-unit id="widget.problems.failed" resname="widget.problems.failed">
                 <source>failure</source>
+            </trans-unit>
+            <trans-unit id="widget.problems.withdrawn" resname="widget.problems.withdrawn">
+                <source>withdrawn</source>
             </trans-unit>
             <trans-unit id="widget.problems.ratedDown" resname="widget.problems.ratedDown">
                 <source>not helpful</source>

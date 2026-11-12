@@ -334,7 +334,11 @@ final class RagStreamMiddleware implements MiddlewareInterface
     ): void {
         [$status, $answer, $citedIds] = match ($terminalChunk?->type) {
             RagStreamChunk::TYPE_DONE => [
-                ($terminalChunk->data['outOfScope'] ?? false) === true ? ChatProtocolRecorder::STATUS_OFF_TOPIC : 'ok',
+                match (true) {
+                    ($terminalChunk->data['outOfScope'] ?? false) === true => ChatProtocolRecorder::STATUS_OFF_TOPIC,
+                    ($terminalChunk->data['withdrawn'] ?? false) === true => ChatProtocolRecorder::STATUS_WITHDRAWN,
+                    default => 'ok',
+                },
                 (string)($terminalChunk->data['answer'] ?? ''),
                 array_values(array_map('strval', (array)($terminalChunk->data['citedIds'] ?? []))),
             ],

@@ -17,7 +17,7 @@ final class ProtocolFilter
      * A turn counts as a problem when the assistant did not deliver a
      * grounded answer: these statuses, or `ok` without a single citation.
      */
-    public const PROBLEM_STATUSES = ['no_context', 'failed', 'clarify', 'aborted'];
+    public const PROBLEM_STATUSES = ['no_context', 'failed', 'clarify', 'aborted', 'withdrawn'];
 
     public function __construct(
         public readonly ?string $siteIdentifier = null,

@@ -8,6 +8,7 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Service\Rag\Conversation;
 use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
+use WapplerSystems\Meilisearch\Service\Rag\RagAnswer;
 
 /**
  * Writes every finished chat turn into the chat protocol — opt-in per site
@@ -35,6 +36,12 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
      * answered product question nor shows up among the knowledge gaps.
      */
     public const STATUS_OFF_TOPIC = EscalationResolver::STATUS_OFF_TOPIC;
+    /**
+     * The answer guard withdrew the model's reply; the visitor saw the
+     * replacement text. Kept apart from `ok` so withdrawals can be reviewed
+     * in the protocol.
+     */
+    public const STATUS_WITHDRAWN = 'withdrawn';
 
     /** A visitor in the chat on the site. */
     public const CHANNEL_WEB = 'web';
@@ -60,6 +67,16 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
     public static function newTurnKey(): string
     {
         return bin2hex(random_bytes(16));
+    }
+
+    /** Protocol status of an answer from RagService::ask(). */
+    public static function statusOf(RagAnswer $answer): string
+    {
+        return match (true) {
+            $answer->outOfScope => self::STATUS_OFF_TOPIC,
+            $answer->withdrawn => self::STATUS_WITHDRAWN,
+            default => $answer->status,
+        };
     }
 
     public function isEnabled(?Site $site): bool

@@ -184,7 +184,7 @@ final class RagController extends ActionController
             $conversation->id,
             $q,
             $answer->answer,
-            $answer->outOfScope ? ChatProtocolRecorder::STATUS_OFF_TOPIC : $answer->status,
+            ChatProtocolRecorder::statusOf($answer),
             $answer->citedIds,
             $answer->sources,
             $escalation !== null,

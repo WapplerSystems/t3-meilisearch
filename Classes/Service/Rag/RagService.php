@@ -948,6 +948,7 @@ final class RagService implements LoggerAwareInterface
             status: 'ok',
             outOfScope: $outOfScope,
             topic: $topic,
+            withdrawn: $this->lastWithdrawal !== null,
         );
         $after = new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options));
         $this->eventDispatcher->dispatch($after);
@@ -1005,6 +1006,7 @@ final class RagService implements LoggerAwareInterface
      */
     public function askStreaming(Site $site, string $question, array $options = []): iterable
     {
+        $this->lastWithdrawal = null;
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
         if ($question === '') {
@@ -1183,7 +1185,7 @@ final class RagService implements LoggerAwareInterface
                 yield $chunk;
             }
             $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, $cachedText, $hits, $citedIds, $options);
-            yield RagStreamChunk::done($cachedText, $citedIds, $notes, $outOfScope, $topic);
+            yield RagStreamChunk::done($cachedText, $citedIds, $notes, $outOfScope, $topic, $this->lastWithdrawal !== null);
             $cachedAnswer = new RagAnswer(
                 answer: trim($cachedText),
                 sources: $hits,
@@ -1192,6 +1194,7 @@ final class RagService implements LoggerAwareInterface
                 notes: $notes,
                 outOfScope: $outOfScope,
                 topic: $topic,
+                withdrawn: $this->lastWithdrawal !== null,
             );
             $cachedSuggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
                 $this->withRelatedTopics(
@@ -1319,7 +1322,7 @@ final class RagService implements LoggerAwareInterface
             yield $chunk;
         }
         $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
-        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope, $topic);
+        yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope, $topic, $this->lastWithdrawal !== null);
 
         $answer = new RagAnswer(
             answer: trim($accumulated),
@@ -1329,6 +1332,7 @@ final class RagService implements LoggerAwareInterface
             notes: $notes,
             outOfScope: $outOfScope,
             topic: $topic,
+            withdrawn: $this->lastWithdrawal !== null,
         );
         // Decision-support suggestions, same generator as the non-streaming
         // ask(); emitted as a trailing frame so the streaming chat shows the
@@ -2222,7 +2226,11 @@ final class RagService implements LoggerAwareInterface
                 return $revised === null ? [$answer, $citedIds] : [$revised, $this->groundedCitations($site, $revised, $hits)];
             }
             $this->lastWithdrawal = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
-            $this->usageCounter->increment($site->getIdentifier(), UsageCounter::WITHDRAWN);
+            // Visitors only, like the rest of the usage statistics: a test
+            // run on the CLI would otherwise trip the withdrawal alert.
+            if (!$this->isInternal($options)) {
+                $this->usageCounter->increment($site->getIdentifier(), UsageCounter::WITHDRAWN);
+            }
             $this->logger?->notice('RAG answer withdrawn ({reason}): {question}', [
                 'reason' => $event->getReason(),
                 'question' => mb_substr($question, 0, 200),

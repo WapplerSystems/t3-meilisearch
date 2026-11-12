@@ -134,7 +134,7 @@ final class AskAssistantTool implements McpToolInterface
             conversationId: $conversation->id,
             question: $question,
             answer: $answer->answer,
-            status: $answer->outOfScope ? ChatProtocolRecorder::STATUS_OFF_TOPIC : $answer->status,
+            status: ChatProtocolRecorder::statusOf($answer),
             citedIds: $answer->citedIds,
             hits: $answer->sources,
             escalated: false,

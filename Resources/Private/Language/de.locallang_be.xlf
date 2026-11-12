@@ -969,6 +969,10 @@
                 <source>off topic</source>
                 <target>außerhalb des Themas</target>
             </trans-unit>
+            <trans-unit id="be.protocol.status.withdrawn" resname="be.protocol.status.withdrawn">
+                <source>withdrawn by the answer check</source>
+                <target>von der Antwortprüfung zurückgezogen</target>
+            </trans-unit>
             <trans-unit id="be.protocol.status.disabled" resname="be.protocol.status.disabled">
                 <source>assistant disabled</source>
                 <target>Assistent deaktiviert</target>
@@ -2536,6 +2540,10 @@
             <trans-unit id="widget.problems.failed" resname="widget.problems.failed">
                 <source>failure</source>
                 <target>Fehler</target>
+            </trans-unit>
+            <trans-unit id="widget.problems.withdrawn" resname="widget.problems.withdrawn">
+                <source>withdrawn</source>
+                <target>zurückgezogen</target>
             </trans-unit>
             <trans-unit id="widget.problems.ratedDown" resname="widget.problems.ratedDown">
                 <source>not helpful</source>

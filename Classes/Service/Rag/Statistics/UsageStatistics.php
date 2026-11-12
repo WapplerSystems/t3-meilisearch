@@ -28,7 +28,7 @@ final class UsageStatistics
     private const TABLE = 'tx_wsmeilisearch_rag_protocol';
 
     /** Statuses of a turn that did not get an answer from the sources. */
-    public const UNANSWERED = ['no_context', 'failed'];
+    public const UNANSWERED = ['no_context', 'failed', 'withdrawn'];
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -42,7 +42,7 @@ final class UsageStatistics
     public function summary(?string $siteIdentifier, int $since, string $channel = ChatProtocolRecorder::CHANNEL_WEB): array
     {
         $summary = ['turns' => 0, 'conversations' => 0, 'status' => [], 'escalated' => 0, 'ratedUp' => 0, 'ratedDown' => 0, 'lastTurn' => 0];
-        foreach (['ok', 'no_context', 'failed', 'clarify', 'aborted', 'off_topic'] as $status) {
+        foreach (['ok', 'no_context', 'failed', 'clarify', 'aborted', 'off_topic', 'withdrawn'] as $status) {
             $summary['status'][$status] = 0;
         }
         $conversations = [];

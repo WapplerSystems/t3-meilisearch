@@ -34,6 +34,13 @@ final class RagAnswer
         public readonly bool $outOfScope = false,
         /** Topic tag of the reply, see RagService::TOPIC_TAG_FORMAT; '' for none. */
         public readonly string $topic = '',
+        /**
+         * The answer guard withdrew the model's reply and $answer is the
+         * replacement (see RagAnswerGuardEvent). Status stays `ok` so the
+         * reply renders and escalates as before; the protocol files it as
+         * `withdrawn`.
+         */
+        public readonly bool $withdrawn = false,
     ) {}
 
     /**
@@ -55,6 +62,7 @@ final class RagAnswer
             $this->notes,
             $this->outOfScope,
             $this->topic,
+            $this->withdrawn,
         );
     }
 
@@ -75,6 +83,7 @@ final class RagAnswer
             $notes,
             $this->outOfScope,
             $this->topic,
+            $this->withdrawn,
         );
     }
 
