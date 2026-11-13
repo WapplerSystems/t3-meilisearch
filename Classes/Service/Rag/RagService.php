@@ -134,6 +134,19 @@ final class RagService implements LoggerAwareInterface
     /** Why the answer guard withdrew the last answer of ask() and what it said, for test runs (ws_meilisearch:ask --json). */
     private ?string $lastWithdrawal = null;
 
+    /**
+     * Milliseconds since the start of the last ask()/askStreaming() at the end
+     * of each phase, in order: rewrite, titles, retrieval, firstToken (stream),
+     * answer, guard, notes, suggestions. Logged once per answer and printed by
+     * ws_meilisearch:ask --json — where the response time goes, measured
+     * instead of guessed.
+     *
+     * @var array<string,int>
+     */
+    private array $timings = [];
+
+    private float $timingStart = 0.0;
+
     /** Reciprocal rank fusion constant (Cormack et al.): damps the top ranks' lead. */
     private const FUSION_K = 60;
 
@@ -801,6 +814,7 @@ final class RagService implements LoggerAwareInterface
     public function ask(Site $site, string $question, array $options = []): RagAnswer
     {
         $this->lastWithdrawal = null;
+        $this->startTimings();
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
         if ($question === '') {
@@ -847,6 +861,7 @@ final class RagService implements LoggerAwareInterface
             $provider, $settings, $conversation, $event->question, $llmOptions,
             $this->resolveLanguageLabel($site, $options),
         );
+        $this->mark('rewrite');
 
         $hits = $this->searchForContext(
             $site,
@@ -863,6 +878,7 @@ final class RagService implements LoggerAwareInterface
         // context and answers — an off-topic question finds nothing in the
         // index, and "no context" would hand it the contact card.
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
+        $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             $answer = RagAnswer::noContext();
@@ -919,6 +935,7 @@ final class RagService implements LoggerAwareInterface
 
         try {
             $responseText = $before->response ?? $provider->complete($before->messages, $before->options);
+            $this->mark('answer');
         } catch (LlmException $e) {
             $this->logger?->error('RAG LLM call failed: {message}', [
                 'message' => $e->getMessage(),
@@ -936,7 +953,9 @@ final class RagService implements LoggerAwareInterface
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $responseText, $hits);
         if (!$outOfScope) {
             [$responseText, $citedIds, $askBack] = $this->guardAnswer($site, $event->question, $responseText, $hits, $citedIds, $topic, $options) + [2 => null];
+            $this->mark('guard');
             if ($askBack !== null) {
+                $this->logTimings();
                 $answer = RagAnswer::clarification($askBack->question, $this->clarifyChoices($askBack->options, $event->question));
                 $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $answer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
                 return $answer;
@@ -960,14 +979,16 @@ final class RagService implements LoggerAwareInterface
             return $final;
         }
         $final = $final->withNotes($this->answerNotes($site, $event->question, $final->answer, $hits, $final->citedIds, $options));
+        $this->mark('notes');
         if (!$this->offersSuggestions($site, false, $final->citedIds)) {
+            $this->logTimings();
             return $final;
         }
         // Decision-support suggestions (followup / refine / recommend),
         // rendered as buttons under the answer. Generated from the final
         // answer + sources; returns [] when disabled or on any error, so it
         // never blocks the answer.
-        return $final->withSuggestions($this->withScopeOptions(
+        $final = $final->withSuggestions($this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
                     $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
@@ -991,6 +1012,10 @@ final class RagService implements LoggerAwareInterface
             $hits,
             $final->citedIds,
         ));
+        $this->mark('suggestions');
+        $this->logTimings();
+
+        return $final;
     }
 
     /**
@@ -1008,6 +1033,7 @@ final class RagService implements LoggerAwareInterface
     public function askStreaming(Site $site, string $question, array $options = []): iterable
     {
         $this->lastWithdrawal = null;
+        $this->startTimings();
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
         if ($question === '') {
@@ -1069,6 +1095,7 @@ final class RagService implements LoggerAwareInterface
             $provider, $settings, $conversation, $event->question, $llmOptions,
             $this->resolveLanguageLabel($site, $options),
         );
+        $this->mark('rewrite');
 
         // Same retrieval as ask() — including the fallback ladder — so the
         // streaming path cannot degrade differently on identical questions.
@@ -1084,6 +1111,7 @@ final class RagService implements LoggerAwareInterface
             true,
         );
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
+        $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
         if ($hits === []) {
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'no_context', [], $questionTopic)) {
@@ -1248,6 +1276,9 @@ final class RagService implements LoggerAwareInterface
                 if ($delta === '') {
                     continue;
                 }
+                if ($accumulated === '') {
+                    $this->mark('firstToken');
+                }
                 $accumulated .= $delta;
                 if ($holdBack) {
                     continue;
@@ -1292,6 +1323,7 @@ final class RagService implements LoggerAwareInterface
             return;
         }
 
+        $this->mark('answer');
         if ($holdBack) {
             yield RagStreamChunk::status(RagStreamChunk::PHASE_CHECKING);
         }
@@ -1302,7 +1334,9 @@ final class RagService implements LoggerAwareInterface
         $citedIds = $outOfScope ? [] : $this->groundedCitations($site, $accumulated, $hits);
         if (!$outOfScope) {
             [$accumulated, $citedIds, $askBack] = $this->guardAnswer($site, $event->question, $accumulated, $hits, $citedIds, $topic, $options) + [2 => null];
+            $this->mark('guard');
             if ($askBack !== null) {
+                $this->logTimings();
                 // The answer was held back (or is replaced on screen by the
                 // clarify frame); the visitor sees the question instead.
                 if ($chunk = $this->fallbackChunk($site, $options, $question, 'clarify', [])) {
@@ -1330,6 +1364,7 @@ final class RagService implements LoggerAwareInterface
             yield $chunk;
         }
         $notes = $outOfScope ? [] : $this->answerNotes($site, $event->question, trim($accumulated), $hits, $citedIds, $options);
+        $this->mark('notes');
         yield RagStreamChunk::done(trim($accumulated), $citedIds, $notes, $outOfScope, $topic, $this->lastWithdrawal !== null);
 
         $answer = new RagAnswer(
@@ -1370,6 +1405,8 @@ final class RagService implements LoggerAwareInterface
             $hits,
             $citedIds,
         );
+        $this->mark('suggestions');
+        $this->logTimings();
         if ($suggestions !== []) {
             yield RagStreamChunk::suggestions($suggestions);
         }
@@ -1737,6 +1774,7 @@ final class RagService implements LoggerAwareInterface
         if ($queries !== []) {
             $searchOptions['documentationQueries'] = $queries;
         }
+        $this->mark('titles');
 
         return $searchOptions;
     }
@@ -2244,6 +2282,34 @@ final class RagService implements LoggerAwareInterface
     public function lastWithdrawal(): ?string
     {
         return $this->lastWithdrawal;
+    }
+
+    /**
+     * Phase timings of the last ask()/askStreaming() call (see $timings).
+     *
+     * @return array<string,int>
+     */
+    public function lastTimings(): array
+    {
+        return $this->timings;
+    }
+
+    private function startTimings(): void
+    {
+        $this->timings = [];
+        $this->timingStart = microtime(true);
+    }
+
+    private function mark(string $phase): void
+    {
+        $this->timings[$phase] = (int)round((microtime(true) - $this->timingStart) * 1000);
+    }
+
+    private function logTimings(): void
+    {
+        if ($this->timings !== []) {
+            $this->logger?->info('RAG timings (ms since start): {timings}', ['timings' => json_encode($this->timings)]);
+        }
     }
 
     /**

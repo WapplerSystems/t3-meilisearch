@@ -171,6 +171,7 @@ final class AskCommand extends Command
             'notes' => $answer->notes,
             'suggestions' => $answer->suggestions,
             'withdrawn' => $this->ragService->lastWithdrawal(),
+            'timings' => $this->ragService->lastTimings(),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }
