@@ -18,7 +18,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * expected answer under the same model the live index is using, so
  * cosine similarity stays meaningful.
  */
-final class ScalewayEmbeddingClient implements EmbeddingClientInterface
+final class ScalewayEmbeddingClient implements BatchEmbeddingClientInterface
 {
     public function __construct(
         private readonly RequestFactory $requestFactory,
@@ -31,6 +31,11 @@ final class ScalewayEmbeddingClient implements EmbeddingClientInterface
 
     public function embed(Site $site, string $text): array
     {
+        return $this->embedMany($site, [$text])[0];
+    }
+
+    public function embedMany(Site $site, array $texts): array
+    {
         $settings = $site->getSettings();
         $model = trim((string)$settings->get('meilisearch.embedder.model', ''));
         $apiKey = trim((string)$settings->get('meilisearch.embedder.apiKey', ''));
@@ -42,6 +47,8 @@ final class ScalewayEmbeddingClient implements EmbeddingClientInterface
         $url = \WapplerSystems\Meilisearch\Service\Llm\ScalewayProvider::baseUrlForProject(
             (string)$settings->get('meilisearch.scaleway.projectId', ''),
         ) . '/v1/embeddings';
-        return extractOpenAiEmbedding($this->requestFactory, $url, $apiKey, $model, $text);
+        // Defined next to OpenAiEmbeddingClient; loading that class makes it available.
+        class_exists(OpenAiEmbeddingClient::class);
+        return extractOpenAiEmbeddings($this->requestFactory, $url, $apiKey, $model, $texts);
     }
 }

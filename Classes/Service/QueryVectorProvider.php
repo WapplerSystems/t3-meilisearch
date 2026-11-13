@@ -8,6 +8,7 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use WapplerSystems\Meilisearch\Service\RagTest\BatchEmbeddingClientInterface;
 use WapplerSystems\Meilisearch\Service\RagTest\EmbeddingClientRegistry;
 
 /**
@@ -165,6 +166,58 @@ final class QueryVectorProvider implements LoggerAwareInterface
         $this->cache->set($key, $vector, ['ws_meilisearch_query_vector']);
 
         return $vector;
+    }
+
+    /**
+     * Fetches the vectors of several queries in one provider call and caches
+     * them, so the forQuery() calls that follow are cache hits. RAG retrieval
+     * searches the question and up to three documentation queries per lane;
+     * one round trip each added up to a second per answer. Does nothing when
+     * the provider cannot embed in batches — forQuery() then fetches one by
+     * one as before. Never throws.
+     *
+     * @param list<string> $queries
+     */
+    public function warm(Site $site, array $queries): void
+    {
+        if ($queries === [] || !$this->isNeeded($site)) {
+            return;
+        }
+        $missing = [];
+        foreach ($queries as $query) {
+            $query = trim($query);
+            if ($query === '') {
+                continue;
+            }
+            if (mb_strlen($query) > self::MAX_QUERY_LENGTH) {
+                $query = mb_substr($query, 0, self::MAX_QUERY_LENGTH);
+            }
+            $text = $this->embedText($site, $query);
+            $key = $this->cacheKey($site, $text);
+            if (!isset($missing[$key]) && !is_array($this->cache->get($key))) {
+                $missing[$key] = $text;
+            }
+        }
+        if (count($missing) < 2) {
+            return;
+        }
+        try {
+            $client = $this->clients->forSite($site);
+            if (!$client instanceof BatchEmbeddingClientInterface) {
+                return;
+            }
+            $vectors = $client->embedMany($site, array_values($missing));
+        } catch (\Throwable $e) {
+            $this->logger?->info('Batch query embedding failed, embedding one by one: {message}', ['message' => $e->getMessage()]);
+            return;
+        }
+        $expected = (int)$site->getSettings()->get('meilisearch.embedder.dimensions', 0);
+        foreach (array_keys($missing) as $position => $key) {
+            $vector = $vectors[$position] ?? [];
+            if ($vector !== [] && ($expected === 0 || count($vector) === $expected)) {
+                $this->cache->set($key, $vector, ['ws_meilisearch_query_vector']);
+            }
+        }
     }
 
     /**

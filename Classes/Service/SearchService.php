@@ -116,6 +116,154 @@ final class SearchService implements LoggerAwareInterface
     }
 
     /**
+     * Several searches in one Meilisearch round trip (multi-search), for
+     * callers that need a batch at once — RAG retrieval runs the question and
+     * each documentation query in every lane, up to sixteen searches that
+     * used to go out one after another. Each request goes through the same
+     * events and parameters as search(); query vectors are fetched in one
+     * provider call first (QueryVectorProvider::warm()).
+     *
+     * Requests with facets need the single path (side queries) and take it;
+     * one that comes back empty and allows zero-result recovery is repeated
+     * on the single path, which recovers; the whole batch falls back to it
+     * when the multi-search fails.
+     *
+     * @param list<array{0:string,1:array<string,mixed>}> $requests query and options, as for search()
+     * @return list<SearchResult> in request order
+     */
+    public function searchMany(Site $site, array $requests): array
+    {
+        $client = $this->engineFactory->createClientForSite($site);
+        if ($client === null || count($requests) < 2) {
+            return array_map(fn (array $r): SearchResult => $this->search($site, $r[0], $r[1]), $requests);
+        }
+        $excludedTypes = array_values(array_filter(array_map(
+            'strval',
+            (array)$site->getSettings()->get('meilisearch.search.excludedTypes', []),
+        )));
+        $hasEmbedder = trim((string)$site->getSettings()->get('meilisearch.embedder.source', '')) !== '';
+
+        $prepared = [];
+        foreach ($requests as $position => [$query, $options]) {
+            $options['__excludedTypes'] = $excludedTypes;
+            $before = new BeforeSearchEvent($query, $options, $site);
+            $this->eventDispatcher->dispatch($before);
+            $before->options['matchingStrategy'] = $this->resolveMatchingStrategy($site, $before->options);
+            $single = ($before->options['facets'] ?? []) !== [];
+            $prepared[$position] = ['before' => $before, 'single' => $single];
+        }
+
+        $vectorTexts = [];
+        foreach ($prepared as $item) {
+            if (!$item['single'] && $hasEmbedder && (bool)($item['before']->options['hybrid'] ?? false)) {
+                $vectorTexts[] = $this->vectorQueryFor($item['before']->query, $item['before']->options);
+            }
+        }
+        $this->queryVectors->warm($site, $vectorTexts);
+
+        $indexName = $this->engineFactory->getIndexName($site);
+        $queries = [];
+        foreach ($prepared as $position => $item) {
+            if ($item['single']) {
+                continue;
+            }
+            $before = $item['before'];
+            $page = max(1, (int)($before->options['page'] ?? 1));
+            $perPage = max(1, (int)($before->options['perPage'] ?? 20));
+            $hybrid = $hasEmbedder && (bool)($before->options['hybrid'] ?? false) ? $this->hybridParams($site, $before->options) : null;
+            [$params] = $this->buildSearchParams($site, $before->query, $before->options, $page, $perPage, $hybrid);
+            $queries[$position] = ['indexUid' => $indexName, 'q' => $before->query] + $params;
+            $prepared[$position]['page'] = $page;
+            $prepared[$position]['perPage'] = $perPage;
+        }
+
+        $raw = [];
+        if ($queries !== []) {
+            try {
+                $response = $client->multiSearch(array_map(
+                    static fn (array $q): \Meilisearch\Contracts\SearchQuery => self::searchQuery($q),
+                    array_values($queries),
+                ));
+                $raw = array_combine(array_keys($queries), array_slice((array)($response['results'] ?? []), 0, count($queries))) ?: [];
+            } catch (\Throwable $e) {
+                $this->logger?->warning('Multi-search failed, searching one by one: {message}', ['message' => $e->getMessage()]);
+                return array_map(fn (array $r): SearchResult => $this->search($site, $r[0], $r[1]), $requests);
+            }
+        }
+
+        $results = [];
+        foreach ($prepared as $position => $item) {
+            if ($item['single']) {
+                $results[$position] = $this->search($site, $requests[$position][0], $requests[$position][1]);
+                continue;
+            }
+            $before = $item['before'];
+            $engine = is_array($raw[$position] ?? null) ? $raw[$position] : [];
+            $hits = is_array($engine['hits'] ?? null) ? $engine['hits'] : [];
+            if ($hits === [] && ($before->options['recover'] ?? true) !== false) {
+                $results[$position] = $this->search($site, $requests[$position][0], $requests[$position][1]);
+                continue;
+            }
+            $result = new SearchResult(
+                hits: $hits,
+                totalHits: (int)($engine['estimatedTotalHits'] ?? $engine['totalHits'] ?? count($hits)),
+                facets: [],
+                page: $item['page'],
+                perPage: $item['perPage'],
+            );
+            $before->options['__recovery'] = $result->totalHits === 0 ? 'none' : '';
+            $before->options['__alternatives'] = [];
+            $after = new AfterSearchEvent($before->query, $before->options, $result, $site);
+            $this->eventDispatcher->dispatch($after);
+            $results[$position] = $after->result;
+        }
+        ksort($results);
+
+        return array_values($results);
+    }
+
+    /**
+     * @param array<string,mixed> $q indexUid, q and search parameters as directSearch() sends them
+     */
+    private static function searchQuery(array $q): \Meilisearch\Contracts\SearchQuery
+    {
+        $query = (new \Meilisearch\Contracts\SearchQuery())
+            ->setIndexUid((string)$q['indexUid'])
+            ->setQuery((string)$q['q'])
+            ->setLimit((int)$q['limit'])
+            ->setOffset((int)$q['offset']);
+        if (isset($q['filter'])) {
+            $query->setFilter(is_array($q['filter']) ? $q['filter'] : [$q['filter']]);
+        }
+        if (isset($q['hybrid'])) {
+            $hybrid = new HybridSearchOptions();
+            if (isset($q['hybrid']['semanticRatio'])) {
+                $hybrid->setSemanticRatio((float)$q['hybrid']['semanticRatio']);
+            }
+            if (!empty($q['hybrid']['embedder'])) {
+                $hybrid->setEmbedder((string)$q['hybrid']['embedder']);
+            }
+            $query->setHybrid($hybrid);
+        }
+        if (isset($q['vector'])) {
+            $query->setVector($q['vector']);
+        }
+        if (isset($q['matchingStrategy'])) {
+            $query->setMatchingStrategy((string)$q['matchingStrategy']);
+        }
+        if (isset($q['sort'])) {
+            $query->setSort($q['sort']);
+        }
+        $query->setAttributesToHighlight($q['attributesToHighlight'])
+            ->setHighlightPreTag((string)$q['highlightPreTag'])
+            ->setHighlightPostTag((string)$q['highlightPostTag'])
+            ->setAttributesToCrop($q['attributesToCrop'])
+            ->setCropMarker((string)$q['cropMarker']);
+
+        return $query;
+    }
+
+    /**
      * Zero-result rescue. Asks QueryRecoveryService for near spellings that
      * do have hits, then decides how much to do with them:
      *
@@ -302,7 +450,93 @@ final class SearchService implements LoggerAwareInterface
             return SearchResult::empty();
         }
         $index = $client->index($this->engineFactory->getIndexName($site));
+        [$params, $facets, $hybridParams] = $this->buildSearchParams($site, $query, $options, $page, $perPage, $hybridParams);
 
+        $response = $index->search($query, $params);
+        $raw = $response->toArray();
+
+        $hits = is_array($raw['hits'] ?? null) ? $raw['hits'] : [];
+        $total = (int)($raw['estimatedTotalHits'] ?? $raw['totalHits'] ?? count($hits));
+        $facetDistribution = is_array($raw['facetDistribution'] ?? null) ? $raw['facetDistribution'] : [];
+
+        // Disjunctive faceting: when the user has an active filter on a facet
+        // attribute, the main query's facetDistribution for that attribute only
+        // lists the values matching the filter — i.e. the OTHER checkboxes
+        // disappear from the panel and the visitor can't switch within the
+        // attribute without first clearing it. Fetch the un-filtered
+        // distribution for each user-filtered attribute via side queries
+        // (same query, all OTHER filters, no hits requested) and merge them in.
+        $userFilters = (array)($options['filters'] ?? []);
+        foreach ($facets as $facetField) {
+            if (!array_key_exists($facetField, $userFilters)) {
+                continue;
+            }
+            $sideFilters = $userFilters;
+            unset($sideFilters[$facetField]);
+            $sideParams = [
+                'limit' => 0,
+                'facets' => [$facetField],
+            ];
+            // Keep the knowledge_resource exclusion here too — without it the
+            // side query (which drops the user's `type` filter) would list
+            // knowledge_resource as an available facet value again.
+            $sideFilter = $this->withKnowledgeResourceExclusion(
+                $this->buildMeilisearchFilter($sideFilters),
+                $options,
+            );
+            if ($sideFilter !== '') {
+                $sideParams['filter'] = $sideFilter;
+            }
+            if ($hybridParams !== null) {
+                $sideParams['hybrid'] = $hybridParams;
+                // Same query, same vector — a side query that ranked
+                // differently from the main one would count the wrong facet
+                // values. Reuses the cached vector, no second roundtrip.
+                if (isset($params['vector'])) {
+                    $sideParams['vector'] = $params['vector'];
+                }
+            }
+            try {
+                $sideRaw = $index->search($query, $sideParams)->toArray();
+                $sideDistribution = is_array($sideRaw['facetDistribution'] ?? null)
+                    ? $sideRaw['facetDistribution']
+                    : [];
+                if (isset($sideDistribution[$facetField]) && is_array($sideDistribution[$facetField])) {
+                    $facetDistribution[$facetField] = $sideDistribution[$facetField];
+                }
+            } catch (\Throwable $e) {
+                // Side-query failure (rare — same engine, same index) is
+                // non-fatal: the panel just falls back to the filtered
+                // distribution for this attribute. Log and continue.
+                $this->logger?->warning('Disjunctive facet side-query failed for {field}: {message}', [
+                    'field' => $facetField,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $total,
+            facets: $this->mapMeilisearchFacets($facetDistribution),
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
+
+    /**
+     * The Meilisearch search parameters for one query, shared by directSearch()
+     * and searchMany(). Returns the parameters, the requested facets and the
+     * hybrid block as actually used — null when the query vector was needed
+     * but could not be had (see the comment inside).
+     *
+     * @param array<string,mixed> $options
+     * @param array<string,mixed>|null $hybridParams
+     * @return array{0:array<string,mixed>,1:list<string>,2:array<string,mixed>|null}
+     */
+    private function buildSearchParams(Site $site, string $query, array $options, int $page, int $perPage, ?array $hybridParams): array
+    {
         $params = [
             'limit' => $perPage,
             'offset' => ($page - 1) * $perPage,
@@ -405,76 +639,7 @@ final class SearchService implements LoggerAwareInterface
         $params['attributesToCrop'] = $cropFields;
         $params['cropMarker'] = $this->configProvider->cropMarker($site);
 
-        $response = $index->search($query, $params);
-        $raw = $response->toArray();
-
-        $hits = is_array($raw['hits'] ?? null) ? $raw['hits'] : [];
-        $total = (int)($raw['estimatedTotalHits'] ?? $raw['totalHits'] ?? count($hits));
-        $facetDistribution = is_array($raw['facetDistribution'] ?? null) ? $raw['facetDistribution'] : [];
-
-        // Disjunctive faceting: when the user has an active filter on a facet
-        // attribute, the main query's facetDistribution for that attribute only
-        // lists the values matching the filter — i.e. the OTHER checkboxes
-        // disappear from the panel and the visitor can't switch within the
-        // attribute without first clearing it. Fetch the un-filtered
-        // distribution for each user-filtered attribute via side queries
-        // (same query, all OTHER filters, no hits requested) and merge them in.
-        $userFilters = (array)($options['filters'] ?? []);
-        foreach ($facets as $facetField) {
-            if (!array_key_exists($facetField, $userFilters)) {
-                continue;
-            }
-            $sideFilters = $userFilters;
-            unset($sideFilters[$facetField]);
-            $sideParams = [
-                'limit' => 0,
-                'facets' => [$facetField],
-            ];
-            // Keep the knowledge_resource exclusion here too — without it the
-            // side query (which drops the user's `type` filter) would list
-            // knowledge_resource as an available facet value again.
-            $sideFilter = $this->withKnowledgeResourceExclusion(
-                $this->buildMeilisearchFilter($sideFilters),
-                $options,
-            );
-            if ($sideFilter !== '') {
-                $sideParams['filter'] = $sideFilter;
-            }
-            if ($hybridParams !== null) {
-                $sideParams['hybrid'] = $hybridParams;
-                // Same query, same vector — a side query that ranked
-                // differently from the main one would count the wrong facet
-                // values. Reuses the cached vector, no second roundtrip.
-                if (isset($params['vector'])) {
-                    $sideParams['vector'] = $params['vector'];
-                }
-            }
-            try {
-                $sideRaw = $index->search($query, $sideParams)->toArray();
-                $sideDistribution = is_array($sideRaw['facetDistribution'] ?? null)
-                    ? $sideRaw['facetDistribution']
-                    : [];
-                if (isset($sideDistribution[$facetField]) && is_array($sideDistribution[$facetField])) {
-                    $facetDistribution[$facetField] = $sideDistribution[$facetField];
-                }
-            } catch (\Throwable $e) {
-                // Side-query failure (rare — same engine, same index) is
-                // non-fatal: the panel just falls back to the filtered
-                // distribution for this attribute. Log and continue.
-                $this->logger?->warning('Disjunctive facet side-query failed for {field}: {message}', [
-                    'field' => $facetField,
-                    'message' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return new SearchResult(
-            hits: $hits,
-            totalHits: $total,
-            facets: $this->mapMeilisearchFacets($facetDistribution),
-            page: $page,
-            perPage: $perPage,
-        );
+        return [$params, $facets, $hybridParams];
     }
 
     /**

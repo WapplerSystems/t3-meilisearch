@@ -581,6 +581,9 @@ final class CitationRenderer
             '/(?<!\*)\*([^*\n]+?)\*(?!\*)/u' => '<em>$1</em>',
             // `code`
             '/`([^`\n]+?)`/u' => '<code>$1</code>',
+            // A bare https URL becomes a link (fixed replies carry them, e.g.
+            // a manufacturer's help). Trailing punctuation stays outside.
+            '/(^|[\s(])(https:\/\/[^\s<>"]+?)(?=[.,;:!?)]*(?:\s|$))/mu' => '$1<a href="$2" target="_blank" rel="noopener">$2</a>',
         ];
 
         return (string)preg_replace(array_keys($rules), array_values($rules), $html);

@@ -24,6 +24,7 @@ use WapplerSystems\Meilisearch\Service\Rag\Escalation\EscalationResolver;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderInterface;
 use WapplerSystems\Meilisearch\Service\Llm\LlmOptions;
 use WapplerSystems\Meilisearch\Service\Llm\LlmProviderRegistry;
+use WapplerSystems\Meilisearch\Service\SearchResult;
 use WapplerSystems\Meilisearch\Service\SearchService;
 use WapplerSystems\Meilisearch\Service\Rag\Statistics\UsageCounter;
 
@@ -1060,6 +1061,7 @@ final class RagService implements LoggerAwareInterface
         }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
+        yield RagStreamChunk::status(RagStreamChunk::PHASE_SEARCHING);
         // Conversational rewrite for retrieval only (see ask()); the streamed
         // answer still uses $event->question so the user's wording + history
         // drive the reply.
@@ -1233,6 +1235,9 @@ final class RagService implements LoggerAwareInterface
         // visitor waits for the whole answer, but never reads one that is
         // then withdrawn (see RagAnswerGuardEvent).
         $holdBack = (bool)$settings->get('meilisearch.rag.stream.holdBack', false);
+        if ($holdBack) {
+            yield RagStreamChunk::status(RagStreamChunk::PHASE_WRITING);
+        }
         // Start of the reply, held back until it is clear whether it carries
         // reply tags — see OUT_OF_SCOPE_MARKER and TOPIC_TAG_FORMAT.
         $head = '';
@@ -1287,6 +1292,9 @@ final class RagService implements LoggerAwareInterface
             return;
         }
 
+        if ($holdBack) {
+            yield RagStreamChunk::status(RagStreamChunk::PHASE_CHECKING);
+        }
         [$accumulated, $outOfScope, $topic] = self::splitReplyTags($accumulated);
         $accumulated = $this->expandFixedReplies($site, $accumulated);
         $topic = $this->knownTopic($site, $topic) ?: $questionTopic;
@@ -1744,21 +1752,53 @@ final class RagService implements LoggerAwareInterface
      */
     private function fusedSearch(Site $site, string $query, array $searchOptions): array
     {
+        $requests = self::fusedRequests($query, $searchOptions);
+        try {
+            $results = $this->searchService->searchMany($site, $requests);
+        } catch (\Throwable $e) {
+            $this->logger?->info('RAG documentation query search failed: {message}', ['message' => $e->getMessage()]);
+            $results = [$this->searchService->search($site, $requests[0][0], $requests[0][1])];
+        }
+
+        return self::fuse(array_map(
+            static fn (SearchResult $result): array => array_map(static fn ($hit): array => (array)$hit, $result->hits),
+            $results,
+        ));
+    }
+
+    /**
+     * The searches fusedSearch() merges: the question, then one per
+     * documentation query (its title as the vector query, out of analytics).
+     *
+     * @param array<string,mixed> $searchOptions
+     * @return list<array{0:string,1:array<string,mixed>}>
+     */
+    private static function fusedRequests(string $query, array $searchOptions): array
+    {
         $queries = array_values(array_filter(array_map('strval', (array)($searchOptions['documentationQueries'] ?? []))));
         unset($searchOptions['documentationQueries']);
-        $lists = [array_map(static fn ($hit): array => (array)$hit, $this->searchService->search($site, $query, $searchOptions)->hits)];
+        $requests = [[$query, $searchOptions]];
         foreach ($queries as $alternative) {
             $alternativeOptions = $searchOptions;
             $alternativeOptions['vectorQuery'] = $alternative;
             $alternativeOptions['__skipAnalytics'] = true;
-            try {
-                $lists[] = array_map(static fn ($hit): array => (array)$hit, $this->searchService->search($site, $alternative, $alternativeOptions)->hits);
-            } catch (\Throwable $e) {
-                $this->logger?->info('RAG documentation query search failed: {message}', ['message' => $e->getMessage()]);
-            }
+            $requests[] = [$alternative, $alternativeOptions];
         }
-        if (count($lists) === 1) {
-            return $lists[0];
+
+        return $requests;
+    }
+
+    /**
+     * Reciprocal rank fusion of result lists, the first list winning ties
+     * and supplying a document's data.
+     *
+     * @param list<list<array<string,mixed>>> $lists
+     * @return list<array<string,mixed>>
+     */
+    private static function fuse(array $lists): array
+    {
+        if (count($lists) <= 1) {
+            return $lists[0] ?? [];
         }
         $scores = [];
         $byId = [];
@@ -1802,8 +1842,12 @@ final class RagService implements LoggerAwareInterface
         bool $collapseIdentical,
         bool $collapseByTitle,
     ): array {
-        $perLane = [];
-        foreach ($lanes as [$filter, $count, $triggers]) {
+        // Every search of every lane — the question plus its documentation
+        // queries, per lane — goes out as one multi-search: one after another
+        // they cost one Meilisearch round trip each, up to sixteen per answer.
+        $requests = [];
+        $laneRequests = [];
+        foreach ($lanes as $laneNo => [$filter, $count, $triggers]) {
             if ($triggers !== [] && !$this->touchesTriggers($askedAs, $triggers)) {
                 continue;
             }
@@ -1812,10 +1856,30 @@ final class RagService implements LoggerAwareInterface
             $laneOptions['filters']['__rawFilters'] = array_merge(is_array($existing) ? $existing : [], [$filter]);
             $factor = $collapseByTitle ? self::TITLE_COLLAPSE_OVERFETCH : self::COLLAPSE_OVERFETCH;
             $laneOptions['perPage'] = min($count * $factor, self::COLLAPSE_MAX_FETCH);
+            foreach (self::fusedRequests($query, $laneOptions) as $request) {
+                $laneRequests[$laneNo][] = count($requests);
+                $requests[] = $request;
+            }
+        }
+        try {
+            $results = $this->searchService->searchMany($site, $requests);
+        } catch (\Throwable $e) {
+            $this->logger?->info('RAG lane search failed: {message}', ['message' => $e->getMessage()]);
+            $results = [];
+        }
+
+        $perLane = [];
+        foreach ($laneRequests as $laneNo => $positions) {
+            $lists = [];
+            foreach ($positions as $position) {
+                if (isset($results[$position])) {
+                    $lists[] = array_map(static fn ($hit): array => (array)$hit, $results[$position]->hits);
+                }
+            }
             $perLane[] = array_values(array_slice(
-                $this->collapseContext($this->fusedSearch($site, $query, $laneOptions), $askedAs, $collapseIdentical, $collapseByTitle),
+                $this->collapseContext(self::fuse($lists), $askedAs, $collapseIdentical, $collapseByTitle),
                 0,
-                $count,
+                $lanes[$laneNo][1],
             ));
         }
 

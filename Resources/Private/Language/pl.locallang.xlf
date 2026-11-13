@@ -67,6 +67,18 @@
                 <source>Generating answer…</source>
                 <target>Generowanie odpowiedzi…</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Przeszukiwanie bazy wiedzy …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Tworzenie odpowiedzi …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Sprawdzanie odpowiedzi …</target>
+            </trans-unit>
             <trans-unit id="rag.answer.interrupted">
                 <source>Connection to the server was interrupted.</source>
                 <target>Połączenie z serwerem zostało przerwane.</target>

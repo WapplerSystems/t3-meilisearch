@@ -67,6 +67,18 @@
                 <source>Generating answer…</source>
                 <target>Yanıt oluşturuluyor…</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Bilgi bankasında aranıyor …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Yanıt yazılıyor …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Yanıt kontrol ediliyor …</target>
+            </trans-unit>
             <trans-unit id="rag.answer.interrupted">
                 <source>Connection to the server was interrupted.</source>
                 <target>Sunucuyla bağlantı kesildi.</target>

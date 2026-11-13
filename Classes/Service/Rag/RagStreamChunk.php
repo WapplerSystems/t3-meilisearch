@@ -45,6 +45,15 @@ final class RagStreamChunk
     public const TYPE_END = 'end';
     public const TYPE_CLARIFY = 'clarify';
     public const TYPE_FALLBACK = 'fallback';
+    /**
+     * What the server is working on while nothing is shown yet: searching,
+     * writing (held back), checking (answer guard). Lets the client replace
+     * the spinner text, so a held-back answer does not look like a hang.
+     */
+    public const TYPE_STATUS = 'status';
+    public const PHASE_SEARCHING = 'searching';
+    public const PHASE_WRITING = 'writing';
+    public const PHASE_CHECKING = 'checking';
     /** First frame when visitor feedback is on: the key to rate this turn with. */
     public const TYPE_TURN = 'turn';
 
@@ -67,6 +76,11 @@ final class RagStreamChunk
     public static function turn(string $key, string $conversationId): self
     {
         return new self(self::TYPE_TURN, ['key' => $key, 'conversation' => $conversationId]);
+    }
+
+    public static function status(string $phase): self
+    {
+        return new self(self::TYPE_STATUS, ['phase' => $phase]);
     }
 
     public static function token(string $text): self

@@ -151,6 +151,18 @@
                 <source>Your question is too long. Please keep it shorter (at most %d characters).</source>
                 <target>Votre question est trop longue. Veuillez la raccourcir (%d caractères au maximum).</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Recherche dans la base de connaissances …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Rédaction de la réponse …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Vérification de la réponse …</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

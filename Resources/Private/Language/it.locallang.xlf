@@ -151,6 +151,18 @@
                 <source>Your question is too long. Please keep it shorter (at most %d characters).</source>
                 <target>La domanda è troppo lunga. La formuli in modo più breve (al massimo %d caratteri).</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Ricerca nella knowledge base …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Scrittura della risposta …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Verifica della risposta …</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

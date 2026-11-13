@@ -67,6 +67,18 @@
                 <source>Generating answer…</source>
                 <target>Antwoord wordt gegenereerd…</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Kennisbank wordt doorzocht …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Antwoord wordt geschreven …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Antwoord wordt gecontroleerd …</target>
+            </trans-unit>
             <trans-unit id="rag.answer.interrupted">
                 <source>Connection to the server was interrupted.</source>
                 <target>De verbinding met de server is verbroken.</target>

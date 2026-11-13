@@ -107,6 +107,18 @@
                 <source>Content element</source>
                 <target>Elemento de contenido</target>
             </trans-unit>
+            <trans-unit id="rag.phase.searching">
+                <source>Searching the knowledge base …</source>
+                <target>Buscando en la base de conocimientos …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.writing">
+                <source>Writing the answer …</source>
+                <target>Redactando la respuesta …</target>
+            </trans-unit>
+            <trans-unit id="rag.phase.checking">
+                <source>Checking the answer …</source>
+                <target>Comprobando la respuesta …</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

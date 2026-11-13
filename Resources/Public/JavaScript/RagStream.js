@@ -63,6 +63,12 @@
             assistant: root.dataset.labelAssistant || 'Assistant',
             suggestions: root.dataset.labelSuggestions || '',
             loading: root.dataset.labelLoading || 'Generating answer…',
+            // Spinner text per `status` frame; missing ones keep the spinner as it is.
+            phases: {
+                searching: root.dataset.labelPhaseSearching || '',
+                writing: root.dataset.labelPhaseWriting || '',
+                checking: root.dataset.labelPhaseChecking || ''
+            },
             interrupted: root.dataset.labelInterrupted || 'Connection to the server was interrupted.',
             // Terminal-state wording, same rag.status.* labels the synchronous
             // template uses. The English defaults are not decoration: HTML
@@ -374,6 +380,14 @@
                     const p = JSON.parse(ev.data);
                     turn.key = (p.key || '').toString();
                     turn.conversation = (p.conversation || '').toString();
+                } catch (_) { /* ignore */ }
+            });
+
+            es.addEventListener('status', function (ev) {
+                try {
+                    const text = labels.phases[(JSON.parse(ev.data).phase || '').toString()] || '';
+                    const label = turn.spinnerEl ? turn.spinnerEl.querySelector('.ws-meilisearch-rag-spinner__label') : null;
+                    if (text && label) label.textContent = text;
                 } catch (_) { /* ignore */ }
             });
 
@@ -947,7 +961,10 @@
             // *italic* — one asterisk pair on a line. A bullet ("* item") has
             // no closing partner and stays as it is.
             .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
-            .replace(/`([^`\n]+?)`/g, '<code>$1</code>');
+            .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+            // A bare https URL becomes a link (fixed replies carry them, e.g.
+            // a manufacturer's help). Trailing punctuation stays outside.
+            .replace(/(^|[\s(])(https:\/\/[^\s<>"]+?)(?=[.,;:!?)]*(?:\s|$))/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
     }
 
     function escapeAttr(s) {
