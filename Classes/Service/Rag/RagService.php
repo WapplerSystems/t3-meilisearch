@@ -1828,7 +1828,13 @@ final class RagService implements LoggerAwareInterface
 
     /**
      * Reciprocal rank fusion of result lists, the first list winning ties
-     * and supplying a document's data.
+     * and supplying a document's data. The question's own best hit (first
+     * list, rank 1) stays first: the documentation queries add documents the
+     * wording of the question misses, they must not push out the one it
+     * finds. Several of them agreeing on neighbouring lessons outscored it —
+     * "Wie begrenze ich in Revit den sichtbaren Bereich einer
+     * Grundrissansicht?" lost the lesson on the crop region, ranked first by
+     * the question alone, to three lessons on views (LINEAR 13.11.2026).
      *
      * @param list<list<array<string,mixed>>> $lists
      * @return list<array<string,mixed>>
@@ -1851,8 +1857,13 @@ final class RagService implements LoggerAwareInterface
             }
         }
         arsort($scores);
+        $order = array_keys($scores);
+        $top = (string)(array_values($lists[0])[0]['id'] ?? '');
+        if ($top !== '' && ($order[0] ?? '') !== $top) {
+            $order = array_merge([$top], array_values(array_diff($order, [$top])));
+        }
 
-        return array_values(array_map(static fn (string $id): array => $byId[$id], array_keys($scores)));
+        return array_values(array_map(static fn (string $id): array => $byId[$id], $order));
     }
 
     /**
