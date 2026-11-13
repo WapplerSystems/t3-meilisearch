@@ -390,6 +390,18 @@
             <trans-unit id="be.protocol.mcpBadgeTitle" resname="be.protocol.mcpBadgeTitle">
                 <source>Submitted via the MCP interface, not by a visitor</source>
             </trans-unit>
+            <trans-unit id="be.protocol.origin" resname="be.protocol.origin">
+                <source>Origin</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.originAny" resname="be.protocol.originAny">
+                <source>Any origin</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.originWeb" resname="be.protocol.originWeb">
+                <source>Website chat</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.originMcpAll" resname="be.protocol.originMcpAll">
+                <source>MCP (all accesses)</source>
+            </trans-unit>
             <trans-unit id="be.protocol.mcp" resname="be.protocol.mcp">
                 <source>MCP</source>
             </trans-unit>

@@ -40,6 +40,9 @@ final class ProtocolEntry
         /** @var list<string> reason keys ticked after "not helpful" */
         public readonly array $feedbackReasons = [],
         public readonly string $feedbackComment = '',
+        /** MCP access token that asked (uid + title at the time), 0/'' for the web chat. */
+        public readonly int $clientUid = 0,
+        public readonly string $clientTitle = '',
     ) {}
 
     /**
@@ -64,6 +67,8 @@ final class ProtocolEntry
             rating: (int)($row['rating'] ?? 0),
             feedbackReasons: self::decodeReasons((string)($row['feedback_reasons'] ?? '')),
             feedbackComment: (string)($row['feedback_comment'] ?? ''),
+            clientUid: (int)($row['client_uid'] ?? 0),
+            clientTitle: (string)($row['client_title'] ?? ''),
         );
     }
 
@@ -88,6 +93,8 @@ final class ProtocolEntry
             'rating' => max(-1, min(1, $this->rating)),
             'feedback_reasons' => self::encodeReasons($this->feedbackReasons),
             'feedback_comment' => $this->feedbackComment,
+            'client_uid' => max(0, $this->clientUid),
+            'client_title' => mb_substr($this->clientTitle, 0, 255),
         ];
     }
 

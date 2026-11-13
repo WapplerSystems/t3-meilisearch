@@ -36,5 +36,9 @@ final class ProtocolFilter
         public readonly string $feedbackReason = '',
         /** Only conversations with a free-text comment after "not helpful". */
         public readonly bool $onlyWithComment = false,
+        /** Only conversations of this channel (web | mcp), '' = all. */
+        public readonly string $channel = '',
+        /** Only conversations asked through this MCP access token (uid), 0 = any. */
+        public readonly int $clientUid = 0,
     ) {}
 }

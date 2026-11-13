@@ -503,6 +503,22 @@
                 <source>Submitted via the MCP interface, not by a visitor</source>
                 <target>Über die MCP-Schnittstelle gestellt, nicht von einem Besucher</target>
             </trans-unit>
+            <trans-unit id="be.protocol.origin" resname="be.protocol.origin">
+                <source>Origin</source>
+                <target>Herkunft</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.originAny" resname="be.protocol.originAny">
+                <source>Any origin</source>
+                <target>Alle</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.originWeb" resname="be.protocol.originWeb">
+                <source>Website chat</source>
+                <target>Website-Chat</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.originMcpAll" resname="be.protocol.originMcpAll">
+                <source>MCP (all accesses)</source>
+                <target>MCP (alle Zugänge)</target>
+            </trans-unit>
             <trans-unit id="be.protocol.mcp" resname="be.protocol.mcp">
                 <source>MCP</source>
                 <target>MCP</target>

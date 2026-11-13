@@ -87,6 +87,7 @@ final class ProtocolGetTool implements McpToolInterface
                 'time' => date('c', $entry->crdate),
                 'languageId' => $entry->languageId,
                 'channel' => $entry->channel,
+                'client' => $entry->clientTitle,
                 'question' => $entry->question,
                 'answer' => $entry->answer,
                 'status' => $entry->status,

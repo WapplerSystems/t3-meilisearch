@@ -110,7 +110,7 @@ final class ChatProtocolRepository
     }
 
     /**
-     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int,ratedUp:int,ratedDown:int}>
+     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int,ratedUp:int,ratedDown:int,channel:string,clientTitle:string}>
      */
     public function findConversations(ProtocolFilter $filter, int $limit = 50, int $offset = 0): array
     {
@@ -151,6 +151,8 @@ final class ChatProtocolRepository
                 'problems' => (int)$row['problems'],
                 'ratedUp' => (int)$row['rated_up'],
                 'ratedDown' => (int)$row['rated_down'],
+                'channel' => (string)$row['channel'],
+                'clientTitle' => (string)$row['client_title'],
             ];
         }
 
@@ -167,6 +169,36 @@ final class ChatProtocolRepository
         $conversationIds = $qb->executeQuery()->fetchFirstColumn();
 
         return count($conversationIds);
+    }
+
+    /**
+     * MCP access tokens that asked at least one protocolled question, newest
+     * title per uid — the filter options of the protocol list. Read from the
+     * protocol rather than the token table so revoked tokens stay selectable.
+     *
+     * @return array<int, string> uid → title
+     */
+    public function findClients(?string $siteIdentifier = null): array
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable(ProtocolEntry::TABLE);
+        $qb->getRestrictions()->removeAll();
+        $qb->select('client_uid')
+            ->addSelectLiteral('MAX(client_title) AS client_title')
+            ->from(ProtocolEntry::TABLE)
+            ->where($qb->expr()->gt('client_uid', $qb->createNamedParameter(0, Connection::PARAM_INT)))
+            ->groupBy('client_uid')
+            ->orderBy('client_title');
+        if ($siteIdentifier !== null) {
+            $qb->andWhere($qb->expr()->eq('site_identifier', $qb->createNamedParameter($siteIdentifier, Connection::PARAM_STR)));
+        }
+
+        $clients = [];
+        foreach ($qb->executeQuery()->fetchAllAssociative() as $row) {
+            $title = (string)$row['client_title'];
+            $clients[(int)$row['client_uid']] = $title !== '' ? $title : '#' . $row['client_uid'];
+        }
+
+        return $clients;
     }
 
     public function deleteOlderThan(string $siteIdentifier, int $timestamp): int
@@ -203,6 +235,8 @@ final class ChatProtocolRepository
             'SUM(' . $problemsExpression . ') AS problems',
             'SUM(CASE WHEN rating > 0 THEN 1 ELSE 0 END) AS rated_up',
             'SUM(CASE WHEN rating < 0 THEN 1 ELSE 0 END) AS rated_down',
+            'MAX(channel) AS channel',
+            'MAX(client_title) AS client_title',
         );
 
         $qb->groupBy('conversation_id');
@@ -253,6 +287,18 @@ final class ChatProtocolRepository
         if ($filter->onlyWithComment) {
             $qb->andHaving(
                 "SUM(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment <> '' THEN 1 ELSE 0 END) > 0"
+            );
+        }
+
+        if ($filter->channel !== '') {
+            $qb->andWhere(
+                $qb->expr()->eq('channel', $qb->createNamedParameter($filter->channel, Connection::PARAM_STR))
+            );
+        }
+
+        if ($filter->clientUid > 0) {
+            $qb->andWhere(
+                $qb->expr()->eq('client_uid', $qb->createNamedParameter($filter->clientUid, Connection::PARAM_INT))
             );
         }
 

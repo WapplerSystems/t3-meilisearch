@@ -12,6 +12,7 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use WapplerSystems\Meilisearch\Controller\Backend\Support\BackendContext;
 use WapplerSystems\Meilisearch\Service\Rag\CitationRenderer;
+use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRecorder;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolRepository;
 use WapplerSystems\Meilisearch\Service\Rag\Protocol\ChatProtocolTranscript;
 use WapplerSystems\Meilisearch\Service\Rag\FeedbackReasons;
@@ -84,6 +85,20 @@ final class ProtocolController
             $reason = '';
         }
         $onlyWithComment = ($params['comment'] ?? '') === '1';
+        // Origin filter: '' all, 'web' site chat, 'mcp' any MCP access,
+        // 'mcp:<uid>' one MCP access token.
+        $clientOptions = $this->repository->findClients($siteFilter !== '' ? $siteFilter : null);
+        $origin = strtolower(trim((string)($params['origin'] ?? '')));
+        $originChannel = '';
+        $originClient = 0;
+        if (in_array($origin, [ChatProtocolRecorder::CHANNEL_WEB, ChatProtocolRecorder::CHANNEL_MCP], true)) {
+            $originChannel = $origin;
+        } elseif (preg_match('/^mcp:(\d+)$/', $origin, $m) === 1 && isset($clientOptions[(int)$m[1]])) {
+            $originChannel = ChatProtocolRecorder::CHANNEL_MCP;
+            $originClient = (int)$m[1];
+        } else {
+            $origin = '';
+        }
         $conversationParam = strtolower(trim((string)($params['conversation'] ?? '')));
         $page = max(1, (int)($params['page'] ?? 1));
 
@@ -105,7 +120,7 @@ final class ProtocolController
                 'conversationId' => $conversationParam,
                 'siteIdentifier' => $detailSiteIdentifier,
                 'downloadUrl' => $this->context->route('protocolDownload', ['conversation' => $conversationParam]),
-                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment),
+                'backUrl' => $this->listUrl($page, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment, $origin),
                 ...$this->context->tabNavData(),
                 'protocolUrl' => $this->context->route('protocol'),
                 'active' => 'protocol',
@@ -131,6 +146,8 @@ final class ProtocolController
             since: $days > 0 ? time() - ($days * 86400) : 0,
             feedbackReason: $reason,
             onlyWithComment: $onlyWithComment,
+            channel: $originChannel,
+            clientUid: $originClient,
         );
 
         $total = $this->repository->countConversations($filter);
@@ -150,16 +167,17 @@ final class ProtocolController
                 $search,
                 $reason,
                 $onlyWithComment,
+                $origin,
                 ['conversation' => $row['conversationId']]
             );
             $rows[] = $row;
         }
 
         $prevUrl = $page > 1
-            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment)
+            ? $this->listUrl($page - 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment, $origin)
             : '';
         $nextUrl = $page < $pages
-            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment)
+            ? $this->listUrl($page + 1, $siteFilter, $days, $onlyEscalated, $onlyProblems, $onlyNegative, $search, $reason, $onlyWithComment, $origin)
             : '';
 
         $moduleTemplate->assignMultiple([
@@ -177,6 +195,12 @@ final class ProtocolController
             'reason' => $reason,
             'reasonOptions' => $reasonOptions,
             'onlyWithComment' => $onlyWithComment,
+            'origin' => $origin,
+            'clientOptions' => array_map(
+                static fn (int $uid, string $title): array => ['value' => 'mcp:' . $uid, 'title' => $title],
+                array_keys($clientOptions),
+                $clientOptions,
+            ),
             'search' => $search,
             'conversationParam' => $conversationParam,
             'availableSites' => $availableSites,
@@ -236,6 +260,7 @@ final class ProtocolController
                 'status' => $entry->status,
                 'escalated' => $entry->escalated,
                 'channel' => $entry->channel,
+                'clientTitle' => $entry->clientTitle,
                 'rating' => $entry->rating,
                 'feedbackReasons' => array_map(
                     fn (string $key): string => $this->reasonLabel($entry->siteIdentifier, $key),
@@ -353,6 +378,7 @@ final class ProtocolController
         string $search,
         string $reason,
         bool $onlyWithComment,
+        string $origin,
         array $additional = []
     ): string {
         $extra = [
@@ -380,6 +406,9 @@ final class ProtocolController
         }
         if ($onlyWithComment) {
             $extra['comment'] = '1';
+        }
+        if ($origin !== '') {
+            $extra['origin'] = $origin;
         }
 
         return $this->context->route('protocol', array_merge($extra, $additional));

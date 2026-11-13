@@ -23,7 +23,7 @@ final class ProtocolListTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Lists chat conversations of this site, newest first. Use it to find questions the assistant could not answer (onlyProblems) or where a visitor was offered human contact (onlyEscalated).';
+        return 'Lists chat conversations of this site, newest first. Use it to find questions the assistant could not answer (onlyProblems) or where a visitor was offered human contact (onlyEscalated). Each conversation names its origin: channel "web" (visitor in the site chat) or "mcp" (asked through an MCP access, with the access title in "client"). Filter with channel to separate visitors from tests.';
     }
 
     public function getInputSchema(): array
@@ -34,6 +34,8 @@ final class ProtocolListTool implements McpToolInterface
                 'onlyProblems' => ['type' => 'boolean'],
                 'onlyEscalated' => ['type' => 'boolean'],
                 'search' => ['type' => 'string', 'maxLength' => 200],
+                'channel' => ['type' => 'string', 'enum' => ['web', 'mcp'], 'description' => 'Only conversations of this origin.'],
+                'client' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Only conversations asked through the MCP access with this title (exact).'],
                 'days' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 365, 'default' => 30],
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 20],
                 'offset' => ['type' => 'integer', 'minimum' => 0, 'default' => 0],
@@ -68,6 +70,26 @@ final class ProtocolListTool implements McpToolInterface
             throw new McpToolException('search must be at most 200 characters.');
         }
 
+        $channel = '';
+        if (array_key_exists('channel', $arguments)) {
+            if (!in_array($arguments['channel'], ['web', 'mcp'], true)) {
+                throw new McpToolException('channel must be "web" or "mcp".');
+            }
+            $channel = $arguments['channel'];
+        }
+        $clientUid = 0;
+        if (array_key_exists('client', $arguments)) {
+            if (!is_string($arguments['client'])) {
+                throw new McpToolException('client must be a string.');
+            }
+            $clients = $this->repository->findClients($context->site->getIdentifier());
+            $clientUid = (int)array_search(trim($arguments['client']), $clients, true);
+            if ($clientUid === 0) {
+                throw new McpToolException('No MCP access with this title asked on this site. Known: ' . implode(', ', $clients));
+            }
+            $channel = 'mcp';
+        }
+
         $days = $this->intArgument($arguments, 'days', 30, 0, 365);
         $limit = $this->intArgument($arguments, 'limit', 20, 1, 100);
         $offset = $this->intArgument($arguments, 'offset', 0, 0);
@@ -78,6 +100,8 @@ final class ProtocolListTool implements McpToolInterface
             onlyProblems: $onlyProblems,
             search: $search,
             since: $days > 0 ? time() - $days * 86400 : 0,
+            channel: $channel,
+            clientUid: $clientUid,
         );
 
         $total = $this->repository->countConversations($filter);
@@ -95,6 +119,8 @@ final class ProtocolListTool implements McpToolInterface
                 'lastAt' => date('c', (int)($conversation['lastAt'] ?? 0)),
                 'escalated' => (bool)($conversation['escalated'] ?? false),
                 'problems' => (int)($conversation['problems'] ?? 0),
+                'channel' => $conversation['channel'],
+                'client' => $conversation['clientTitle'],
             ];
         }
 

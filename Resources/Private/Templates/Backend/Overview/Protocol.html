@@ -55,7 +55,7 @@
                             <span class="badge bg-danger" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.ratedDown')}">&#128078;</span>
                         </f:if>
                         <f:if condition="{entry.channel} == 'mcp'">
-                            <span class="badge bg-info text-dark" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcpBadgeTitle')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/></span>
+                            <span class="badge bg-info text-dark" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcpBadgeTitle')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/><f:if condition="{entry.clientTitle}">: {entry.clientTitle}</f:if></span>
                         </f:if>
                         <a href="{entry.knowledgeUrl}" class="btn btn-sm btn-outline-primary ms-auto"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.addAsKnowledge"/></a>
                     </div>
@@ -161,6 +161,17 @@
                                 </select>
                             </div>
                         </f:if>
+                        <div class="mb-2">
+                            <label class="form-label" for="origin"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.origin"/></label>
+                            <select name="origin" id="origin" class="form-select form-select-sm w-auto">
+                                <option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.originAny"/></option>
+                                <option value="web" {f:if(condition: '{origin} == "web"', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.originWeb"/></option>
+                                <option value="mcp" {f:if(condition: '{origin} == "mcp"', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.originMcpAll"/></option>
+                                <f:for each="{clientOptions}" as="clientOption">
+                                    <option value="{clientOption.value}" {f:if(condition: '{origin} == {clientOption.value}', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/>: {clientOption.title}</option>
+                                </f:for>
+                            </select>
+                        </div>
                         <div class="mb-2 form-check">
                             <input type="checkbox" name="comment" value="1" id="comment" class="form-check-input" {f:if(condition: '{onlyWithComment}', then: 'checked="checked"')} />
                             <label class="form-check-label" for="comment"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.onlyWithComment"/></label>
@@ -181,6 +192,7 @@
                             <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.siteLabel"/></th>
                             <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.firstQuestion"/></th>
                             <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.turns"/></th>
+                            <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.origin"/></th>
                             <th><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.notes"/></th>
                             <th></th>
                         </tr>
@@ -192,6 +204,12 @@
                                 <td>{row.siteIdentifier}</td>
                                 <td><f:format.crop maxCharacters="120">{row.firstQuestion}</f:format.crop></td>
                                 <td>{row.turns}</td>
+                                <td>
+                                    <f:if condition="{row.channel} == 'mcp'">
+                                        <f:then><span class="badge bg-info text-dark"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/><f:if condition="{row.clientTitle}">: {row.clientTitle}</f:if></span></f:then>
+                                        <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.originWeb"/></f:else>
+                                    </f:if>
+                                </td>
                                 <td>
                                     <f:if condition="{row.escalated}">
                                         <span class="badge bg-warning text-dark"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.contactOffer"/></span>

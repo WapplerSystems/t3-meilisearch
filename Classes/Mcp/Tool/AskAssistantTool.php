@@ -139,6 +139,8 @@ final class AskAssistantTool implements McpToolInterface
             hits: $answer->sources,
             escalated: false,
             channel: ChatProtocolRecorder::CHANNEL_MCP,
+            clientUid: $context->client->uid,
+            clientTitle: $context->client->title,
         );
 
         $result = [

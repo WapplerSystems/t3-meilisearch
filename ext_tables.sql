@@ -235,6 +235,11 @@ CREATE TABLE tx_wsmeilisearch_rag_protocol (
     -- through the MCP endpoint) — so test questions of the site owner do not
     -- distort the picture of what visitors ask.
     channel         VARCHAR(16) DEFAULT 'web' NOT NULL,
+    -- MCP turns: uid and title of the access token (tx_wsmeilisearch_mcp_token)
+    -- that asked — the title is copied so the origin stays readable after the
+    -- token is revoked. 0 / empty for the web chat.
+    client_uid      INT(11) UNSIGNED DEFAULT 0 NOT NULL,
+    client_title    VARCHAR(255) DEFAULT '' NOT NULL,
     -- Random key the streamed chat hands the visitor with the turn (frame
     -- "turn"); the thumbs under the answer send it back to rate exactly this
     -- row. 32 hex digits, empty for turns without feedback (MCP, off).

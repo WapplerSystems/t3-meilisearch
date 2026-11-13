@@ -101,6 +101,8 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
         bool $escalated,
         string $channel = self::CHANNEL_WEB,
         string $turnKey = '',
+        int $clientUid = 0,
+        string $clientTitle = '',
     ): void {
         if (!$this->isEnabled($site) || preg_match(Conversation::ID_PATTERN, $conversationId) !== 1) {
             return;
@@ -136,6 +138,8 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
                 escalated: $escalated,
                 channel: $channel,
                 turnKey: preg_match(self::TURN_KEY_PATTERN, $turnKey) === 1 ? $turnKey : '',
+                clientUid: $clientUid,
+                clientTitle: $clientTitle,
             ));
         } catch (\Throwable $e) {
             // A protocol that cannot be written must never cost the visitor
