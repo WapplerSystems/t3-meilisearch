@@ -54,6 +54,16 @@ final class RetrievalCheckCommand extends Command
             ->addOption('question', null, InputOption::VALUE_REQUIRED, 'Check one ad-hoc question instead of the stored tests — prints the retrieved context.')
             ->addOption('show', null, InputOption::VALUE_REQUIRED, 'How many retrieved documents to list per question', '5')
             ->addOption(
+                'language',
+                'l',
+                InputOption::VALUE_REQUIRED,
+                'Site language id the question is asked in, as ws_meilisearch:ask --language. Retrieval is '
+                . 'filtered to it and the query rewrite and documentation queries are written for it — without '
+                . 'the language they come out different and the check measured another pipeline than the chat. '
+                . 'Empty: no language. Default: 0.',
+                '0',
+            )
+            ->addOption(
                 'semantic-ratio',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -290,12 +300,18 @@ final class RetrievalCheckCommand extends Command
      */
     private function overrides(InputInterface $input): array
     {
+        $options = [];
+        $language = $input->getOption('language');
+        if ($language !== null && $language !== '' && is_numeric($language)) {
+            $options['filters'] = ['language' => [(int)$language]];
+            $options['language'] = (int)$language;
+        }
         $ratio = $input->getOption('semantic-ratio');
-        if ($ratio === null || $ratio === '' || !is_numeric($ratio)) {
-            return [];
+        if ($ratio !== null && $ratio !== '' && is_numeric($ratio)) {
+            $options['semanticRatio'] = max(0.0, min(1.0, (float)$ratio));
         }
 
-        return ['semanticRatio' => max(0.0, min(1.0, (float)$ratio))];
+        return $options;
     }
 
     private function resolveSite(?string $identifier): ?Site
