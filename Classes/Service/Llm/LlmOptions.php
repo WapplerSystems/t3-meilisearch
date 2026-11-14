@@ -31,6 +31,10 @@ final class LlmOptions
             'productId' => (string)$settings->get('meilisearch.infomaniak.productId', ''),
             'scalewayProjectId' => (string)$settings->get('meilisearch.scaleway.projectId', ''),
         ];
+        $reasoningEffort = trim((string)$settings->get('meilisearch.rag.reasoningEffort', ''));
+        if ($reasoningEffort !== '') {
+            $options['reasoningEffort'] = $reasoningEffort;
+        }
         $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
         if ($maxTokens > 0) {
             $options['maxTokens'] = $maxTokens;

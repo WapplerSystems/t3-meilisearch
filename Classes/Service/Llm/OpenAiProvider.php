@@ -80,6 +80,11 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
         if (isset($options['maxTokens'])) {
             $body['max_tokens'] = (int)$options['maxTokens'];
         }
+        // Models that think first count the thinking against max_tokens; see
+        // meilisearch.rag.reasoningEffort.
+        if (($options['reasoningEffort'] ?? '') !== '') {
+            $body['reasoning_effort'] = (string)$options['reasoningEffort'];
+        }
 
         try {
             $response = $this->requestFactory->request(
@@ -121,6 +126,11 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
 
         $content = $payload['choices'][0]['message']['content'] ?? null;
         if (!is_string($content) || $content === '') {
+            $message = $payload['choices'][0]['message'] ?? [];
+            if (($payload['choices'][0]['finish_reason'] ?? '') === 'length'
+                && (($message['reasoning_content'] ?? $message['reasoning'] ?? '') !== '')) {
+                throw new LlmException(static::class . ': no content in response, the model spent the token limit on reasoning (see meilisearch.rag.reasoningEffort)');
+            }
             throw new LlmException(static::class . ': no content in response');
         }
         return $content;
@@ -146,6 +156,11 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
         ];
         if (isset($options['maxTokens'])) {
             $body['max_tokens'] = (int)$options['maxTokens'];
+        }
+        // Models that think first count the thinking against max_tokens; see
+        // meilisearch.rag.reasoningEffort.
+        if (($options['reasoningEffort'] ?? '') !== '') {
+            $body['reasoning_effort'] = (string)$options['reasoningEffort'];
         }
 
         try {

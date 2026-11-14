@@ -524,6 +524,12 @@ settings:
     type: int
     default: 0
 
+  meilisearch.rag.reasoningEffort:
+    label: 'RAG LLM reasoning effort'
+    description: 'Sent as reasoning_effort to OpenAI-compatible providers (OpenAI, Scaleway, …) for models that think before they answer. Their thinking counts against maxTokens and against the short budgets of the query rewriter and classifier; unbounded it eats the whole budget and the call returns no text. Values depend on the model (Scaleway: gpt-oss-120b takes low/medium/high, deepseek-v4-flash takes none to switch thinking off). Empty = not sent (models without thinking, e.g. mistral-medium, need nothing).'
+    type: string
+    default: ''
+
   meilisearch.rag.stripStopWords:
     label: 'Strip stop-words from RAG queries'
     description: 'When true, the client-side stop-word stripper runs against RAG-retrieval queries — turning "Wie kann ich die Lizenzdatei automatisch importieren?" into "Lizenzdatei automatisch importieren" before it reaches Meilisearch. Defaults on; raise the relevant fach-tokens above common-word matches. Turn off only when your queries are already short and you rely on multi-word synonym expansion ("gebe frei" → "freigeben") which the stripped form would defeat.'

@@ -64,6 +64,13 @@ final class AskCommand extends Command
                 . 'while the visitor chat keeps the configured one.',
             )
             ->addOption(
+                'reasoning-effort',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'reasoning_effort for this answer instead of meilisearch.rag.reasoningEffort — what a '
+                . 'thinking model given with --model needs (e.g. low for gpt-oss-120b, none for deepseek-v4-flash).',
+            )
+            ->addOption(
                 'follow-up',
                 null,
                 InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
@@ -103,6 +110,10 @@ final class AskCommand extends Command
         $model = trim((string)$input->getOption('model'));
         if ($model !== '') {
             $options['model'] = $model;
+        }
+        $effort = trim((string)$input->getOption('reasoning-effort'));
+        if ($effort !== '') {
+            $options['reasoningEffort'] = $effort;
         }
 
         // Follow-ups run in one conversation, carried the way the controller
