@@ -147,6 +147,9 @@ final class RagService implements LoggerAwareInterface
 
     private float $timingStart = 0.0;
 
+    /** Model that answered the last ask()/askStreaming() call. */
+    private string $lastModel = '';
+
     /** Reciprocal rank fusion constant (Cormack et al.): damps the top ranks' lead. */
     private const FUSION_K = 60;
 
@@ -785,8 +788,12 @@ final class RagService implements LoggerAwareInterface
 
     /**
      * Pick the LLM options a caller may override. Deliberately a whitelist:
-     * an arbitrary $options array must not be able to swap the model or the
-     * API key of a site.
+     * an arbitrary $options array must not be able to swap the API key or the
+     * endpoint of a site. The model can be swapped for internal runs only
+     * (`internal` => true: CLI, backend test, regression catalogue), so a
+     * candidate model is tested against the live knowledge base while the
+     * visitor chat keeps the configured one. It stays with the configured
+     * provider and credentials.
      *
      * @param array<string,mixed> $options
      * @return array<string,mixed>
@@ -796,6 +803,10 @@ final class RagService implements LoggerAwareInterface
         $overrides = [];
         if (array_key_exists('temperature', $options)) {
             $overrides['temperature'] = (float)$options['temperature'];
+        }
+        $model = trim((string)($options['model'] ?? ''));
+        if ($model !== '' && $this->isInternal($options) && preg_match('/^[\w.:\/-]{1,128}$/', $model) === 1) {
+            $overrides['model'] = $model;
         }
         return $overrides;
     }
@@ -853,6 +864,7 @@ final class RagService implements LoggerAwareInterface
         }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
+        $this->lastModel = (string)($llmOptions['model'] ?? '');
         // Fold conversation history into the *retrieval* query so a follow-up
         // ("und der Preis?") searches for the right subject. Retrieval only —
         // $event->question (the user's actual wording) still drives the answer
@@ -1087,6 +1099,7 @@ final class RagService implements LoggerAwareInterface
         }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
+        $this->lastModel = (string)($llmOptions['model'] ?? '');
         yield RagStreamChunk::status(RagStreamChunk::PHASE_SEARCHING);
         // Conversational rewrite for retrieval only (see ask()); the streamed
         // answer still uses $event->question so the user's wording + history
@@ -2293,6 +2306,11 @@ final class RagService implements LoggerAwareInterface
     public function lastWithdrawal(): ?string
     {
         return $this->lastWithdrawal;
+    }
+
+    public function lastModel(): string
+    {
+        return $this->lastModel;
     }
 
     /**

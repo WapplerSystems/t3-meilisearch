@@ -56,6 +56,14 @@ final class AskCommand extends Command
                 . 'out-of-scope flag, notes, suggestions) — for scripted test runs over a question catalogue.',
             )
             ->addOption(
+                'model',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Answer with this model of the configured provider instead of meilisearch.rag.model '
+                . '(e.g. gpt-oss-120b) — to test a candidate model against the live knowledge base '
+                . 'while the visitor chat keeps the configured one.',
+            )
+            ->addOption(
                 'follow-up',
                 null,
                 InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
@@ -90,6 +98,11 @@ final class AskCommand extends Command
             // filter so it doesn't drift to English on multi-language
             // context. Matches the FE controller behaviour.
             $options['language'] = (int)$languageOption;
+        }
+
+        $model = trim((string)$input->getOption('model'));
+        if ($model !== '') {
+            $options['model'] = $model;
         }
 
         // Follow-ups run in one conversation, carried the way the controller
@@ -171,6 +184,7 @@ final class AskCommand extends Command
             'notes' => $answer->notes,
             'suggestions' => $answer->suggestions,
             'withdrawn' => $this->ragService->lastWithdrawal(),
+            'model' => $this->ragService->lastModel(),
             'timings' => $this->ragService->lastTimings(),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
