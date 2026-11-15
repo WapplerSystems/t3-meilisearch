@@ -929,7 +929,7 @@ final class RagService implements LoggerAwareInterface
 
         $hits = $this->publishDateEnricher->enrich($site, $hits);
 
-        $systemPrompt = $this->siteText($site, 'meilisearch.rag.systemPrompt');
+        $systemPrompt = $this->systemPrompt($site, $options);
         $currentTurnMessages = $this->promptBuilder->build(
             $site,
             $event->question,
@@ -1189,7 +1189,7 @@ final class RagService implements LoggerAwareInterface
         // the user-visible "Sources" panel — see Rag/Ask.html.
         yield RagStreamChunk::sources($hits);
 
-        $systemPrompt = $this->siteText($site, 'meilisearch.rag.systemPrompt');
+        $systemPrompt = $this->systemPrompt($site, $options);
         $currentTurnMessages = $this->promptBuilder->build(
             $site,
             $event->question,
@@ -2645,6 +2645,23 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $hits;
+    }
+
+    /**
+     * The site's system prompt, or for an internal run (CLI, regression
+     * catalogue) the one the caller passes as `systemPrompt`: a prompt
+     * variant, e.g. one tuned for a candidate model, is tested against the
+     * live knowledge base while the visitor chat keeps the configured one.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function systemPrompt(Site $site, array $options): string
+    {
+        $override = $options['systemPrompt'] ?? null;
+        if (is_string($override) && trim($override) !== '' && $this->isInternal($options)) {
+            return $override;
+        }
+        return $this->siteText($site, 'meilisearch.rag.systemPrompt');
     }
 
     /**

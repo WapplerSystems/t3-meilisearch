@@ -71,6 +71,13 @@ final class AskCommand extends Command
                 . 'thinking model given with --model needs (e.g. low for gpt-oss-120b, none for deepseek-v4-flash).',
             )
             ->addOption(
+                'system-prompt',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Answer with the system prompt in this file instead of meilisearch.rag.systemPrompt — to test '
+                . 'a prompt variant against the live knowledge base while the visitor chat keeps the configured one.',
+            )
+            ->addOption(
                 'follow-up',
                 null,
                 InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
@@ -110,6 +117,15 @@ final class AskCommand extends Command
         $model = trim((string)$input->getOption('model'));
         if ($model !== '') {
             $options['model'] = $model;
+        }
+        $promptFile = trim((string)$input->getOption('system-prompt'));
+        if ($promptFile !== '') {
+            $prompt = is_file($promptFile) ? (string)file_get_contents($promptFile) : '';
+            if (trim($prompt) === '') {
+                $io->error('System prompt file missing or empty: ' . $promptFile);
+                return Command::FAILURE;
+            }
+            $options['systemPrompt'] = $prompt;
         }
         $effort = trim((string)$input->getOption('reasoning-effort'));
         if ($effort !== '') {
