@@ -43,7 +43,7 @@ final class IndexRecordCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('table', InputArgument::REQUIRED, 'Table, e.g. tx_wsmeilisearch_knowledge_resource, tx_news_domain_model_news, sys_file')
-            ->addArgument('uid', InputArgument::OPTIONAL, 'Record uid. Omit to (re)index every record the provider yields for the table.')
+            ->addArgument('uid', InputArgument::OPTIONAL, 'Record uid. Omit (or pass "" to name a site) to (re)index every record the provider yields for the table.')
             ->addArgument('site', InputArgument::OPTIONAL, 'Site identifier (default: first Meilisearch-configured site)')
             ->addOption('remove', null, InputOption::VALUE_NONE, 'Remove the record from the index instead of indexing it (requires uid).')
             ->addOption('force-embed', null, InputOption::VALUE_NONE, 'Re-embed instead of re-using the vector already stored for the document.');
@@ -54,7 +54,7 @@ final class IndexRecordCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $table = (string)$input->getArgument('table');
         $uidArg = $input->getArgument('uid');
-        $uid = $uidArg !== null ? (int)$uidArg : null;
+        $uid = $uidArg !== null && $uidArg !== '' ? (int)$uidArg : null;
         $remove = (bool)$input->getOption('remove');
         $forceEmbed = (bool)$input->getOption('force-embed');
 
