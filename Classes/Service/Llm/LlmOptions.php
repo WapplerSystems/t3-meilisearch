@@ -35,6 +35,10 @@ final class LlmOptions
         if ($reasoningEffort !== '') {
             $options['reasoningEffort'] = $reasoningEffort;
         }
+        $reasoningTokens = (int)$settings->get('meilisearch.rag.reasoningTokens', 0);
+        if ($reasoningTokens > 0) {
+            $options['reasoningTokens'] = $reasoningTokens;
+        }
         $helperReasoningEffort = trim((string)$settings->get('meilisearch.rag.helperReasoningEffort', ''));
         if ($helperReasoningEffort !== '') {
             $options['helperReasoningEffort'] = $helperReasoningEffort;

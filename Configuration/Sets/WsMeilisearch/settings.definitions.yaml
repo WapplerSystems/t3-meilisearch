@@ -530,6 +530,12 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.reasoningTokens:
+    label: 'RAG LLM thinking budget (tokens)'
+    description: 'Added to the token limit of every call that may think (reasoning effort set and not "none"), so maxTokens keeps bounding the text while a thinking model reasons first. Without it the thinking counts against maxTokens and a long reasoning leaves no text ("no content in response, the model spent the token limit on reasoning"). 1500 is a starting point for deepseek-v4-flash with low. 0 = nothing added.'
+    type: int
+    default: 0
+
   meilisearch.rag.helperReasoningEffort:
     label: 'RAG LLM reasoning effort of the helper steps'
     description: 'reasoning_effort for the short calls around the answer: query rewrite, documentation queries, clarification check, suggestions and their probes. Their token budgets are small (32–400), so a thinking model can spend them on reasoning and return nothing — the step then fails open and the search quietly gets worse. Typically the value that switches thinking off (Scaleway deepseek-v4-flash: none) while meilisearch.rag.reasoningEffort lets the answer think a little (low). Empty = same as meilisearch.rag.reasoningEffort.'

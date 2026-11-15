@@ -77,14 +77,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
             'messages' => $messages,
             'temperature' => (float)($options['temperature'] ?? 0.2),
         ];
-        if (isset($options['maxTokens'])) {
-            $body['max_tokens'] = (int)$options['maxTokens'];
-        }
-        // Models that think first count the thinking against max_tokens; see
-        // meilisearch.rag.reasoningEffort.
-        if (($options['reasoningEffort'] ?? '') !== '') {
-            $body['reasoning_effort'] = (string)$options['reasoningEffort'];
-        }
+        $body = self::withLimits($body, $options);
 
         try {
             $response = $this->requestFactory->request(
@@ -136,6 +129,30 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
         return $content;
     }
 
+    /**
+     * max_tokens and reasoning_effort. Models that think first count the
+     * thinking against max_tokens: when a call may think (reasoningEffort set
+     * and not "none"), meilisearch.rag.reasoningTokens is added on top, so
+     * maxTokens keeps bounding the text and the thinking cannot eat it.
+     *
+     * @param array<string,mixed> $body
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    protected static function withLimits(array $body, array $options): array
+    {
+        $effort = (string)($options['reasoningEffort'] ?? '');
+        if ($effort !== '') {
+            $body['reasoning_effort'] = $effort;
+        }
+        if (isset($options['maxTokens'])) {
+            $thinking = $effort !== '' && $effort !== 'none' ? max(0, (int)($options['reasoningTokens'] ?? 0)) : 0;
+            $body['max_tokens'] = (int)$options['maxTokens'] + $thinking;
+        }
+
+        return $body;
+    }
+
     public function streamComplete(array $messages, array $options): iterable
     {
         $model = (string)($options['model'] ?? '');
@@ -154,14 +171,7 @@ class OpenAiProvider implements LlmProviderInterface, LoggerAwareInterface
             'temperature' => (float)($options['temperature'] ?? 0.2),
             'stream' => true,
         ];
-        if (isset($options['maxTokens'])) {
-            $body['max_tokens'] = (int)$options['maxTokens'];
-        }
-        // Models that think first count the thinking against max_tokens; see
-        // meilisearch.rag.reasoningEffort.
-        if (($options['reasoningEffort'] ?? '') !== '') {
-            $body['reasoning_effort'] = (string)$options['reasoningEffort'];
-        }
+        $body = self::withLimits($body, $options);
 
         try {
             $response = $this->requestFactory->request(

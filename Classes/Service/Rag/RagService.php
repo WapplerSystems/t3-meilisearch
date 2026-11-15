@@ -793,8 +793,8 @@ final class RagService implements LoggerAwareInterface
      * (`internal` => true: CLI, backend test, regression catalogue), so a
      * candidate model is tested against the live knowledge base while the
      * visitor chat keeps the configured one, together with the reasoning
-     * effort such a model may need (meilisearch.rag.reasoningEffort and
-     * helperReasoningEffort). It stays
+     * effort and thinking budget such a model may need
+     * (meilisearch.rag.reasoningEffort, helperReasoningEffort, reasoningTokens). It stays
      * with the configured provider and credentials.
      *
      * @param array<string,mixed> $options
@@ -815,6 +815,9 @@ final class RagService implements LoggerAwareInterface
             if ($effort !== '' && $this->isInternal($options) && preg_match('/^[a-z]{1,16}$/', $effort) === 1) {
                 $overrides[$key] = $effort;
             }
+        }
+        if (isset($options['reasoningTokens']) && $this->isInternal($options)) {
+            $overrides['reasoningTokens'] = max(0, min(16000, (int)$options['reasoningTokens']));
         }
         return $overrides;
     }

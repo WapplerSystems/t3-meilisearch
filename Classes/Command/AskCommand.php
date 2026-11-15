@@ -78,6 +78,13 @@ final class AskCommand extends Command
                 . 'meilisearch.rag.helperReasoningEffort — e.g. none while the answer thinks with --reasoning-effort=low.',
             )
             ->addOption(
+                'reasoning-tokens',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Thinking budget added to the token limit of calls that may think, instead of '
+                . 'meilisearch.rag.reasoningTokens (e.g. 1500 with --reasoning-effort=low).',
+            )
+            ->addOption(
                 'system-prompt',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -124,6 +131,9 @@ final class AskCommand extends Command
         $model = trim((string)$input->getOption('model'));
         if ($model !== '') {
             $options['model'] = $model;
+        }
+        if (trim((string)$input->getOption('reasoning-tokens')) !== '') {
+            $options['reasoningTokens'] = (int)$input->getOption('reasoning-tokens');
         }
         $promptFile = trim((string)$input->getOption('system-prompt'));
         if ($promptFile !== '') {
