@@ -195,6 +195,12 @@ final class RagService implements LoggerAwareInterface
         bool $rerank = false,
     ): array {
         $collapseByTitle = $this->collapsesReleaseCopies($site);
+        // The language filter matches the page tree, not the text. Documents
+        // indexed for every site language — file passages — would otherwise
+        // ground a German answer in the English manual.
+        if ((bool)$site->getSettings()->get('meilisearch.rag.restrictToContentLanguage', false)) {
+            $searchOptions = $this->withContentLanguage($site, $searchOptions);
+        }
         // Reranking needs a wider candidate set than the context it keeps:
         // the point is to promote a document retrieval ranked sixth or tenth.
         $rerankCandidates = $rerank ? $this->rerankCandidates($site, $maxHits) : 0;

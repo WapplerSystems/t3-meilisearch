@@ -1067,6 +1067,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.restrictToContentLanguage:
+    label: 'RAG: only documents written in the answer language'
+    description: 'Adds the detected text language (contentLanguage) to the retrieval filter, as the related-topics suggestions already do. The site-language filter alone matches the page tree: documents indexed for every language, such as file passages, would ground a German answer in an English manual. Documents whose language could not be detected still pass.'
+    type: bool
+    default: false
+
   meilisearch.rag.knowledgeLanguages:
     label: 'RAG: search the knowledge of another language'
     description: 'Entries "<page language id>:<knowledge language id>", e.g. "7:1": on pages of language 7 the chat searches the documents of language 1, and the keyword rewrite writes the search query in that language. The answer stays in the language of the page (or of the question). For languages the knowledge base does not exist in.'
