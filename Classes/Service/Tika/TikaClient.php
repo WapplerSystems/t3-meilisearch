@@ -51,7 +51,10 @@ final class TikaClient implements LoggerAwareInterface
         ];
         $lang = trim((string)($ocr['ocrLanguage'] ?? ''));
         if ($lang !== '') {
-            $headers['X-Tika-OCR-Language'] = $lang;
+            // X-Tika-OCRLanguage, no hyphen: Tika 3 rejects the hyphenated
+            // name as "an invalid X-Tika-OCR header" (HTTP 400), so every
+            // OCR request failed and scanned PDFs stayed out of the index.
+            $headers['X-Tika-OCRLanguage'] = $lang;
         }
         $strategy = trim((string)($ocr['ocrStrategy'] ?? ''));
         if ($strategy !== '') {
