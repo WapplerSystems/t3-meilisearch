@@ -35,6 +35,10 @@ final class LlmOptions
         if ($reasoningEffort !== '') {
             $options['reasoningEffort'] = $reasoningEffort;
         }
+        $helperReasoningEffort = trim((string)$settings->get('meilisearch.rag.helperReasoningEffort', ''));
+        if ($helperReasoningEffort !== '') {
+            $options['helperReasoningEffort'] = $helperReasoningEffort;
+        }
         $maxTokens = (int)$settings->get('meilisearch.rag.maxTokens', 0);
         if ($maxTokens > 0) {
             $options['maxTokens'] = $maxTokens;
@@ -42,6 +46,24 @@ final class LlmOptions
         foreach ($overrides as $key => $value) {
             $options[$key] = $value;
         }
+
+        return $options;
+    }
+
+    /**
+     * The options for the short helper calls around an answer (rewrite,
+     * classification, suggestions): meilisearch.rag.helperReasoningEffort
+     * instead of the answer's reasoning effort, when set.
+     *
+     * @param array<string,mixed> $options as fromSettings() returns them
+     * @return array<string,mixed>
+     */
+    public static function forHelpers(array $options): array
+    {
+        if (($options['helperReasoningEffort'] ?? '') !== '') {
+            $options['reasoningEffort'] = $options['helperReasoningEffort'];
+        }
+        unset($options['helperReasoningEffort']);
 
         return $options;
     }

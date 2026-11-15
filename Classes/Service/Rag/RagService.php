@@ -793,7 +793,8 @@ final class RagService implements LoggerAwareInterface
      * (`internal` => true: CLI, backend test, regression catalogue), so a
      * candidate model is tested against the live knowledge base while the
      * visitor chat keeps the configured one, together with the reasoning
-     * effort such a model may need (meilisearch.rag.reasoningEffort). It stays
+     * effort such a model may need (meilisearch.rag.reasoningEffort and
+     * helperReasoningEffort). It stays
      * with the configured provider and credentials.
      *
      * @param array<string,mixed> $options
@@ -809,9 +810,11 @@ final class RagService implements LoggerAwareInterface
         if ($model !== '' && $this->isInternal($options) && preg_match('/^[\w.:\/-]{1,128}$/', $model) === 1) {
             $overrides['model'] = $model;
         }
-        $effort = trim((string)($options['reasoningEffort'] ?? ''));
-        if ($effort !== '' && $this->isInternal($options) && preg_match('/^[a-z]{1,16}$/', $effort) === 1) {
-            $overrides['reasoningEffort'] = $effort;
+        foreach (['reasoningEffort', 'helperReasoningEffort'] as $key) {
+            $effort = trim((string)($options[$key] ?? ''));
+            if ($effort !== '' && $this->isInternal($options) && preg_match('/^[a-z]{1,16}$/', $effort) === 1) {
+                $overrides[$key] = $effort;
+            }
         }
         return $overrides;
     }
@@ -870,12 +873,16 @@ final class RagService implements LoggerAwareInterface
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         $this->lastModel = (string)($llmOptions['model'] ?? '');
+        // Everything but the answer itself: rewrite, documentation queries,
+        // clarification, suggestions (meilisearch.rag.helperReasoningEffort).
+        $helperLlmOptions = LlmOptions::forHelpers($llmOptions);
+        unset($llmOptions['helperReasoningEffort']);
         // Fold conversation history into the *retrieval* query so a follow-up
         // ("und der Preis?") searches for the right subject. Retrieval only —
         // $event->question (the user's actual wording) still drives the answer
         // prompt below and the analytics, so nothing user-visible changes.
         $retrievalQuestion = $this->queryRewriter->rewrite(
-            $provider, $settings, $conversation, $event->question, $llmOptions,
+            $provider, $settings, $conversation, $event->question, $helperLlmOptions,
             $this->resolveLanguageLabel($site, $options),
         );
         $this->mark('rewrite');
@@ -884,7 +891,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $llmOptions, $options),
+                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -915,7 +922,7 @@ final class RagService implements LoggerAwareInterface
                 $conversation,
                 $event->question,
                 $hits,
-                $llmOptions,
+                $helperLlmOptions,
             )
             : Clarification::answerable();
         if ($clarification->needed) {
@@ -1008,13 +1015,13 @@ final class RagService implements LoggerAwareInterface
         $final = $final->withSuggestions($this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
-                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $llmOptions),
+                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $final, $helperLlmOptions),
                     $site,
                     $provider,
                     $settings,
                     $event->options,
                     $maxHits,
-                    $llmOptions,
+                    $helperLlmOptions,
                     $this->resolveLanguageLabel($site, $options),
                     $hits,
                 ),
@@ -1105,12 +1112,16 @@ final class RagService implements LoggerAwareInterface
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         $this->lastModel = (string)($llmOptions['model'] ?? '');
+        // Everything but the answer itself: rewrite, documentation queries,
+        // clarification, suggestions (meilisearch.rag.helperReasoningEffort).
+        $helperLlmOptions = LlmOptions::forHelpers($llmOptions);
+        unset($llmOptions['helperReasoningEffort']);
         yield RagStreamChunk::status(RagStreamChunk::PHASE_SEARCHING);
         // Conversational rewrite for retrieval only (see ask()); the streamed
         // answer still uses $event->question so the user's wording + history
         // drive the reply.
         $retrievalQuestion = $this->queryRewriter->rewrite(
-            $provider, $settings, $conversation, $event->question, $llmOptions,
+            $provider, $settings, $conversation, $event->question, $helperLlmOptions,
             $this->resolveLanguageLabel($site, $options),
         );
         $this->mark('rewrite');
@@ -1121,7 +1132,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $llmOptions, $options),
+                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -1158,7 +1169,7 @@ final class RagService implements LoggerAwareInterface
                 $conversation,
                 $event->question,
                 $hits,
-                $llmOptions,
+                $helperLlmOptions,
             )
             : Clarification::answerable();
         if ($clarification->needed) {
@@ -1247,13 +1258,13 @@ final class RagService implements LoggerAwareInterface
             $cachedSuggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
                 $this->withRelatedTopics(
                     $this->groundSuggestions(
-                        $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $llmOptions),
+                        $this->suggestionGenerator->generate($provider, $settings, $event->question, $cachedAnswer, $helperLlmOptions),
                         $site,
                         $provider,
                         $settings,
                         $event->options,
                         $maxHits,
-                        $llmOptions,
+                        $helperLlmOptions,
                         $this->resolveLanguageLabel($site, $options),
                         $hits,
                     ),
@@ -1402,13 +1413,13 @@ final class RagService implements LoggerAwareInterface
         $suggestions = !$this->offersSuggestions($site, $outOfScope, $citedIds) ? [] : $this->withScopeOptions(
             $this->withRelatedTopics(
                 $this->groundSuggestions(
-                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $llmOptions),
+                    $this->suggestionGenerator->generate($provider, $settings, $event->question, $answer, $helperLlmOptions),
                     $site,
                     $provider,
                     $settings,
                     $event->options,
                     $maxHits,
-                    $llmOptions,
+                    $helperLlmOptions,
                     $this->resolveLanguageLabel($site, $options),
                     $hits,
                 ),

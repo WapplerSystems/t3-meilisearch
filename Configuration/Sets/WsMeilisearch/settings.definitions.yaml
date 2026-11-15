@@ -530,6 +530,12 @@ settings:
     type: string
     default: ''
 
+  meilisearch.rag.helperReasoningEffort:
+    label: 'RAG LLM reasoning effort of the helper steps'
+    description: 'reasoning_effort for the short calls around the answer: query rewrite, documentation queries, clarification check, suggestions and their probes. Their token budgets are small (32–400), so a thinking model can spend them on reasoning and return nothing — the step then fails open and the search quietly gets worse. Typically the value that switches thinking off (Scaleway deepseek-v4-flash: none) while meilisearch.rag.reasoningEffort lets the answer think a little (low). Empty = same as meilisearch.rag.reasoningEffort.'
+    type: string
+    default: ''
+
   meilisearch.rag.stripStopWords:
     label: 'Strip stop-words from RAG queries'
     description: 'When true, the client-side stop-word stripper runs against RAG-retrieval queries — turning "Wie kann ich die Lizenzdatei automatisch importieren?" into "Lizenzdatei automatisch importieren" before it reaches Meilisearch. Defaults on; raise the relevant fach-tokens above common-word matches. Turn off only when your queries are already short and you rely on multi-word synonym expansion ("gebe frei" → "freigeben") which the stripped form would defeat.'

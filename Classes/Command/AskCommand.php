@@ -71,6 +71,13 @@ final class AskCommand extends Command
                 . 'thinking model given with --model needs (e.g. low for gpt-oss-120b, none for deepseek-v4-flash).',
             )
             ->addOption(
+                'helper-reasoning-effort',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'reasoning_effort for the helper steps (rewrite, documentation queries, suggestions) instead of '
+                . 'meilisearch.rag.helperReasoningEffort — e.g. none while the answer thinks with --reasoning-effort=low.',
+            )
+            ->addOption(
                 'system-prompt',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -127,9 +134,11 @@ final class AskCommand extends Command
             }
             $options['systemPrompt'] = $prompt;
         }
-        $effort = trim((string)$input->getOption('reasoning-effort'));
-        if ($effort !== '') {
-            $options['reasoningEffort'] = $effort;
+        foreach (['reasoning-effort' => 'reasoningEffort', 'helper-reasoning-effort' => 'helperReasoningEffort'] as $option => $key) {
+            $effort = trim((string)$input->getOption($option));
+            if ($effort !== '') {
+                $options[$key] = $effort;
+            }
         }
 
         // Follow-ups run in one conversation, carried the way the controller
