@@ -33,6 +33,21 @@ final class TextExtractor implements LoggerAwareInterface
 
     public function extract(File $file, Site $site): ExtractionResult
     {
+        return $this->run($file, $site, false);
+    }
+
+    /**
+     * Like extract(), but keeps the page boundaries (ExtractionResult::$pages).
+     * Cached separately from the plain text: the two outputs differ, and a
+     * site switching passages on must not be served the page-less text.
+     */
+    public function extractPages(File $file, Site $site): ExtractionResult
+    {
+        return $this->run($file, $site, true);
+    }
+
+    private function run(File $file, Site $site, bool $paged): ExtractionResult
+    {
         $config = $this->readConfig($site);
         if ($config['url'] === '') {
             return ExtractionResult::skipped('Tika disabled for site (empty meilisearch.tika.url)');
@@ -57,9 +72,12 @@ final class TextExtractor implements LoggerAwareInterface
             return ExtractionResult::failed('Cannot compute content hash');
         }
 
-        $cacheKey = $this->cacheKey($sha1, $config);
+        $cacheKey = $this->cacheKey($sha1, $config) . ($paged ? '_pages' : '');
         $cached = $this->cache->get($cacheKey);
-        if (is_string($cached)) {
+        if ($paged && is_array($cached)) {
+            return ExtractionResult::pages(array_values(array_map('strval', $cached)));
+        }
+        if (!$paged && is_string($cached)) {
             return ExtractionResult::success($cached);
         }
 
@@ -68,22 +86,19 @@ final class TextExtractor implements LoggerAwareInterface
             return ExtractionResult::failed('Cannot read file contents');
         }
 
-        $result = $this->tikaClient->extractText(
-            $config['url'],
-            $contents,
-            $mime,
-            $config['timeout'],
-            $config['ocrEnabled']
-                ? [
-                    'ocrLanguage' => $config['ocrLanguage'],
-                    'ocrStrategy' => $config['ocrStrategy'],
-                ]
-                : [],
-        );
+        $ocr = $config['ocrEnabled']
+            ? [
+                'ocrLanguage' => $config['ocrLanguage'],
+                'ocrStrategy' => $config['ocrStrategy'],
+            ]
+            : [];
+        $result = $paged
+            ? $this->tikaClient->extractPages($config['url'], $contents, $mime, $config['timeout'], $ocr)
+            : $this->tikaClient->extractText($config['url'], $contents, $mime, $config['timeout'], $ocr);
         if ($result->status === ExtractionResult::SUCCESS) {
             // Cache forever — entries become unreachable when their sha1 stops
             // matching any sys_file row, and SimpleFileBackend handles GC.
-            $this->cache->set($cacheKey, $result->text, ['tika']);
+            $this->cache->set($cacheKey, $paged ? $result->pages : $result->text, ['tika']);
         }
         return $result;
     }

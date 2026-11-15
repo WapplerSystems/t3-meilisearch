@@ -228,7 +228,7 @@ final class RagService implements LoggerAwareInterface
                 $hits = $this->rerankHits($site, $askedAs, $hits);
             }
         } else {
-            $collapsed = $this->collapseContext($this->fusedSearch($site, $query, $searchOptions), $askedAs, $collapseIdentical, $collapseByTitle);
+            $collapsed = $this->limitPerParent($site, $this->collapseContext($this->fusedSearch($site, $query, $searchOptions), $askedAs, $collapseIdentical, $collapseByTitle));
             if ($rerankCandidates > 0) {
                 $collapsed = $this->rerankHits($site, $askedAs, array_values(array_slice($collapsed, 0, $rerankCandidates)));
             }
@@ -236,12 +236,12 @@ final class RagService implements LoggerAwareInterface
         }
         if ($hits === []) {
             $hits = array_values(array_slice(
-                $this->collapseContext(
+                $this->limitPerParent($site, $this->collapseContext(
                     $this->retrieveWithFallbacks($site, $query, $searchOptions, $maxHits),
                     $askedAs,
                     $collapseIdentical,
                     $collapseByTitle,
-                ),
+                )),
                 0,
                 $maxHits,
             ));
@@ -251,6 +251,39 @@ final class RagService implements LoggerAwareInterface
         }
 
         return $this->labelCitations($site, $this->adjustContextHits($site, $askedAs, $hits, $searchOptions), $this->resolveLanguageId($searchOptions));
+    }
+
+    /**
+     * At most meilisearch.rag.maxPassagesPerParent hits per parent document
+     * (0: no limit). Passages of one long manual are near neighbours in the
+     * vector space — without a cap a question about it fills the whole
+     * context with five of its pages and leaves no room for the product
+     * page or the second manual that also applies. Hits without a parentId
+     * are not affected. The list keeps its order; the spares the over-fetch
+     * brought in move up.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @return list<array<string,mixed>>
+     */
+    private function limitPerParent(Site $site, array $hits): array
+    {
+        $max = (int)$site->getSettings()->get('meilisearch.rag.maxPassagesPerParent', 0);
+        if ($max <= 0) {
+            return $hits;
+        }
+        $seen = [];
+        $kept = [];
+        foreach ($hits as $hit) {
+            $parent = (string)($hit['parentId'] ?? '');
+            if ($parent !== '') {
+                $seen[$parent] = ($seen[$parent] ?? 0) + 1;
+                if ($seen[$parent] > $max) {
+                    continue;
+                }
+            }
+            $kept[] = $hit;
+        }
+        return $kept;
     }
 
     /**
@@ -1958,7 +1991,7 @@ final class RagService implements LoggerAwareInterface
                 }
             }
             $perLane[] = array_values(array_slice(
-                $this->collapseContext(self::fuse($lists), $askedAs, $collapseIdentical, $collapseByTitle),
+                $this->limitPerParent($site, $this->collapseContext(self::fuse($lists), $askedAs, $collapseIdentical, $collapseByTitle)),
                 0,
                 $lanes[$laneNo][1],
             ));

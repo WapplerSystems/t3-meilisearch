@@ -29,6 +29,20 @@ final class IndexWriteStats
     /** Documents dropped because embedding failed after all retries. */
     public int $failed = 0;
 
+    /**
+     * Adds another run's counts — a record indexed by several providers
+     * (a file as a whole and page by page) reports one total.
+     */
+    public function add(self $other): void
+    {
+        $this->seen += $other->seen;
+        $this->written += $other->written;
+        $this->skipped += $other->skipped;
+        $this->reused += $other->reused;
+        $this->embedded += $other->embedded;
+        $this->failed += $other->failed;
+    }
+
     public function summary(): string
     {
         return sprintf(

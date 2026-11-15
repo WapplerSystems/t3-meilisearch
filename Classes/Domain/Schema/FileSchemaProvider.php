@@ -133,6 +133,51 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
 
     public function iterateDocuments(Site $site): iterable
     {
+        $languages = $site->getLanguages();
+        foreach ($this->eligibleFiles($site) as [$file, $publicUrl]) {
+            // Body extraction is best-effort. A failure here (Tika
+            // unreachable, file content missing on a forked
+            // environment, OCR timeout) leaves the doc indexable as
+            // title + metadata only — the operator can still find
+            // it by name without losing the entry entirely.
+            try {
+                $bodytext = $this->extractBody($file, $site);
+            } catch (\Throwable $e) {
+                $this->logger?->info('FileSchemaProvider body extraction skipped for {uid}: {message}', [
+                    'uid' => $file->getUid(),
+                    'message' => $e->getMessage(),
+                ]);
+                $bodytext = '';
+            }
+
+            foreach ($languages as $language) {
+                try {
+                    $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
+                } catch (\Throwable $e) {
+                    $this->logger?->warning('FileSchemaProvider skipped {uid} for language {lang}: {message}', [
+                        'uid' => $file->getUid(),
+                        'lang' => $language->getLanguageId(),
+                        'message' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+                if ($document !== null) {
+                    yield $document;
+                }
+            }
+        }
+    }
+
+    /**
+     * Every file this site indexes, with its normalised public URL — the
+     * filters of a full reindex in one place, so a provider deriving further
+     * documents from the same files (FilePassageSchemaProvider) applies
+     * exactly the same rules instead of a copy that drifts.
+     *
+     * @return iterable<array{0:File,1:string}>
+     */
+    public function eligibleFiles(Site $site): iterable
+    {
         // Emergency bypass for environments where the FAL storage backend
         // returns NoSuchKey / 404 for many sys_file rows (typical after a
         // bucket rename, a fal_s3 storage swap, or a partial migration).
@@ -150,7 +195,6 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             return;
         }
 
-        $languages = $site->getLanguages();
         $dedupe = $this->shouldDeduplicate($site);
         $eligibleUids = $dedupe ? $this->filesForSite($site) : null;
         // Whitelist wins when non-empty (only these extensions index);
@@ -235,37 +279,64 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
                 ]);
                 continue;
             }
-            // Body extraction is best-effort. A failure here (Tika
-            // unreachable, file content missing on a forked
-            // environment, OCR timeout) leaves the doc indexable as
-            // title + metadata only — the operator can still find
-            // it by name without losing the entry entirely.
-            try {
-                $bodytext = $this->extractBody($file, $site);
-            } catch (\Throwable $e) {
-                $this->logger?->info('FileSchemaProvider body extraction skipped for {uid}: {message}', [
-                    'uid' => $file->getUid(),
-                    'message' => $e->getMessage(),
-                ]);
-                $bodytext = '';
-            }
-
-            foreach ($languages as $language) {
-                try {
-                    $document = $this->toDocument($file, $language->getLanguageId(), $bodytext, $publicUrl, $site);
-                } catch (\Throwable $e) {
-                    $this->logger?->warning('FileSchemaProvider skipped {uid} for language {lang}: {message}', [
-                        'uid' => $file->getUid(),
-                        'lang' => $language->getLanguageId(),
-                        'message' => $e->getMessage(),
-                    ]);
-                    continue;
-                }
-                if ($document !== null) {
-                    yield $document;
-                }
-            }
+            yield [$file, $publicUrl];
         }
+    }
+
+    /**
+     * Single-file counterpart of eligibleFiles() for the DataHandler / FAL
+     * path: the file and its public URL when the site indexes it, else null.
+     *
+     * @return array{0:File,1:string}|null
+     */
+    public function eligibleFile(int $uid, Site $site): ?array
+    {
+        if (!$this->isFileEligibleForSite($uid, $site)) {
+            return null;
+        }
+        try {
+            $file = $this->resourceFactory->getFileObject($uid);
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($file->isMissing()
+            || $this->identifierIsExcluded((string)$file->getIdentifier(), $this->excludeIdentifierPrefixes($site))
+        ) {
+            return null;
+        }
+        $allowed = $this->normaliseExtensionList($site, 'meilisearch.indexing.allowedExtensions');
+        $ext = strtolower((string)$file->getExtension());
+        if ($allowed !== [] && !in_array($ext, $allowed, true)) {
+            return null;
+        }
+        if ($allowed === [] && in_array($ext, $this->normaliseExtensionList($site, 'meilisearch.indexing.excludeExtensions'), true)) {
+            return null;
+        }
+        try {
+            return [$file, $this->normalisePublicUrl((string)$file->getPublicUrl())];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Title as the default-language metadata gives it, else the file name.
+     */
+    public function titleFor(File $file): string
+    {
+        $title = (string)($this->metadataForLanguage((int)$file->getUid(), 0)['title'] ?? '');
+        return $title !== '' ? $title : (string)$file->getName();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function accessGroupsFor(File $file): array
+    {
+        return $this->fileAccessResolver->resolve(
+            (int)$file->getUid(),
+            self::parseFeGroups((string)($this->metadataForLanguage((int)$file->getUid(), 0)['fe_groups'] ?? '')),
+        );
     }
 
     public function getAdditionalFields(): array

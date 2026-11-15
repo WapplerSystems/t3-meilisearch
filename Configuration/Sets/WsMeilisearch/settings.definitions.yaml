@@ -431,6 +431,36 @@ settings:
     type: string
     default: 'auto'
 
+  meilisearch.passages.enabled:
+    label: 'Index file passages'
+    description: 'Index every page of a document as its own passage (type "file_passage") so the assistant can answer from page 30 of a long manual and cite the page. Passages are hidden from the visitor search. Needs Tika; costs one embedding per page.'
+    type: bool
+    default: false
+
+  meilisearch.passages.extensions:
+    label: 'Passage file extensions'
+    description: 'Extensions split into passages, within what meilisearch.indexing.allowedExtensions admits anyway. Formats without pages become one passage per chunk.'
+    type: stringlist
+    default: ['pdf']
+
+  meilisearch.passages.maxChars:
+    label: 'Passage length (characters)'
+    description: 'A page longer than this is split into several passages at line breaks. Keep it at or below meilisearch.rag.maxContextChars, or the assistant sees passages cut short.'
+    type: int
+    default: 2400
+
+  meilisearch.passages.overlapChars:
+    label: 'Passage overlap (characters)'
+    description: 'Each further passage of a split page starts with this many characters of the previous one, so a table cut in two stays readable from either side.'
+    type: int
+    default: 300
+
+  meilisearch.passages.minChars:
+    label: 'Minimum passage length (characters)'
+    description: 'Shorter passages (blank pages, a lone page number) are not indexed.'
+    type: int
+    default: 80
+
   meilisearch.indexing.allowedExtensions:
     label: 'Allowed file extensions'
     description: 'Whitelist of lower-case file extensions to include in the index. When non-empty, ONLY these extensions are indexed and excludeExtensions is ignored. Example: [pdf, docx, doc, html, htm, md, txt, rtf, odt, epub]. Empty by default — falls back to the excludeExtensions blacklist.'
@@ -772,6 +802,12 @@ settings:
     description: 'How many top-ranked search hits to feed into the LLM as context. Higher = better grounding but more tokens. Defaults to 5.'
     type: int
     default: 5
+
+  meilisearch.rag.maxPassagesPerParent:
+    label: 'Max passages per document in the context'
+    description: 'Caps how many passages of one document (hits sharing a parentId, e.g. the pages of one PDF from meilisearch.passages) reach the context. 0 = no limit.'
+    type: int
+    default: 0
 
   meilisearch.rag.maxContextChars:
     label: 'Max characters per context hit'

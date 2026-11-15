@@ -707,7 +707,10 @@ final class SearchService implements LoggerAwareInterface
         if ($options['includeKnowledgeResources'] ?? false) {
             return $filter;
         }
-        $types = array_unique(array_merge(['knowledge_resource'], (array)($options['__excludedTypes'] ?? [])));
+        // Page passages of files (FilePassageSchemaProvider) are grounding
+        // for the assistant like knowledge resources: one manual would
+        // otherwise fill the result list with forty of its pages.
+        $types = array_unique(array_merge(['knowledge_resource', 'file_passage'], (array)($options['__excludedTypes'] ?? [])));
         $exclude = implode(' AND ', array_map(
             static fn (string $type): string => 'type != "' . addcslashes($type, '"\\') . '"',
             $types,

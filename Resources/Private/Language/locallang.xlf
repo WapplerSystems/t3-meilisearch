@@ -27,6 +27,9 @@
             <trans-unit id="search.facets.heading">
                 <source>Filter</source>
             </trans-unit>
+            <trans-unit id="rag.citation.page">
+                <source>p. %d</source>
+            </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
             </trans-unit>

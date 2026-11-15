@@ -18,15 +18,28 @@ final class ExtractionResult
     public const SKIPPED = 'skipped';
     public const FAILED  = 'failed';
 
+    /**
+     * @param list<string> $pages text per page (index = page − 1) when the
+     *        extraction was page-wise, otherwise empty
+     */
     public function __construct(
         public readonly string $status,
         public readonly string $text = '',
         public readonly string $reason = '',
+        public readonly array $pages = [],
     ) {}
 
     public static function success(string $text): self
     {
         return new self(self::SUCCESS, $text);
+    }
+
+    /**
+     * @param list<string> $pages
+     */
+    public static function pages(array $pages): self
+    {
+        return new self(self::SUCCESS, implode("\n\n", $pages), '', array_values($pages));
     }
 
     public static function skipped(string $reason): self

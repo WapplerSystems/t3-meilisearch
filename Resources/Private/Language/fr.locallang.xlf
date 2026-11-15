@@ -23,6 +23,10 @@
                 <source>Filter</source>
                 <target>Filtre</target>
             </trans-unit>
+            <trans-unit id="rag.citation.page">
+                <source>p. %d</source>
+                <target>p. %d</target>
+            </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
                 <target>Interroger le site</target>

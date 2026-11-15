@@ -40,13 +40,125 @@ final class TikaClient implements LoggerAwareInterface
         int $timeout,
         array $ocr = [],
     ): ExtractionResult {
+        return $this->request($tikaBaseUrl, $fileContents, $mimeType, $timeout, $ocr, 'text/plain');
+    }
+
+    /**
+     * Text per page. Tika's XHTML output wraps every PDF page in
+     * `<div class="page">`; the plain-text endpoint loses those boundaries,
+     * and with them any chance to cite "page 14" of a 150-page manual.
+     *
+     * Formats without pages (DOCX, TXT, …) come back as one pseudo-page, so
+     * callers never have to tell the two apart. Empty pages are kept as ''
+     * so a list index always equals page number − 1.
+     *
+     * @param array{ocrLanguage?: string, ocrStrategy?: string} $ocr
+     */
+    public function extractPages(
+        string $tikaBaseUrl,
+        string $fileContents,
+        string $mimeType,
+        int $timeout,
+        array $ocr = [],
+    ): ExtractionResult {
+        $result = $this->request($tikaBaseUrl, $fileContents, $mimeType, $timeout, $ocr, 'text/html');
+        if ($result->status !== ExtractionResult::SUCCESS) {
+            return $result;
+        }
+        $pages = self::pagesFromXhtml($result->text);
+        if (implode('', $pages) === '') {
+            return ExtractionResult::skipped('Tika returned no page text');
+        }
+        return ExtractionResult::pages($pages);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function pagesFromXhtml(string $xhtml): array
+    {
+        $previous = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $xhtml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        if (!$loaded) {
+            return [];
+        }
+        $xpath = new \DOMXPath($dom);
+        $nodes = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " page ")]');
+        if ($nodes === false || $nodes->length === 0) {
+            $body = $dom->getElementsByTagName('body')->item(0);
+            return [self::nodeText($body ?? $dom)];
+        }
+        $pages = [];
+        foreach ($nodes as $node) {
+            $pages[] = self::nodeText($node);
+        }
+        return $pages;
+    }
+
+    /**
+     * Block elements become line breaks, so table rows and list items do not
+     * run into one another; runs of blanks collapse to one.
+     */
+    private static function nodeText(\DOMNode $node): string
+    {
+        $lines = [];
+        $current = '';
+        $walk = static function (\DOMNode $n) use (&$walk, &$lines, &$current): void {
+            foreach ($n->childNodes as $child) {
+                if ($child instanceof \DOMText) {
+                    $current .= $child->nodeValue;
+                    continue;
+                }
+                if (!$child instanceof \DOMElement) {
+                    continue;
+                }
+                $block = in_array(strtolower($child->tagName), ['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table'], true);
+                if ($block) {
+                    $lines[] = $current;
+                    $current = '';
+                }
+                $walk($child);
+                if ($block) {
+                    $lines[] = $current;
+                    $current = '';
+                } elseif (in_array(strtolower($child->tagName), ['td', 'th'], true)) {
+                    $current .= ' | ';
+                }
+            }
+        };
+        $walk($node);
+        $lines[] = $current;
+        $clean = [];
+        foreach ($lines as $line) {
+            $line = trim((string)preg_replace('/[^\S\n]+/u', ' ', $line), " |\t\n\r\0\x0B");
+            if ($line !== '') {
+                $clean[] = $line;
+            }
+        }
+        return implode("\n", $clean);
+    }
+
+    /**
+     * @param array{ocrLanguage?: string, ocrStrategy?: string} $ocr
+     */
+    private function request(
+        string $tikaBaseUrl,
+        string $fileContents,
+        string $mimeType,
+        int $timeout,
+        array $ocr,
+        string $accept,
+    ): ExtractionResult {
         $tikaBaseUrl = rtrim($tikaBaseUrl, '/');
         if ($tikaBaseUrl === '') {
             return ExtractionResult::skipped('Tika URL not configured');
         }
 
         $headers = [
-            'Accept' => 'text/plain',
+            'Accept' => $accept,
             'Content-Type' => $mimeType !== '' ? $mimeType : 'application/octet-stream',
         ];
         $lang = trim((string)($ocr['ocrLanguage'] ?? ''));

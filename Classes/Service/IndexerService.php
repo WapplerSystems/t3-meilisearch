@@ -9,6 +9,7 @@ use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use WapplerSystems\Meilisearch\Domain\Schema\PreReindexCleanupInterface;
 use WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface;
+use WapplerSystems\Meilisearch\Domain\Schema\StaleDocumentsInterface;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Service\Indexing\DocumentBatchWriter;
 use WapplerSystems\Meilisearch\Service\Indexing\IndexWriteStats;
@@ -314,10 +315,16 @@ final class IndexerService implements LoggerAwareInterface
         $indexName = $this->engineFactory->getIndexName($site);
         $client = $this->engineFactory->createClientForSite($site);
 
+        // Every provider of the table, not just the first: a file is indexed
+        // as a whole (FileSchemaProvider) and page by page
+        // (FilePassageSchemaProvider), and an edit must reach both.
+        $supported = false;
+        $total = new IndexWriteStats();
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
                 continue;
             }
+            $supported = true;
             // A single record is written in place, so unchanged documents
             // can be skipped outright — an editor re-saving a record
             // without touching indexed fields costs nothing.
@@ -331,29 +338,50 @@ final class IndexerService implements LoggerAwareInterface
                 $forceEmbed,
                 false,
             );
-            $any = false;
+            $count = 0;
             foreach ($provider->fetchDocuments($uid, $site) as $document) {
                 $event = new BeforeDocumentIndexedEvent($provider, $document);
                 $this->eventDispatcher->dispatch($event);
                 $writer->push($event->document, $provider);
-                $any = true;
+                $count++;
             }
             $writer->flush();
-            $this->lastStats = $writer->stats;
-            if (!$any) {
+            $total->add($writer->stats);
+            if ($count === 0) {
                 // Record vanished or got hidden — drop every document variant
                 // we might have written previously (per-language, etc.).
                 foreach ($provider->buildDocumentIds($uid, $site) as $docId) {
                     $engine->deleteDocument($indexName, $docId);
                 }
             }
-            // false when embedding failed: the document was deliberately
-            // NOT pushed (Meilisearch rejects vectorless documents against
-            // the userProvided embedder), so the caller must not treat
-            // this record as indexed.
-            return $writer->stats->failed === 0;
+            $this->deleteStale($provider, $client, $indexName, $uid, $count);
+            // A document whose embedding failed was deliberately NOT pushed
+            // (Meilisearch rejects vectorless documents against the
+            // userProvided embedder), so the caller must not treat this
+            // record as indexed.
         }
-        return false;
+        $this->lastStats = $total;
+        return $supported && $total->failed === 0;
+    }
+
+    /**
+     * Documents of a record beyond the $keptCount just written, for providers
+     * that cannot list their document ids (StaleDocumentsInterface).
+     */
+    private function deleteStale(SchemaProviderInterface $provider, ?\Meilisearch\Client $client, string $indexName, int $uid, int $keptCount): void
+    {
+        if (!$provider instanceof StaleDocumentsInterface || $client === null) {
+            return;
+        }
+        try {
+            $client->index($indexName)->deleteDocuments(['filter' => $provider->staleDocumentsFilter($uid, $keptCount)]);
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Removing stale documents of {provider} {uid} failed: {message}', [
+                'provider' => $provider::class,
+                'uid' => $uid,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -376,10 +404,13 @@ final class IndexerService implements LoggerAwareInterface
         $indexName = $this->engineFactory->getIndexName($site);
         $client = $this->engineFactory->createClientForSite($site);
 
+        $supported = false;
+        $total = new IndexWriteStats();
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
                 continue;
             }
+            $supported = true;
             $writer = $this->createWriter(
                 $site,
                 $engine,
@@ -396,10 +427,10 @@ final class IndexerService implements LoggerAwareInterface
                 $writer->push($event->document, $provider);
             }
             $writer->flush();
-            $this->lastStats = $writer->stats;
-            return $writer->stats->written + $writer->stats->skipped;
+            $total->add($writer->stats);
         }
-        return -1;
+        $this->lastStats = $total;
+        return $supported ? $total->written + $total->skipped : -1;
     }
 
     public function removeRecord(string $table, int $uid, Site $site): bool
@@ -409,16 +440,19 @@ final class IndexerService implements LoggerAwareInterface
             return false;
         }
         $indexName = $this->engineFactory->getIndexName($site);
+        $client = $this->engineFactory->createClientForSite($site);
 
+        $supported = false;
         foreach ($this->schemaProviders as $provider) {
             if (!$provider->supports($table)) {
                 continue;
             }
+            $supported = true;
             foreach ($provider->buildDocumentIds($uid, $site) as $docId) {
                 $engine->deleteDocument($indexName, $docId);
             }
-            return true;
+            $this->deleteStale($provider, $client, $indexName, $uid, 0);
         }
-        return false;
+        return $supported;
     }
 }

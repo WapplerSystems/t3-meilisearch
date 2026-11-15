@@ -35,6 +35,10 @@
                 <source>Filter</source>
                 <target>Filter</target>
             </trans-unit>
+            <trans-unit id="rag.citation.page">
+                <source>p. %d</source>
+                <target>S. %d</target>
+            </trans-unit>
             <trans-unit id="rag.form.heading">
                 <source>Ask the site</source>
                 <target>Frag die Website</target>
