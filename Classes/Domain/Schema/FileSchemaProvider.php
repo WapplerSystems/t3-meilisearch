@@ -8,12 +8,15 @@ use CmsIg\Seal\Schema\Field\TextField;
 use Meilisearch\Client;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\ProcessedFile;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\Tika\ExtractionResult;
 use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
@@ -39,8 +42,9 @@ use WapplerSystems\Meilisearch\Service\Tika\TextExtractor;
  *  - false (default): index every non-missing sys_file into every site's
  *    index. Useful when the search index doubles as a global file library.
  *  - true: only index files that are referenced (via sys_file_reference)
- *    from a page belonging to the current site. Strict per-site results,
- *    no cross-site leakage.
+ *    from a visible record on a visible page belonging to the current site.
+ *    Strict per-site results, no cross-site leakage, nothing that only a
+ *    hidden page or element uses.
  */
 final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCleanupInterface, LoggerAwareInterface
 {
@@ -697,20 +701,45 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
      * don't resolve to any site are skipped — they aren't part of any
      * frontend search experience.
      *
+     * A reference only counts when a visitor can reach it: the record that
+     * holds it (content element, file collection, news …) is not hidden or
+     * deleted, and neither is its page. Without that, a file used only on
+     * hidden pages — demo elements, a page still in preparation — went into
+     * the index, and the site search and the assistant handed it out
+     * (production, 2026-11-16: a "PDF Test" placeholder from a hidden demo
+     * page).
+     *
      * @return array<string,array<int,bool>>
      */
     private function buildFilesPerSiteMap(): array
     {
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
-        $rows = $qb->select('uid_local', 'pid')
+        $rows = $qb->select('uid_local', 'pid', 'tablenames', 'uid_foreign')
             ->distinct()
             ->from('sys_file_reference')
             ->where($qb->expr()->gt('pid', 0))
             ->executeQuery()
             ->fetchAllAssociative();
 
+        $foreignUids = [];
+        foreach ($rows as $row) {
+            $foreignUids[(string)$row['tablenames']][(int)$row['uid_foreign']] = true;
+        }
+        $visibleForeign = [];
+        foreach ($foreignUids as $table => $uids) {
+            $visibleForeign[$table] = $this->visibleRecords($table, array_keys($uids));
+        }
+        $pages = $this->pageVisibility();
+
         $map = [];
         foreach ($rows as $row) {
+            $table = (string)$row['tablenames'];
+            if ($visibleForeign[$table] !== null && !isset($visibleForeign[$table][(int)$row['uid_foreign']])) {
+                continue;
+            }
+            if (!$this->pageIsVisible((int)$row['pid'], $pages)) {
+                continue;
+            }
             try {
                 $site = $this->siteFinder->getSiteByPageId((int)$row['pid']);
             } catch (\Throwable) {
@@ -719,6 +748,87 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             $map[$site->getIdentifier()][(int)$row['uid_local']] = true;
         }
         return $map;
+    }
+
+    /**
+     * The given uids of $table that pass the default restrictions (not
+     * deleted, not hidden, within start/end time), or null when the table
+     * is unknown to TCA — then the reference counts as before.
+     *
+     * @param list<int> $uids
+     * @return array<int,bool>|null
+     */
+    private function visibleRecords(string $table, array $uids): ?array
+    {
+        if ($table === '' || !isset($GLOBALS['TCA'][$table])) {
+            return null;
+        }
+        $visible = [];
+        foreach (array_chunk($uids, 1000) as $chunk) {
+            $qb = $this->connectionPool->getQueryBuilderForTable($table);
+            $result = $qb->select('uid')
+                ->from($table)
+                ->where($qb->expr()->in('uid', $qb->createNamedParameter($chunk, Connection::PARAM_INT_ARRAY)))
+                ->executeQuery();
+            while (($uid = $result->fetchOne()) !== false) {
+                $visible[(int)$uid] = true;
+            }
+        }
+        return $visible;
+    }
+
+    /**
+     * Every page row with what decides its visibility, keyed by uid.
+     * Deleted pages are left out by the default restriction, so they read
+     * as missing — which is invisible as well.
+     *
+     * @return array<int,array{pid:int,hidden:bool,extendToSubpages:bool}>
+     */
+    private function pageVisibility(): array
+    {
+        $qb = $this->connectionPool->getQueryBuilderForTable('pages');
+        $qb->getRestrictions()->removeAll()
+            ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+        $result = $qb->select('uid', 'pid', 'hidden', 'extendToSubpages')
+            ->from('pages')
+            ->where($qb->expr()->eq('sys_language_uid', 0))
+            ->executeQuery();
+        $pages = [];
+        while ($row = $result->fetchAssociative()) {
+            $pages[(int)$row['uid']] = [
+                'pid' => (int)$row['pid'],
+                'hidden' => (bool)$row['hidden'],
+                'extendToSubpages' => (bool)$row['extendToSubpages'],
+            ];
+        }
+        return $pages;
+    }
+
+    /**
+     * A page is out of reach when it is hidden or deleted itself, or when a
+     * page above it is hidden with "extend to subpages". A hidden page
+     * without that flag hides only itself, as in the frontend.
+     *
+     * @param array<int,array{pid:int,hidden:bool,extendToSubpages:bool}> $pages
+     */
+    private function pageIsVisible(int $uid, array $pages): bool
+    {
+        if (!isset($pages[$uid]) || $pages[$uid]['hidden']) {
+            return false;
+        }
+        $seen = [];
+        $parent = $pages[$uid]['pid'];
+        while ($parent > 0 && !isset($seen[$parent])) {
+            $seen[$parent] = true;
+            if (!isset($pages[$parent])) {
+                return false;
+            }
+            if ($pages[$parent]['hidden'] && $pages[$parent]['extendToSubpages']) {
+                return false;
+            }
+            $parent = $pages[$parent]['pid'];
+        }
+        return true;
     }
 
     /**
@@ -863,7 +973,39 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
             );
         }
 
+        $referenced = $this->referencedFileUids($site);
+        if ($referenced !== null && $referenced !== []) {
+            $filters['deduplicateFiles'] = $this->notReferencedFilter('file', $referenced);
+        }
+
         return $filters;
+    }
+
+    /**
+     * The files a visitor can reach on this site (see buildFilesPerSiteMap()),
+     * or null when meilisearch.deduplicateFiles is off and every file
+     * counts. Other file-based providers use it to drop what is no longer
+     * referenced.
+     *
+     * @return list<int>|null
+     */
+    public function referencedFileUids(Site $site): ?array
+    {
+        return $this->shouldDeduplicate($site) ? array_keys($this->filesForSite($site)) : null;
+    }
+
+    /**
+     * Filter for the documents of $type whose file is no longer referenced
+     * on a visible page — e.g. it was only ever used on a hidden one. An
+     * empty list is never turned into a filter by the callers: "no file is
+     * referenced" more likely means a failed lookup than an empty site, and
+     * the filter would wipe every file document.
+     *
+     * @param list<int> $uids
+     */
+    public function notReferencedFilter(string $type, array $uids): string
+    {
+        return sprintf('type = %s AND uid NOT IN [%s]', $this->quoteFilterValue($type), implode(', ', array_map('intval', $uids)));
     }
 
     private function quoteFilterValue(string $value): string

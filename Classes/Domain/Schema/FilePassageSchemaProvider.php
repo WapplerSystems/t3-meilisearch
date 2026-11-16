@@ -119,30 +119,48 @@ final class FilePassageSchemaProvider implements SchemaProviderInterface, PreRei
     }
 
     /**
-     * Passages of a site that switched them off, and of extensions no longer
-     * listed, would otherwise stay in the index for good: a reindex only
-     * reaches what it still yields.
+     * Passages of a site that switched them off, of extensions no longer
+     * listed and of files no longer referenced on a visible page would
+     * otherwise stay in the index for good: a reindex only reaches what it
+     * still yields.
      */
     public function cleanupBeforeReindex(Site $site, Client $client, string $indexName): int
     {
-        $filter = $this->enabled($site)
-            ? sprintf(
+        $filters = [];
+        if ($this->enabled($site)) {
+            $filters[] = sprintf(
                 'type = "%s" AND extension NOT IN [%s]',
                 self::TYPE,
                 implode(', ', array_map(static fn (string $e): string => '"' . addcslashes($e, '"\\') . '"', $this->extensions($site))),
-            )
-            : sprintf('type = "%s"', self::TYPE);
+            );
+            // Files no longer referenced on a visible page (deduplicateFiles),
+            // the same rule FileSchemaProvider applies to its documents.
+            $referenced = $this->files->referencedFileUids($site);
+            if ($referenced !== null && $referenced !== []) {
+                $filters[] = $this->files->notReferencedFilter(self::TYPE, $referenced);
+            }
+        } else {
+            $filters[] = sprintf('type = "%s"', self::TYPE);
+        }
         try {
             if ((int)($client->index($indexName)->stats()['numberOfDocuments'] ?? 0) === 0) {
                 return 0;
             }
-            $task = $client->index($indexName)->deleteDocuments(['filter' => $filter]);
-            $result = $client->waitForTask($task['taskUid'] ?? null, timeoutInMs: 30000);
-            return (int)($result['details']['deletedDocuments'] ?? 0);
         } catch (\Throwable $e) {
             $this->logger?->warning('FilePassageSchemaProvider pre-reindex cleanup failed: {message}', ['message' => $e->getMessage()]);
             return 0;
         }
+        $deleted = 0;
+        foreach ($filters as $filter) {
+            try {
+                $task = $client->index($indexName)->deleteDocuments(['filter' => $filter]);
+                $result = $client->waitForTask($task['taskUid'] ?? null, timeoutInMs: 30000);
+                $deleted += (int)($result['details']['deletedDocuments'] ?? 0);
+            } catch (\Throwable $e) {
+                $this->logger?->warning('FilePassageSchemaProvider pre-reindex cleanup failed: {message}', ['message' => $e->getMessage()]);
+            }
+        }
+        return $deleted;
     }
 
     /**
