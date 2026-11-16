@@ -45,6 +45,13 @@ use WapplerSystems\Meilisearch\Service\Rag\Statistics\UsageCounter;
  */
 final class RagService implements LoggerAwareInterface
 {
+    /** Words of a reaction to the previous answer, no subject of their own (withOwnWording()). */
+    private const REACTION_WORDS = [
+        'verstehe', 'versteh', 'nicht', 'bitte', 'genauer', 'einfacher', 'ausführlicher', 'kürzer', 'erklären',
+        'erkläre', 'nochmal', 'danke', 'vielen', 'meinst', 'beispiel', 'understand', 'please', 'explain', 'simpler',
+        'again', 'thanks', 'example',
+    ];
+
     /**
      * How many extra hits to fetch when identical documents are collapsed.
      * Four is the size of the largest reuse group observed in a production
@@ -912,6 +919,12 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return $previous;
         }
+        $fixed = $this->fixedAnswer($site, $event->question, $options)
+            ?? ($this->repeatedQuestionAnswer($site, $event->question, $conversation, $options)[0] ?? null);
+        if ($fixed !== null) {
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $fixed, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+            return $fixed;
+        }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         $this->lastModel = (string)($llmOptions['model'] ?? '');
@@ -933,7 +946,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options),
+                $this->withOwnWording($site, $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options), $conversation, $event->question, $retrievalQuestion),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -1151,6 +1164,32 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return;
         }
+        if (($fixed = $this->fixedAnswer($site, $event->question, $options)) !== null) {
+            yield RagStreamChunk::token($fixed->answer);
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', [], $fixed->topic)) {
+                yield $chunk;
+            }
+            yield RagStreamChunk::done($fixed->answer, [], [], false, $fixed->topic);
+            yield RagStreamChunk::end();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $fixed, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+            return;
+        }
+        if (($repeated = $this->repeatedQuestionAnswer($site, $event->question, $conversation, $options)) !== null) {
+            [$repeatedAnswer, $buttons] = $repeated;
+            yield RagStreamChunk::token($repeatedAnswer->answer);
+            // The support card, whatever the escalation rule says for an
+            // answer: it is one of the three ways on LINEAR asked for.
+            if ($chunk = $this->fallbackChunk($site, $options, $question, 'repeated', [])) {
+                yield $chunk;
+            }
+            yield RagStreamChunk::done($repeatedAnswer->answer, []);
+            if ($buttons !== []) {
+                yield RagStreamChunk::suggestions($buttons);
+            }
+            yield RagStreamChunk::end();
+            $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $repeatedAnswer, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
+            return;
+        }
 
         $llmOptions = $this->buildLlmOptions($settings, $this->llmOverridesFrom($options));
         $this->lastModel = (string)($llmOptions['model'] ?? '');
@@ -1174,7 +1213,7 @@ final class RagService implements LoggerAwareInterface
             $site,
             $this->withoutFilteredTerms($event->options, $retrievalQuestion),
             $this->withVectorQuery(
-                $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options),
+                $this->withOwnWording($site, $this->withDocumentationQueries($site, $provider, self::withoutStripOption($event->options), $conversation->isEmpty() ? $event->question : $retrievalQuestion, $helperLlmOptions, $options), $conversation, $event->question, $retrievalQuestion),
                 $this->withoutFilteredTerms($event->options, $this->vectorQuestion($conversation, $event->question, $retrievalQuestion)),
             ),
             $maxHits,
@@ -1848,6 +1887,60 @@ final class RagService implements LoggerAwareInterface
         $this->mark('titles');
 
         return $searchOptions;
+    }
+
+    /**
+     * A follow-up's own wording as one more query next to the rewritten one
+     * (meilisearch.rag.followUpOwnWording).
+     *
+     * The rewrite completes a follow-up with the subject of the conversation,
+     * and for a short question that names a subject of its own that is too
+     * much: "Was ist der Breitenfaktor" after a question on the symbol legend
+     * became a search for the width factor of the legend, found legend pages
+     * only and missed the pages on text styles, where the width factor is
+     * (Gregor 16.11.2026). Searched as typed as well, the term's own pages
+     * join the context by rank fusion; the rewritten query still decides the
+     * first hit.
+     *
+     * @param array<string,mixed> $searchOptions
+     * @return array<string,mixed>
+     */
+    private function withOwnWording(Site $site, array $searchOptions, Conversation $conversation, string $question, string $retrievalQuestion): array
+    {
+        if ($conversation->isEmpty() || !(bool)$site->getSettings()->get('meilisearch.rag.followUpOwnWording', false)
+            || self::sameWording($question) === self::sameWording($retrievalQuestion) || !self::namesOwnTerm($question, $conversation)) {
+            return $searchOptions;
+        }
+        $queries = array_values(array_filter(array_map('strval', (array)($searchOptions['documentationQueries'] ?? []))));
+        $queries[] = $this->withoutFilteredTerms($searchOptions, $question);
+        $searchOptions['documentationQueries'] = $queries;
+
+        return $searchOptions;
+    }
+
+    /**
+     * Whether a follow-up brings a word of its own: five letters or more, not
+     * in the previous question and no word of a reaction ("verstehe ich
+     * nicht", "bitte genauer"). Those only refer back; searched as typed they
+     * would add pages about nothing to the context.
+     */
+    private static function namesOwnTerm(string $question, Conversation $conversation): bool
+    {
+        $previous = '';
+        foreach (array_reverse($conversation->turns) as $turn) {
+            if ($turn instanceof Turn) {
+                $previous = mb_strtolower($turn->question);
+                break;
+            }
+        }
+        preg_match_all('/\p{L}[\p{L}\p{N}-]{4,}/u', mb_strtolower($question), $words);
+        foreach ($words[0] as $word) {
+            if (!in_array($word, self::REACTION_WORDS, true) && !str_contains($previous, $word)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -2754,6 +2847,109 @@ final class RagService implements LoggerAwareInterface
      * Whole words, so "mac" finds "Mac?" but not "machen"; a trailing "*"
      * makes a prefix ("modul*" finds "Modul", "Module", "Modulen").
      */
+    /**
+     * A fixed reply for questions that match a pattern, without retrieval and
+     * without the model (meilisearch.rag.fixedAnswers, entries
+     * "<reply key>|<topic>|<regex body>", case-insensitive).
+     *
+     * For questions the knowledge base will never answer and that still have
+     * one right reply. "Hat LINEAR eine öffentliche Schnittstelle für
+     * Entwickler?" came four times in three days and got "nichts gefunden"
+     * each time; LINEAR wants a fixed sentence pointing to its consultants
+     * (Gregor 16.11.2026). The topic picks the card under the reply, as a
+     * [topic:…] tag of the model would.
+     *
+     * @param array<string,mixed> $options
+     */
+    private function fixedAnswer(Site $site, string $question, array $options): ?RagAnswer
+    {
+        foreach ((array)$site->getSettings()->get('meilisearch.rag.fixedAnswers', []) as $entry) {
+            $parts = explode('|', (string)$entry, 3);
+            if (count($parts) !== 3 || trim($parts[0]) === '' || trim($parts[2]) === '') {
+                continue;
+            }
+            $matches = @preg_match('/' . str_replace('/', '\\/', trim($parts[2])) . '/iu', $question);
+            if ($matches !== 1) {
+                continue;
+            }
+
+            return new RagAnswer(
+                answer: $this->expandFixedReplies($site, '[reply:' . trim($parts[0]) . ':' . $this->languageCode($site, $options) . ']'),
+                sources: [],
+                citedIds: [],
+                status: 'ok',
+                topic: $this->knownTopic($site, trim($parts[1])),
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * The reply to a question asked again word for word in the same
+     * conversation: a pointer to the answer above instead of a second, nearly
+     * identical one (meilisearch.rag.repeatedQuestion.enabled).
+     *
+     * Asked twice ("Details zu LINEAR Anschluss-Definitionen editieren"),
+     * LINA answered twice in almost the same words (Gregor 16.11.2026). The
+     * visitor who asks again did not find what they were looking for in the
+     * first answer; the same text once more does not help them. Instead:
+     * "the answer is above, what is missing?" and three ways on — the main
+     * source of that answer, a more detailed explanation, the support. Only
+     * the same wording counts (case, spaces and closing punctuation aside); a
+     * similar question is a new question.
+     *
+     * @param array<string,mixed> $options
+     * @return array{0:RagAnswer,1:list<array{type:string,label:string,value:string}>}|null
+     */
+    private function repeatedQuestionAnswer(Site $site, string $question, Conversation $conversation, array $options): ?array
+    {
+        if (!(bool)$site->getSettings()->get('meilisearch.rag.repeatedQuestion.enabled', false)) {
+            return null;
+        }
+        $previous = null;
+        foreach (array_reverse($conversation->turns) as $turn) {
+            if ($turn instanceof Turn && !$turn->isClarification()) {
+                $previous = $turn;
+                break;
+            }
+        }
+        if ($previous === null || self::sameWording($previous->question) !== self::sameWording($question)) {
+            return null;
+        }
+        $language = $this->languageCode($site, $options);
+        $buttons = [];
+        foreach ($previous->citations as $citation) {
+            $uri = trim((string)($citation['uri'] ?? ''));
+            if ((string)($citation['type'] ?? '') !== 'knowledge_resource' && $uri !== '') {
+                $buttons[] = ['type' => 'recommend', 'label' => $this->expandFixedReplies($site, '[reply:repeated-open:' . $language . ']'), 'value' => $uri];
+                break;
+            }
+        }
+        $buttons[] = [
+            'type' => 'followup',
+            'label' => $this->expandFixedReplies($site, '[reply:repeated-detail:' . $language . ']'),
+            'value' => $this->expandFixedReplies($site, '[reply:repeated-detail-question:' . $language . ']'),
+        ];
+        $buttons = array_values(array_filter($buttons, static fn (array $b): bool => $b['label'] !== '' && $b['value'] !== ''));
+
+        return [
+            new RagAnswer(
+                answer: $this->expandFixedReplies($site, '[reply:repeated-question:' . $language . ']'),
+                sources: [],
+                citedIds: [],
+                status: 'ok',
+                suggestions: $buttons,
+            ),
+            $buttons,
+        ];
+    }
+
+    private static function sameWording(string $question): string
+    {
+        return trim((string)preg_replace(['/\s+/u', '/[\s?!.…]+$/u'], [' ', ''], mb_strtolower(trim($question))));
+    }
+
     /**
      * The answer to "Woher weißt du das?": the sources the previous answer
      * cited, without a new search. Null when the question is no such request

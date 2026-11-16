@@ -124,8 +124,7 @@
             e.preventDefault();
             const q = readQuestion();
             if (q === '') return;
-            if (currentStream) currentStream.close();
-            ask(q);
+            askAgain(q);
         });
 
         // followup / refine suggestions re-ask through the stream; recommend
@@ -137,8 +136,7 @@
             e.preventDefault();
             const value = btn.getAttribute('data-suggestion-value') || '';
             if (value === '') return;
-            if (currentStream) currentStream.close();
-            ask(value);
+            askAgain(value);
         });
 
         // Reset link: when the chat is embedded inline (no iframe) a normal
@@ -170,8 +168,7 @@
         root.addEventListener('wsms:rag-ask', function (e) {
             const q = e.detail && e.detail.question ? String(e.detail.question).trim() : '';
             if (q === '') return;
-            if (currentStream) currentStream.close();
-            ask(q);
+            askAgain(q);
         });
 
         // "Was this helpful?" row under a finished answer. Needs the key from
@@ -349,6 +346,21 @@
             // finishes one — answered, clarified, failed, dropped — comes
             // through here. Rendering it anywhere else would miss a path.
             renderFallback(turn);
+        }
+
+        // The same question again within a few seconds is a double click or a
+        // second Enter, not a new question: it would close the stream of the
+        // first one and answer twice (LINEAR 16.11.2026, two requests 4 s
+        // apart). Asked again later, it goes to the server, which answers a
+        // word-for-word repeat itself.
+        let lastAsked = { q: '', at: 0 };
+        function askAgain(q) {
+            const key = q.trim().toLowerCase();
+            const now = Date.now();
+            if (key === lastAsked.q && now - lastAsked.at < 8000) return;
+            lastAsked = { q: key, at: now };
+            if (currentStream) currentStream.close();
+            ask(q);
         }
 
         function ask(q) {

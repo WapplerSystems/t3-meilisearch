@@ -1145,6 +1145,24 @@ settings:
     type: int
     default: 80
 
+  meilisearch.rag.fixedAnswers:
+    label: 'RAG: fixed replies for questions of a kind'
+    description: 'Entries "<reply key>|<topic>|<pattern>", the pattern a case-insensitive regular expression without delimiters. A question that matches gets the fixed reply "<reply key>" of meilisearch.rag.fixedReplies in the page language, without a search and without the model; the topic (e.g. "sales", may be empty) picks the card under the reply. For questions the knowledge base never answers and that still have one right reply.'
+    type: stringlist
+    default: []
+
+  meilisearch.rag.repeatedQuestion.enabled:
+    label: 'RAG: point to the answer above when a question is asked again word for word'
+    description: 'The same question again in the same conversation (case, spaces and closing punctuation aside) gets the fixed reply "repeated-question" instead of a second answer, with the buttons "repeated-open" (main source of the answer above), "repeated-detail" (asks "repeated-detail-question") and the support card. Texts in meilisearch.rag.fixedReplies.'
+    type: bool
+    default: false
+
+  meilisearch.rag.followUpOwnWording:
+    label: 'RAG: search a follow-up as typed as well'
+    description: 'A follow-up that brings a word of its own (five letters or more, not in the previous question) is searched as typed next to its rewritten form, merged by rank fusion. Without it, "Was ist der Breitenfaktor" after a question on the legend finds legend pages only.'
+    type: bool
+    default: false
+
   meilisearch.rag.factSheet:
     label: 'RAG: fact sheet'
     description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'
