@@ -1898,9 +1898,10 @@ final class RagService implements LoggerAwareInterface
      * much: "Was ist der Breitenfaktor" after a question on the symbol legend
      * became a search for the width factor of the legend, found legend pages
      * only and missed the pages on text styles, where the width factor is
-     * (Gregor 16.11.2026). Searched as typed as well, the term's own pages
-     * join the context by rank fusion; the rewritten query still decides the
-     * first hit.
+     * (Gregor 16.11.2026). Searched as typed as well, its best hit gets the
+     * second place in the fused list (see fuse()): by rank fusion alone the
+     * legend pages, found by every other query, kept it out. The rewritten
+     * query still decides the first hit.
      *
      * @param array<string,mixed> $searchOptions
      * @return array<string,mixed>
@@ -1911,9 +1912,7 @@ final class RagService implements LoggerAwareInterface
             || self::sameWording($question) === self::sameWording($retrievalQuestion) || !self::namesOwnTerm($question, $conversation)) {
             return $searchOptions;
         }
-        $queries = array_values(array_filter(array_map('strval', (array)($searchOptions['documentationQueries'] ?? []))));
-        $queries[] = $this->withoutFilteredTerms($searchOptions, $question);
-        $searchOptions['documentationQueries'] = $queries;
+        $searchOptions['ownWordingQuery'] = $this->withoutFilteredTerms($searchOptions, $question);
 
         return $searchOptions;
     }
@@ -1965,12 +1964,21 @@ final class RagService implements LoggerAwareInterface
         return self::fuse(array_map(
             static fn (SearchResult $result): array => array_map(static fn ($hit): array => (array)$hit, $result->hits),
             $results,
-        ));
+        ), self::hasOwnWording($searchOptions) && count($results) === count($requests));
+    }
+
+    /**
+     * @param array<string,mixed> $searchOptions
+     */
+    private static function hasOwnWording(array $searchOptions): bool
+    {
+        return trim((string)($searchOptions['ownWordingQuery'] ?? '')) !== '';
     }
 
     /**
      * The searches fusedSearch() merges: the question, then one per
-     * documentation query (its title as the vector query, out of analytics).
+     * documentation query (its title as the vector query, out of analytics),
+     * last the follow-up as typed (withOwnWording()).
      *
      * @param array<string,mixed> $searchOptions
      * @return list<array{0:string,1:array<string,mixed>}>
@@ -1978,13 +1986,20 @@ final class RagService implements LoggerAwareInterface
     private static function fusedRequests(string $query, array $searchOptions): array
     {
         $queries = array_values(array_filter(array_map('strval', (array)($searchOptions['documentationQueries'] ?? []))));
-        unset($searchOptions['documentationQueries']);
+        $ownWording = trim((string)($searchOptions['ownWordingQuery'] ?? ''));
+        unset($searchOptions['documentationQueries'], $searchOptions['ownWordingQuery']);
         $requests = [[$query, $searchOptions]];
         foreach ($queries as $alternative) {
             $alternativeOptions = $searchOptions;
             $alternativeOptions['vectorQuery'] = $alternative;
             $alternativeOptions['__skipAnalytics'] = true;
             $requests[] = [$alternative, $alternativeOptions];
+        }
+        if ($ownWording !== '') {
+            $ownOptions = $searchOptions;
+            $ownOptions['vectorQuery'] = $ownWording;
+            $ownOptions['__skipAnalytics'] = true;
+            $requests[] = [$ownWording, $ownOptions];
         }
 
         return $requests;
@@ -2003,7 +2018,7 @@ final class RagService implements LoggerAwareInterface
      * @param list<list<array<string,mixed>>> $lists
      * @return list<array<string,mixed>>
      */
-    private static function fuse(array $lists): array
+    private static function fuse(array $lists, bool $pinLast = false): array
     {
         if (count($lists) <= 1) {
             return $lists[0] ?? [];
@@ -2025,6 +2040,12 @@ final class RagService implements LoggerAwareInterface
         $top = (string)(array_values($lists[0])[0]['id'] ?? '');
         if ($top !== '' && ($order[0] ?? '') !== $top) {
             $order = array_merge([$top], array_values(array_diff($order, [$top])));
+        }
+        // The follow-up as typed (withOwnWording()): its best hit second.
+        $ownTop = $pinLast ? (string)(array_values(end($lists) ?: [])[0]['id'] ?? '') : '';
+        if ($ownTop !== '' && $ownTop !== ($order[0] ?? '')) {
+            $rest = array_values(array_diff($order, [$ownTop]));
+            $order = array_merge(array_slice($rest, 0, 1), [$ownTop], array_slice($rest, 1));
         }
 
         return array_values(array_map(static fn (string $id): array => $byId[$id], $order));
@@ -2090,7 +2111,7 @@ final class RagService implements LoggerAwareInterface
                 }
             }
             $perLane[] = array_values(array_slice(
-                $this->limitPerParent($site, $this->collapseContext(self::fuse($lists), $askedAs, $collapseIdentical, $collapseByTitle)),
+                $this->limitPerParent($site, $this->collapseContext(self::fuse($lists, self::hasOwnWording($searchOptions) && count($lists) === count($positions)), $askedAs, $collapseIdentical, $collapseByTitle)),
                 0,
                 $lanes[$laneNo][1],
             ));
