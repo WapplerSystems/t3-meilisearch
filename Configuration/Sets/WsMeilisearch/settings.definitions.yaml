@@ -391,7 +391,7 @@ settings:
 
   meilisearch.deduplicateFiles:
     label: 'Dedupe FAL files by site'
-    description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site). Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'
+    description: 'When enabled, FAL files are only indexed into a site if they are actually referenced from a page belonging to that site (via sys_file_reference → page → site), and only by a record a visitor can reach: references from hidden or deleted pages and content elements do not count, nor pages below a page hidden with "extend to subpages". Disabled by default so every site indexes every non-missing file — backward compatible with the original FAL-indexing rollout. Enable for production sites that share a Meilisearch server but want strict per-site search results.'
     type: bool
     default: false
 
