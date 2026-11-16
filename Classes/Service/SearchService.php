@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service;
 
+use Meilisearch\Contracts\DocumentsQuery;
 use Meilisearch\Contracts\HybridSearchOptions;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
@@ -46,6 +47,42 @@ final class SearchService implements LoggerAwareInterface
         private readonly QueryRecoveryService $queryRecovery,
         private readonly QueryVectorProvider $queryVectors,
     ) {}
+
+    /**
+     * The documents with these ids, in the order asked, without vectors.
+     * Ids the index does not hold are left out; a failing lookup returns none.
+     *
+     * @param list<string> $ids
+     * @return list<array<string,mixed>>
+     */
+    public function documents(Site $site, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('strval', $ids))));
+        $client = $ids === [] ? null : $this->engineFactory->createClientForSite($site);
+        if ($client === null) {
+            return [];
+        }
+        $quote = static fn (string $value): string => '"' . str_replace(['"', '\\'], '', $value) . '"';
+        try {
+            $result = $client->index($this->engineFactory->getIndexName($site))->getDocuments(
+                (new DocumentsQuery())
+                    ->setFilter(['id IN [' . implode(', ', array_map($quote, $ids)) . ']'])
+                    ->setLimit(count($ids)),
+            );
+        } catch (\Throwable $e) {
+            $this->logger?->warning('Documents by id failed: {message}', ['message' => $e->getMessage()]);
+
+            return [];
+        }
+        $byId = [];
+        foreach ($result->getResults() as $document) {
+            $document = (array)$document;
+            unset($document['_vectors']);
+            $byId[(string)($document['id'] ?? '')] = $document;
+        }
+
+        return array_values(array_filter(array_map(static fn (string $id): ?array => $byId[$id] ?? null, $ids)));
+    }
 
     /**
      * @param array{

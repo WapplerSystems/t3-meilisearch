@@ -957,6 +957,7 @@ final class RagService implements LoggerAwareInterface
         // Before the empty check: with fixed facts the model still sees a
         // context and answers — an off-topic question finds nothing in the
         // index, and "no context" would hand it the contact card.
+        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options);
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
@@ -1221,6 +1222,7 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
             true,
         );
+        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options);
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
@@ -1888,6 +1890,51 @@ final class RagService implements LoggerAwareInterface
         $this->mark('titles');
 
         return $searchOptions;
+    }
+
+    /**
+     * In a follow-up, the documents the previous answer cited stay in the
+     * context (meilisearch.rag.followUpKeepCited: how many, 0 = off).
+     *
+     * "ich habe es bereits beantragt" after an answer on the e-learning access
+     * with a test licence was searched as "Testlizenz E-Learning beantragt"
+     * and found the activation pages, not the page the answer had cited — and
+     * the model, without the page it had just answered from, found nothing
+     * (Gregor 16.11.2026). A short follow-up is about that page. The kept
+     * documents come after the retrieved ones; when the context is full they
+     * take the last places. Fixed entries ("site-…") come back on their own.
+     *
+     * @param list<array<string,mixed>> $hits
+     * @param array<string,mixed> $options
+     * @return list<array<string,mixed>>
+     */
+    private function withPreviousCitations(Site $site, Conversation $conversation, array $hits, int $maxHits, array $options): array
+    {
+        $keep = (int)$site->getSettings()->get('meilisearch.rag.followUpKeepCited', 0);
+        $previous = null;
+        foreach (array_reverse($conversation->turns) as $turn) {
+            if ($turn instanceof Turn && !$turn->isClarification()) {
+                $previous = $turn;
+                break;
+            }
+        }
+        if ($keep <= 0 || $previous === null) {
+            return $hits;
+        }
+        $present = array_flip(array_map(static fn (array $hit): string => (string)($hit['id'] ?? ''), $hits));
+        $missing = array_slice(array_values(array_filter(
+            $previous->citedIds,
+            static fn (string $id): bool => !str_starts_with($id, 'site-') && !isset($present[$id]),
+        )), 0, $keep);
+        $kept = $this->labelCitations($site, $this->searchService->documents($site, $missing), $this->resolveLanguageId($options));
+        if ($kept === []) {
+            return $hits;
+        }
+        if ($maxHits > 0 && count($hits) + count($kept) > $maxHits) {
+            $hits = array_slice($hits, 0, max(0, $maxHits - count($kept)));
+        }
+
+        return array_merge($hits, $kept);
     }
 
     /**

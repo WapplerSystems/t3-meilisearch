@@ -1163,6 +1163,12 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.followUpKeepCited:
+    label: 'RAG: keep the cited documents in a follow-up'
+    description: 'How many documents the previous answer cited stay in the context of a follow-up, after the retrieved ones (0: off). A short follow-up ("ich habe es bereits beantragt") is about the page just cited, and its rewritten search often misses it.'
+    type: int
+    default: 0
+
   meilisearch.rag.factSheet:
     label: 'RAG: fact sheet'
     description: 'Longer facts the site maintains itself and no page states in one place — company data, product lines, which module is needed for what. Added like meilisearch.rag.fixedFacts as an invisible, citable entry (id "site-fact-sheet"), but in full, with its line structure, regardless of meilisearch.rag.maxContextChars. Use meilisearch.rag.factSheetTriggers to keep it out of how-to questions. Multi-line text: put it in a file and set "file:<path>" relative to config/sites/<site>/ — TYPO3 exports site settings as TypoScript constants, and line breaks in a value break the constants that follow.'
