@@ -49,7 +49,8 @@ final class RagService implements LoggerAwareInterface
     private const REACTION_WORDS = [
         'verstehe', 'versteh', 'nicht', 'bitte', 'genauer', 'einfacher', 'ausführlicher', 'kürzer', 'erklären',
         'erkläre', 'nochmal', 'danke', 'vielen', 'meinst', 'beispiel', 'understand', 'please', 'explain', 'simpler',
-        'again', 'thanks', 'example',
+        'again', 'thanks', 'example', 'sicher', 'glaube', 'stimmt', 'falsch', 'richtig', 'wirklich', 'korrekt',
+        'think', 'wrong', 'really', 'correct', 'right',
     ];
 
     /**
@@ -1920,7 +1921,7 @@ final class RagService implements LoggerAwareInterface
     /**
      * Whether a follow-up brings a word of its own: five letters or more, not
      * in the previous question and no word of a reaction ("verstehe ich
-     * nicht", "bitte genauer"). Those only refer back; searched as typed they
+     * nicht", "bitte genauer", "bist du sicher?"). Those only refer back; searched as typed they
      * would add pages about nothing to the context.
      */
     private static function namesOwnTerm(string $question, Conversation $conversation): bool
