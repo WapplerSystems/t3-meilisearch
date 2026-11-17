@@ -920,7 +920,7 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return $previous;
         }
-        $fixed = $this->fixedAnswer($site, $event->question, $options)
+        $fixed = $this->fixedAnswer($site, $event->question, $options, $conversation)
             ?? ($this->repeatedQuestionAnswer($site, $event->question, $conversation, $options)[0] ?? null);
         if ($fixed !== null) {
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $fixed, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
@@ -957,7 +957,7 @@ final class RagService implements LoggerAwareInterface
         // Before the empty check: with fixed facts the model still sees a
         // context and answers — an off-topic question finds nothing in the
         // index, and "no context" would hand it the contact card.
-        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options);
+        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options, $event->options);
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
@@ -1166,7 +1166,7 @@ final class RagService implements LoggerAwareInterface
             $this->eventDispatcher->dispatch(new AfterRagAnswerEvent($event->question, $previous, $site, $this->resolveLanguageId($options), $this->isInternal($options)));
             return;
         }
-        if (($fixed = $this->fixedAnswer($site, $event->question, $options)) !== null) {
+        if (($fixed = $this->fixedAnswer($site, $event->question, $options, $conversation)) !== null) {
             yield RagStreamChunk::token($fixed->answer);
             if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', [], $fixed->topic)) {
                 yield $chunk;
@@ -1222,7 +1222,7 @@ final class RagService implements LoggerAwareInterface
             $this->collapsesIdentical($settings),
             true,
         );
-        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options);
+        $hits = $this->withPreviousCitations($site, $conversation, $hits, $maxHits, $options, $event->options);
         $hits = $this->withContextEntries($site, $event->question, $this->withFixedFacts($site, $event->question, $hits), $options);
         $this->mark('retrieval');
         $questionTopic = $this->topicFromQuestion($site, $event->question);
@@ -1904,11 +1904,18 @@ final class RagService implements LoggerAwareInterface
      * documents come after the retrieved ones; when the context is full they
      * take the last places. Fixed entries ("site-…") come back on their own.
      *
+     * A kept document has to pass the raw filters of this retrieval: after
+     * "Ist mit ACAD gezeichnet." the retrieval was narrowed to AutoCAD, the
+     * Revit page of the answer before came back anyway, the model wrote its
+     * content as "In LINEAR Solutions für AutoCAD …" and the answer was
+     * withdrawn for citing across platforms (Gregor 17.11.2026).
+     *
      * @param list<array<string,mixed>> $hits
      * @param array<string,mixed> $options
+     * @param array<string,mixed> $searchOptions
      * @return list<array<string,mixed>>
      */
-    private function withPreviousCitations(Site $site, Conversation $conversation, array $hits, int $maxHits, array $options): array
+    private function withPreviousCitations(Site $site, Conversation $conversation, array $hits, int $maxHits, array $options, array $searchOptions = []): array
     {
         $keep = (int)$site->getSettings()->get('meilisearch.rag.followUpKeepCited', 0);
         $previous = null;
@@ -1926,7 +1933,11 @@ final class RagService implements LoggerAwareInterface
             $previous->citedIds,
             static fn (string $id): bool => !str_starts_with($id, 'site-') && !isset($present[$id]),
         )), 0, $keep);
-        $kept = $this->labelCitations($site, $this->searchService->documents($site, $missing), $this->resolveLanguageId($options));
+        $filters = array_values(array_filter(
+            array_map('strval', (array)($searchOptions['filters']['__rawFilters'] ?? [])),
+            static fn (string $expression): bool => trim($expression) !== '',
+        ));
+        $kept = $this->labelCitations($site, $this->searchService->documents($site, $missing, $filters), $this->resolveLanguageId($options));
         if ($kept === []) {
             return $hits;
         }
@@ -2928,16 +2939,39 @@ final class RagService implements LoggerAwareInterface
      * (Gregor 16.11.2026). The topic picks the card under the reply, as a
      * [topic:…] tag of the model would.
      *
+     * meilisearch.rag.fixedFollowUpAnswers, same format, are for follow-ups
+     * that only the turn before explains: "ich habe es bereits beantragt"
+     * after an answer on the e-learning access got a price sentence (Gregor
+     * 17.11.2026). Their pattern is matched against the previous question and
+     * answer, a line "---" and the question; they are tried first.
+     *
      * @param array<string,mixed> $options
      */
-    private function fixedAnswer(Site $site, string $question, array $options): ?RagAnswer
+    private function fixedAnswer(Site $site, string $question, array $options, ?Conversation $conversation = null): ?RagAnswer
     {
+        $previous = null;
+        foreach (array_reverse($conversation?->turns ?? []) as $turn) {
+            if ($turn instanceof Turn && !$turn->isClarification()) {
+                $previous = $turn;
+                break;
+            }
+        }
+        $candidates = [];
+        if ($previous !== null) {
+            $followUp = $previous->question . "\n" . $previous->answer . "\n---\n" . $question;
+            foreach ((array)$site->getSettings()->get('meilisearch.rag.fixedFollowUpAnswers', []) as $entry) {
+                $candidates[] = [(string)$entry, $followUp];
+            }
+        }
         foreach ((array)$site->getSettings()->get('meilisearch.rag.fixedAnswers', []) as $entry) {
-            $parts = explode('|', (string)$entry, 3);
+            $candidates[] = [(string)$entry, $question];
+        }
+        foreach ($candidates as [$entry, $text]) {
+            $parts = explode('|', $entry, 3);
             if (count($parts) !== 3 || trim($parts[0]) === '' || trim($parts[2]) === '') {
                 continue;
             }
-            $matches = @preg_match('/' . str_replace('/', '\\/', trim($parts[2])) . '/iu', $question);
+            $matches = @preg_match('/' . str_replace('/', '\\/', trim($parts[2])) . '/iu', $text);
             if ($matches !== 1) {
                 continue;
             }

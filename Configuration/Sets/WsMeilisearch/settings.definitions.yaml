@@ -1151,6 +1151,12 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.rag.fixedFollowUpAnswers:
+    label: 'RAG: fixed replies for follow-ups the previous turn explains'
+    description: 'Same format as meilisearch.rag.fixedAnswers, but the pattern is matched against the previous question and answer, a line "---" and the new question (use (?s) to match across lines). Tried before meilisearch.rag.fixedAnswers, only in a conversation with an answer before. For follow-ups like "ich habe es bereits beantragt" whose subject only the turn before names.'
+    type: stringlist
+    default: []
+
   meilisearch.rag.repeatedQuestion.enabled:
     label: 'RAG: point to the answer above when a question is asked again word for word'
     description: 'The same question again in the same conversation (case, spaces and closing punctuation aside) gets the fixed reply "repeated-question" instead of a second answer, with the buttons "repeated-open" (main source of the answer above), "repeated-detail" (asks "repeated-detail-question") and the support card. Texts in meilisearch.rag.fixedReplies.'

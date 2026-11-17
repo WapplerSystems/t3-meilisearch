@@ -51,11 +51,14 @@ final class SearchService implements LoggerAwareInterface
     /**
      * The documents with these ids, in the order asked, without vectors.
      * Ids the index does not hold are left out; a failing lookup returns none.
+     * $filters are further filter expressions a document has to match (the
+     * raw filters of a search, e.g. a product the conversation narrowed to).
      *
      * @param list<string> $ids
+     * @param list<string> $filters
      * @return list<array<string,mixed>>
      */
-    public function documents(Site $site, array $ids): array
+    public function documents(Site $site, array $ids, array $filters = []): array
     {
         $ids = array_values(array_unique(array_filter(array_map('strval', $ids))));
         $client = $ids === [] ? null : $this->engineFactory->createClientForSite($site);
@@ -66,7 +69,7 @@ final class SearchService implements LoggerAwareInterface
         try {
             $result = $client->index($this->engineFactory->getIndexName($site))->getDocuments(
                 (new DocumentsQuery())
-                    ->setFilter(['id IN [' . implode(', ', array_map($quote, $ids)) . ']'])
+                    ->setFilter(['id IN [' . implode(', ', array_map($quote, $ids)) . ']', ...$filters])
                     ->setLimit(count($ids)),
             );
         } catch (\Throwable $e) {
