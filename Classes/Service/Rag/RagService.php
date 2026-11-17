@@ -142,6 +142,9 @@ final class RagService implements LoggerAwareInterface
     /** Why the answer guard withdrew the last answer of ask() and what it said, for test runs (ws_meilisearch:ask --json). */
     private ?string $lastWithdrawal = null;
 
+    /** Reason and replaced answer of the last answer a guard listener turned into a question back (CLI runs). */
+    private ?string $lastAskedInstead = null;
+
     /**
      * Milliseconds since the start of the last ask()/askStreaming() at the end
      * of each phase, in order: rewrite, titles, retrieval, firstToken (stream),
@@ -883,6 +886,7 @@ final class RagService implements LoggerAwareInterface
     public function ask(Site $site, string $question, array $options = []): RagAnswer
     {
         $this->lastWithdrawal = null;
+        $this->lastAskedInstead = null;
         $this->startTimings();
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
@@ -1114,6 +1118,7 @@ final class RagService implements LoggerAwareInterface
     public function askStreaming(Site $site, string $question, array $options = []): iterable
     {
         $this->lastWithdrawal = null;
+        $this->lastAskedInstead = null;
         $this->startTimings();
         $question = trim($question);
         $options = $this->withKnowledgeLanguage($site, $this->withQuestionLanguage($site, $question, $options));
@@ -2539,6 +2544,15 @@ final class RagService implements LoggerAwareInterface
         return $this->lastWithdrawal;
     }
 
+    /**
+     * Why the last answer was replaced by a question back, and the answer it
+     * replaced — the regression catalogue tells the rules apart by it.
+     */
+    public function lastAskedInstead(): ?string
+    {
+        return $this->lastAskedInstead;
+    }
+
     public function lastModel(): string
     {
         return $this->lastModel;
@@ -2601,6 +2615,7 @@ final class RagService implements LoggerAwareInterface
             );
             $this->eventDispatcher->dispatch($event);
             if (($clarification = $event->getClarification()) !== null) {
+                $this->lastAskedInstead = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
                 $this->logger?->info('RAG answer replaced by a question back ({reason}): {question}', [
                     'reason' => $event->getReason(),
                     'question' => mb_substr($question, 0, 200),
