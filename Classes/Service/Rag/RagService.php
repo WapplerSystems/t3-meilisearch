@@ -142,6 +142,9 @@ final class RagService implements LoggerAwareInterface
     /** Why the answer guard withdrew the last answer of ask() and what it said, for test runs (ws_meilisearch:ask --json). */
     private ?string $lastWithdrawal = null;
 
+    /** The last fixedAnswer() matched an entry with topic "-" (no contact card). */
+    private bool $fixedAnswerWithoutCard = false;
+
     /** Reason and replaced answer of the last answer a guard listener turned into a question back (CLI runs). */
     private ?string $lastAskedInstead = null;
 
@@ -1173,7 +1176,7 @@ final class RagService implements LoggerAwareInterface
         }
         if (($fixed = $this->fixedAnswer($site, $event->question, $options, $conversation)) !== null) {
             yield RagStreamChunk::token($fixed->answer);
-            if ($chunk = $this->fallbackChunk($site, $options, $question, 'ok', [], $fixed->topic)) {
+            if (!$this->fixedAnswerWithoutCard && $chunk = $this->fallbackChunk($site, $options, $question, 'ok', [], $fixed->topic)) {
                 yield $chunk;
             }
             yield RagStreamChunk::done($fixed->answer, [], [], false, $fixed->topic);
@@ -2958,6 +2961,8 @@ final class RagService implements LoggerAwareInterface
      * (Gregor 16.11.2026). The topic picks the card under the reply, as a
      * [topic:…] tag of the model would.
      *
+     * The topic "-" shows no contact card under the reply at all.
+     *
      * meilisearch.rag.fixedFollowUpAnswers, same format, are for follow-ups
      * that only the turn before explains: "ich habe es bereits beantragt"
      * after an answer on the e-learning access got a price sentence (Gregor
@@ -2968,6 +2973,7 @@ final class RagService implements LoggerAwareInterface
      */
     private function fixedAnswer(Site $site, string $question, array $options, ?Conversation $conversation = null): ?RagAnswer
     {
+        $this->fixedAnswerWithoutCard = false;
         $previous = null;
         foreach (array_reverse($conversation?->turns ?? []) as $turn) {
             if ($turn instanceof Turn && !$turn->isClarification()) {
@@ -2994,6 +3000,10 @@ final class RagService implements LoggerAwareInterface
             if ($matches !== 1) {
                 continue;
             }
+
+            // Topic "-": a pointer that needs no contact card under it
+            // ("Was ist neu in V26.2?" → the What's-New page, LINEAR 18.11.2026).
+            $this->fixedAnswerWithoutCard = trim($parts[1]) === '-';
 
             return new RagAnswer(
                 answer: $this->expandFixedReplies($site, '[reply:' . trim($parts[0]) . ':' . $this->languageCode($site, $options) . ']'),
