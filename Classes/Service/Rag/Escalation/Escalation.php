@@ -20,16 +20,24 @@ final class Escalation
         public readonly string $heading = '',
         public readonly string $text = '',
         public readonly array $actions = [],
+        /**
+         * The person the card is about — a consultant the answer named —
+         * shown with name, role and photo above the actions (LINEAR
+         * 18.11.2026). Empty name = no person.
+         *
+         * @var array{name:string,role:string,image:string}
+         */
+        public readonly array $person = ['name' => '', 'role' => '', 'image' => ''],
     ) {}
 
     public function withHeading(string $heading): self
     {
-        return new self($heading, $this->text, $this->actions);
+        return new self($heading, $this->text, $this->actions, $this->person);
     }
 
     public function withText(string $text): self
     {
-        return new self($this->heading, $text, $this->actions);
+        return new self($this->heading, $text, $this->actions, $this->person);
     }
 
     /**
@@ -37,7 +45,7 @@ final class Escalation
      */
     public function withActions(array $actions): self
     {
-        return new self($this->heading, $this->text, array_values($actions));
+        return new self($this->heading, $this->text, array_values($actions), $this->person);
     }
 
     public function withAddedAction(EscalationAction $action, bool $prepend = false): self
@@ -45,7 +53,15 @@ final class Escalation
         $actions = $this->actions;
         $prepend ? array_unshift($actions, $action) : $actions[] = $action;
 
-        return new self($this->heading, $this->text, $actions);
+        return new self($this->heading, $this->text, $actions, $this->person);
+    }
+
+    /**
+     * @param string $image absolute or root-relative URL of a photo, '' for none
+     */
+    public function withPerson(string $name, string $role = '', string $image = ''): self
+    {
+        return new self($this->heading, $this->text, $this->actions, ['name' => $name, 'role' => $role, 'image' => $image]);
     }
 
     /**
@@ -61,13 +77,14 @@ final class Escalation
      * Shape shared by the Fluid partial and the `fallback` stream frame, so
      * both render paths draw from exactly the same data.
      *
-     * @return array{heading:string,text:string,actions:list<array{type:string,label:string,href:string,value:string,newWindow:bool}>}
+     * @return array{heading:string,text:string,person:array{name:string,role:string,image:string},actions:list<array{type:string,label:string,href:string,value:string,newWindow:bool}>}
      */
     public function toArray(): array
     {
         return [
             'heading' => $this->heading,
             'text' => $this->text,
+            'person' => $this->person,
             'actions' => array_map(static fn(EscalationAction $a): array => $a->toArray(), $this->actions),
         ];
     }

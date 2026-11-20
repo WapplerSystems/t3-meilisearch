@@ -573,10 +573,19 @@
                 + '<a class="ws-meilisearch-rag-fallback__' + escapeAttr(type) + '" href="' + href + '">'
                 + escapeText((a.value || '').toString()) + '</a></li>';
         });
+        const person = card.person && card.person.name ? card.person : null;
+        const personHtml = person
+            ? '<div class="ws-meilisearch-rag-fallback__person d-flex align-items-center gap-3 mb-2">'
+                + (person.image ? '<img src="' + escapeAttr(person.image.toString()) + '" alt="' + escapeAttr(person.name.toString()) + '" width="64" height="64" loading="lazy" class="ws-meilisearch-rag-fallback__photo rounded-circle" style="object-fit: cover;">' : '')
+                + '<div><strong class="d-block">' + escapeText(person.name.toString()) + '</strong>'
+                + (person.role ? '<span class="small text-muted">' + escapeText(person.role.toString()) + '</span>' : '')
+                + '</div></div>'
+            : '';
         turn.fallbackEl.innerHTML =
             '<aside class="ws-meilisearch-rag-fallback alert alert-light border mt-3" role="complementary">'
             + (card.heading ? '<h3 class="h6 mb-2">' + escapeText(card.heading.toString()) + '</h3>' : '')
             + (card.text ? '<p class="small text-muted mb-2">' + escapeText(card.text.toString()) + '</p>' : '')
+            + personHtml
             + '<ul class="list-unstyled mb-0 d-flex flex-wrap gap-3">' + items.join('') + '</ul>'
             + '</aside>';
     }

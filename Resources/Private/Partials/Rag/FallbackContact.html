@@ -8,7 +8,8 @@
     `fallback` stream frame (renderFallback()) — change both together.
 
     Arguments:
-      - escalation  {heading, text, actions: [{type, label, href, value, newWindow}]}
+      - escalation  {heading, text, person: {name, role, image}, actions: [{type, label, href, value, newWindow}]}
+                    person.name empty = no person block.
                     type email|phone: "label: <a>value</a>"; type link: button.
                     hrefs are final, placeholders already substituted.
 </f:comment>
@@ -20,6 +21,18 @@
         </f:if>
         <f:if condition="{escalation.text}">
             <p class="small text-muted mb-2">{escalation.text}</p>
+        </f:if>
+
+        <f:if condition="{escalation.person.name}">
+            <div class="ws-meilisearch-rag-fallback__person d-flex align-items-center gap-3 mb-2">
+                <f:if condition="{escalation.person.image}">
+                    <img src="{escalation.person.image}" alt="{escalation.person.name}" width="64" height="64" loading="lazy" class="ws-meilisearch-rag-fallback__photo rounded-circle" style="object-fit: cover;" />
+                </f:if>
+                <div>
+                    <strong class="d-block">{escalation.person.name}</strong>
+                    <f:if condition="{escalation.person.role}"><span class="small text-muted">{escalation.person.role}</span></f:if>
+                </div>
+            </div>
         </f:if>
 
         <ul class="list-unstyled mb-0 d-flex flex-wrap gap-3">
