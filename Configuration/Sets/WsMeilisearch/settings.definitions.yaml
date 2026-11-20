@@ -166,6 +166,12 @@ settings:
     type: bool
     default: false
 
+  meilisearch.rag.protocol.internalNetworks:
+    label: 'RAG protocol: internal networks'
+    description: 'Client addresses whose chat turns the protocol marks as internal (with logged-in backend users) — the site owner''s own tests, kept apart from visitors in the protocol filter and the MCP protocol tools. IPv4/IPv6 addresses or CIDR ranges, e.g. 203.0.113.10 or 203.0.113.0/24.'
+    type: stringlist
+    default: []
+
   meilisearch.rag.protocol.retentionDays:
     label: 'RAG: chat protocol retention (days)'
     description: 'Turns older than this are deleted by the console command ws_meilisearch:rag:protocol:prune (schedule it daily via the "Execute console commands" scheduler task). 0 keeps the protocol forever. Default 90.'

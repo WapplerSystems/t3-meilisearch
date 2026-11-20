@@ -511,6 +511,38 @@
                 <source>Any origin</source>
                 <target>Alle</target>
             </trans-unit>
+            <trans-unit id="be.protocol.traffic" resname="be.protocol.traffic">
+                <source>Traffic</source>
+                <target>Herkunft</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficAll" resname="be.protocol.trafficAll">
+                <source>All</source>
+                <target>Alle</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficVisitor" resname="be.protocol.trafficVisitor">
+                <source>Visitors only</source>
+                <target>Nur Besucher</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficInternal" resname="be.protocol.trafficInternal">
+                <source>Internal only (backend users, own network)</source>
+                <target>Nur intern (Backend-Nutzer, eigenes Netz)</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal" resname="be.protocol.internal">
+                <source>internal</source>
+                <target>intern</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal.backend" resname="be.protocol.internal.backend">
+                <source>Asked by a logged-in backend user</source>
+                <target>Von einem angemeldeten Backend-Nutzer gefragt</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal.network" resname="be.protocol.internal.network">
+                <source>Asked from an internal network (meilisearch.rag.protocol.internalNetworks)</source>
+                <target>Aus einem internen Netz gefragt (meilisearch.rag.protocol.internalNetworks)</target>
+            </trans-unit>
+            <trans-unit id="be.protocol.page" resname="be.protocol.page">
+                <source>Page (path contains)</source>
+                <target>Seite (Pfad enthält)</target>
+            </trans-unit>
             <trans-unit id="be.protocol.originWeb" resname="be.protocol.originWeb">
                 <source>Website chat</source>
                 <target>Website-Chat</target>

@@ -43,6 +43,10 @@ final class ProtocolEntry
         /** MCP access token that asked (uid + title at the time), 0/'' for the web chat. */
         public readonly int $clientUid = 0,
         public readonly string $clientTitle = '',
+        /** Path of the page the chat was opened on, '' when unknown. */
+        public readonly string $pageUrl = '',
+        /** backend | network for internal traffic, '' for a visitor. */
+        public readonly string $internal = '',
     ) {}
 
     /**
@@ -69,6 +73,8 @@ final class ProtocolEntry
             feedbackComment: (string)($row['feedback_comment'] ?? ''),
             clientUid: (int)($row['client_uid'] ?? 0),
             clientTitle: (string)($row['client_title'] ?? ''),
+            pageUrl: (string)($row['page_url'] ?? ''),
+            internal: (string)($row['internal'] ?? ''),
         );
     }
 
@@ -95,6 +101,8 @@ final class ProtocolEntry
             'feedback_comment' => $this->feedbackComment,
             'client_uid' => max(0, $this->clientUid),
             'client_title' => mb_substr($this->clientTitle, 0, 255),
+            'page_url' => mb_substr($this->pageUrl, 0, 255),
+            'internal' => mb_substr($this->internal, 0, 16),
         ];
     }
 

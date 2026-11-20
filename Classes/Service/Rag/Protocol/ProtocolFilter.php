@@ -40,5 +40,9 @@ final class ProtocolFilter
         public readonly string $channel = '',
         /** Only conversations asked through this MCP access token (uid), 0 = any. */
         public readonly int $clientUid = 0,
+        /** Only conversations with a turn on a page whose path contains this. */
+        public readonly string $pageUrl = '',
+        /** internal | visitor | '' (all): internal traffic of the site owner (see TrafficOrigin). */
+        public readonly string $traffic = '',
     ) {}
 }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WapplerSystems\Meilisearch\Service\Rag\Protocol;
 
+use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -52,6 +53,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
 
     public function __construct(
         private readonly ChatProtocolRepository $repository,
+        private readonly TrafficOrigin $trafficOrigin,
     ) {}
 
     /**
@@ -103,6 +105,7 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
         string $turnKey = '',
         int $clientUid = 0,
         string $clientTitle = '',
+        ?ServerRequestInterface $request = null,
     ): void {
         if (!$this->isEnabled($site) || preg_match(Conversation::ID_PATTERN, $conversationId) !== 1) {
             return;
@@ -140,6 +143,8 @@ final class ChatProtocolRecorder implements LoggerAwareInterface
                 turnKey: preg_match(self::TURN_KEY_PATTERN, $turnKey) === 1 ? $turnKey : '',
                 clientUid: $clientUid,
                 clientTitle: $clientTitle,
+                pageUrl: $request !== null ? $this->trafficOrigin->pageUrl($request) : '',
+                internal: $request !== null ? $this->trafficOrigin->internal($site, $request) : '',
             ));
         } catch (\Throwable $e) {
             // A protocol that cannot be written must never cost the visitor

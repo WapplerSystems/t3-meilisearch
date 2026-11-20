@@ -57,6 +57,8 @@
                         <f:if condition="{entry.channel} == 'mcp'">
                             <span class="badge bg-info text-dark" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcpBadgeTitle')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/><f:if condition="{entry.clientTitle}">: {entry.clientTitle}</f:if></span>
                         </f:if>
+                        <f:if condition="{entry.internal}"><span class="badge bg-secondary" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.internal.{entry.internal}')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.internal"/></span></f:if>
+                        <f:if condition="{entry.pageUrl}"><span class="badge bg-light text-dark" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.page')}">{entry.pageUrl}</span></f:if>
                         <a href="{entry.knowledgeUrl}" class="btn btn-sm btn-outline-primary ms-auto"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.addAsKnowledge"/></a>
                     </div>
                     <div class="card-body">
@@ -172,6 +174,18 @@
                                 </f:for>
                             </select>
                         </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="traffic"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.traffic"/></label>
+                            <select name="traffic" id="traffic" class="form-select form-select-sm w-auto">
+                                <option value=""><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.trafficAll"/></option>
+                                <option value="visitor" {f:if(condition: '{trafficFilter} == "visitor"', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.trafficVisitor"/></option>
+                                <option value="internal" {f:if(condition: '{trafficFilter} == "internal"', then: 'selected="selected"')}><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.trafficInternal"/></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="pageUrl"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.page"/></label>
+                            <input type="text" name="pageUrl" id="pageUrl" value="{pageFilter}" class="form-control form-control-sm w-auto" placeholder="/de/…" />
+                        </div>
                         <div class="mb-2 form-check">
                             <input type="checkbox" name="comment" value="1" id="comment" class="form-check-input" {f:if(condition: '{onlyWithComment}', then: 'checked="checked"')} />
                             <label class="form-check-label" for="comment"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.onlyWithComment"/></label>
@@ -209,6 +223,8 @@
                                         <f:then><span class="badge bg-info text-dark"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.mcp"/><f:if condition="{row.clientTitle}">: {row.clientTitle}</f:if></span></f:then>
                                         <f:else><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.originWeb"/></f:else>
                                     </f:if>
+                                    <f:if condition="{row.internal}"><span class="badge bg-secondary" title="{f:translate(key: 'LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.internal.{row.internal}')}"><f:translate key="LLL:EXT:ws_meilisearch/Resources/Private/Language/locallang_be.xlf:be.protocol.internal"/></span></f:if>
+                                    <f:if condition="{row.pageUrl}"><br><small class="text-muted">{row.pageUrl}</small></f:if>
                                 </td>
                                 <td>
                                     <f:if condition="{row.escalated}">

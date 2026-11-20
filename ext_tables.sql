@@ -252,6 +252,13 @@ CREATE TABLE tx_wsmeilisearch_rag_protocol (
     feedback_reasons VARCHAR(255) DEFAULT '' NOT NULL,
     -- Optional free text after "not helpful" (meilisearch.rag.feedback.commentMaxLength).
     feedback_comment TEXT,
+    -- Path of the page the chat was opened on (from the request's Referer,
+    -- same host only, no query) — so turns from a test page can be filtered.
+    page_url        VARCHAR(255) DEFAULT '' NOT NULL,
+    -- Why the turn counts as internal traffic of the site owner, '' for a
+    -- visitor: backend (a logged-in backend user) or network (a client IP
+    -- in meilisearch.rag.protocol.internalNetworks).
+    internal        VARCHAR(16) DEFAULT '' NOT NULL,
 
     PRIMARY KEY (uid),
     KEY conversation (conversation_id, crdate),

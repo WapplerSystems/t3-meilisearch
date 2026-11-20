@@ -263,7 +263,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
             }
         }
 
-        $this->recordProtocol($site, $languageId, $conversation->id, $question, $terminalChunk, $streamedText, $sources, $escalated, $turnKey);
+        $this->recordProtocol($site, $languageId, $conversation->id, $question, $terminalChunk, $streamedText, $sources, $escalated, $turnKey, $request);
 
         // Persist the conversation turn if we produced an answer or asked a
         // clarifying question. We can't piggy-back this on the controller (the
@@ -331,6 +331,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
         array $sources,
         bool $escalated,
         string $turnKey = '',
+        ?ServerRequestInterface $request = null,
     ): void {
         [$status, $answer, $citedIds] = match ($terminalChunk?->type) {
             RagStreamChunk::TYPE_DONE => [
@@ -348,7 +349,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
             RagStreamChunk::TYPE_DISABLED => ['disabled', '', []],
             default => [ChatProtocolRecorder::STATUS_ABORTED, trim($streamedText), []],
         };
-        $this->protocolRecorder->record($site, $languageId, $conversationId, $question, $answer, $status, $citedIds, $sources, $escalated, turnKey: $turnKey);
+        $this->protocolRecorder->record($site, $languageId, $conversationId, $question, $answer, $status, $citedIds, $sources, $escalated, turnKey: $turnKey, request: $request);
     }
 
     private function emitFrame(RagStreamChunk $chunk): void

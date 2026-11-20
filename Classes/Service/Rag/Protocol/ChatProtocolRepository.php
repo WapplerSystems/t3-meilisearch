@@ -110,7 +110,7 @@ final class ChatProtocolRepository
     }
 
     /**
-     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int,ratedUp:int,ratedDown:int,channel:string,clientTitle:string}>
+     * @return list<array{conversationId:string,siteIdentifier:string,languageId:int,firstQuestion:string,turns:int,startedAt:int,lastAt:int,escalated:bool,problems:int,ratedUp:int,ratedDown:int,channel:string,clientTitle:string,pageUrl:string,internal:string}>
      */
     public function findConversations(ProtocolFilter $filter, int $limit = 50, int $offset = 0): array
     {
@@ -153,6 +153,8 @@ final class ChatProtocolRepository
                 'ratedDown' => (int)$row['rated_down'],
                 'channel' => (string)$row['channel'],
                 'clientTitle' => (string)$row['client_title'],
+                'pageUrl' => (string)($row['page_url'] ?? ''),
+                'internal' => (string)($row['internal'] ?? ''),
             ];
         }
 
@@ -237,6 +239,8 @@ final class ChatProtocolRepository
             'SUM(CASE WHEN rating < 0 THEN 1 ELSE 0 END) AS rated_down',
             'MAX(channel) AS channel',
             'MAX(client_title) AS client_title',
+            'MAX(page_url) AS page_url',
+            'MAX(internal) AS internal',
         );
 
         $qb->groupBy('conversation_id');
@@ -300,6 +304,18 @@ final class ChatProtocolRepository
             $qb->andWhere(
                 $qb->expr()->eq('client_uid', $qb->createNamedParameter($filter->clientUid, Connection::PARAM_INT))
             );
+        }
+
+        if (trim($filter->pageUrl) !== '') {
+            $pageParam = $qb->createNamedParameter('%' . $qb->escapeLikeWildcards(trim($filter->pageUrl)) . '%', Connection::PARAM_STR);
+            $qb->andHaving('SUM(CASE WHEN page_url LIKE ' . $pageParam . ' THEN 1 ELSE 0 END) > 0');
+        }
+
+        // A conversation is internal as soon as one of its turns is.
+        if ($filter->traffic === 'internal') {
+            $qb->andHaving("MAX(internal) <> ''");
+        } elseif ($filter->traffic === 'visitor') {
+            $qb->andHaving("MAX(internal) = ''");
         }
 
         if ($filter->onlyProblems) {

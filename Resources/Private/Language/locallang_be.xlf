@@ -396,6 +396,30 @@
             <trans-unit id="be.protocol.originAny" resname="be.protocol.originAny">
                 <source>Any origin</source>
             </trans-unit>
+            <trans-unit id="be.protocol.traffic" resname="be.protocol.traffic">
+                <source>Traffic</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficAll" resname="be.protocol.trafficAll">
+                <source>All</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficVisitor" resname="be.protocol.trafficVisitor">
+                <source>Visitors only</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.trafficInternal" resname="be.protocol.trafficInternal">
+                <source>Internal only (backend users, own network)</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal" resname="be.protocol.internal">
+                <source>internal</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal.backend" resname="be.protocol.internal.backend">
+                <source>Asked by a logged-in backend user</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.internal.network" resname="be.protocol.internal.network">
+                <source>Asked from an internal network (meilisearch.rag.protocol.internalNetworks)</source>
+            </trans-unit>
+            <trans-unit id="be.protocol.page" resname="be.protocol.page">
+                <source>Page (path contains)</source>
+            </trans-unit>
             <trans-unit id="be.protocol.originWeb" resname="be.protocol.originWeb">
                 <source>Website chat</source>
             </trans-unit>

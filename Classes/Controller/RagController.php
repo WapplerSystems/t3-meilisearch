@@ -188,6 +188,7 @@ final class RagController extends ActionController
             $answer->citedIds,
             $answer->sources,
             $escalation !== null,
+            request: $psrRequest instanceof ServerRequestInterface ? $psrRequest : null,
         );
 
         // Persist answered turns and clarification turns alike: the reply to a

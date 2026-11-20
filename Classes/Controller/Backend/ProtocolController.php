@@ -34,6 +34,10 @@ final class ProtocolController
 {
     private const PER_PAGE = 50;
 
+    private string $pageFilter = '';
+
+    private string $trafficFilter = '';
+
     public function __construct(
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly ChatProtocolRepository $repository,
@@ -99,6 +103,9 @@ final class ProtocolController
         } else {
             $origin = '';
         }
+        // Page and traffic filters (LINEAR 18.11.2026: test page, internal traffic).
+        $this->pageFilter = mb_substr(trim((string)($params['pageUrl'] ?? '')), 0, 255);
+        $this->trafficFilter = in_array($params['traffic'] ?? '', ['internal', 'visitor'], true) ? (string)$params['traffic'] : '';
         $conversationParam = strtolower(trim((string)($params['conversation'] ?? '')));
         $page = max(1, (int)($params['page'] ?? 1));
 
@@ -148,6 +155,8 @@ final class ProtocolController
             onlyWithComment: $onlyWithComment,
             channel: $originChannel,
             clientUid: $originClient,
+            pageUrl: $this->pageFilter,
+            traffic: $this->trafficFilter,
         );
 
         $total = $this->repository->countConversations($filter);
@@ -196,6 +205,8 @@ final class ProtocolController
             'reasonOptions' => $reasonOptions,
             'onlyWithComment' => $onlyWithComment,
             'origin' => $origin,
+            'pageFilter' => $this->pageFilter,
+            'trafficFilter' => $this->trafficFilter,
             'clientOptions' => array_map(
                 static fn (int $uid, string $title): array => ['value' => 'mcp:' . $uid, 'title' => $title],
                 array_keys($clientOptions),
@@ -261,6 +272,8 @@ final class ProtocolController
                 'escalated' => $entry->escalated,
                 'channel' => $entry->channel,
                 'clientTitle' => $entry->clientTitle,
+                'pageUrl' => $entry->pageUrl,
+                'internal' => $entry->internal,
                 'rating' => $entry->rating,
                 'feedbackReasons' => array_map(
                     fn (string $key): string => $this->reasonLabel($entry->siteIdentifier, $key),
@@ -409,6 +422,12 @@ final class ProtocolController
         }
         if ($origin !== '') {
             $extra['origin'] = $origin;
+        }
+        if ($this->pageFilter !== '') {
+            $extra['pageUrl'] = $this->pageFilter;
+        }
+        if ($this->trafficFilter !== '') {
+            $extra['traffic'] = $this->trafficFilter;
         }
 
         return $this->context->route('protocol', array_merge($extra, $additional));

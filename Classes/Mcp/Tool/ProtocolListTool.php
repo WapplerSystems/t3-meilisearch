@@ -23,7 +23,7 @@ final class ProtocolListTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Lists chat conversations of this site, newest first. Use it to find questions the assistant could not answer (onlyProblems) or where a visitor was offered human contact (onlyEscalated). Each conversation names its origin: channel "web" (visitor in the site chat) or "mcp" (asked through an MCP access, with the access title in "client"). Filter with channel to separate visitors from tests.';
+        return 'Lists chat conversations of this site, newest first. Use it to find questions the assistant could not answer (onlyProblems) or where a visitor was offered human contact (onlyEscalated). Each conversation names its origin: channel "web" (visitor in the site chat) or "mcp" (asked through an MCP access, with the access title in "client"). Filter with channel to separate visitors from tests; traffic "visitor" leaves out internal traffic of the site owner (logged-in backend users, own network), "internal" shows only that, and page filters by the path of the page the chat was opened on (substring).';
     }
 
     public function getInputSchema(): array
@@ -36,6 +36,8 @@ final class ProtocolListTool implements McpToolInterface
                 'search' => ['type' => 'string', 'maxLength' => 200],
                 'channel' => ['type' => 'string', 'enum' => ['web', 'mcp'], 'description' => 'Only conversations of this origin.'],
                 'client' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Only conversations asked through the MCP access with this title (exact).'],
+                'traffic' => ['type' => 'string', 'enum' => ['visitor', 'internal'], 'description' => 'visitor: without internal traffic; internal: only backend users and the own network.'],
+                'page' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Only conversations with a turn on a page whose path contains this (e.g. a test page).'],
                 'days' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 365, 'default' => 30],
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 20],
                 'offset' => ['type' => 'integer', 'minimum' => 0, 'default' => 0],
@@ -90,6 +92,21 @@ final class ProtocolListTool implements McpToolInterface
             $channel = 'mcp';
         }
 
+        $traffic = '';
+        if (array_key_exists('traffic', $arguments)) {
+            if (!in_array($arguments['traffic'], ['visitor', 'internal'], true)) {
+                throw new McpToolException('traffic must be "visitor" or "internal".');
+            }
+            $traffic = $arguments['traffic'];
+        }
+        $page = '';
+        if (array_key_exists('page', $arguments)) {
+            if (!is_string($arguments['page']) || mb_strlen($arguments['page']) > 255) {
+                throw new McpToolException('page must be a string of at most 255 characters.');
+            }
+            $page = trim($arguments['page']);
+        }
+
         $days = $this->intArgument($arguments, 'days', 30, 0, 365);
         $limit = $this->intArgument($arguments, 'limit', 20, 1, 100);
         $offset = $this->intArgument($arguments, 'offset', 0, 0);
@@ -102,6 +119,8 @@ final class ProtocolListTool implements McpToolInterface
             since: $days > 0 ? time() - $days * 86400 : 0,
             channel: $channel,
             clientUid: $clientUid,
+            pageUrl: $page,
+            traffic: $traffic,
         );
 
         $total = $this->repository->countConversations($filter);
@@ -121,6 +140,8 @@ final class ProtocolListTool implements McpToolInterface
                 'problems' => (int)($conversation['problems'] ?? 0),
                 'channel' => $conversation['channel'],
                 'client' => $conversation['clientTitle'],
+                'page' => $conversation['pageUrl'] ?? '',
+                'internal' => $conversation['internal'] ?? '',
             ];
         }
 

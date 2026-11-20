@@ -88,6 +88,8 @@ final class ProtocolGetTool implements McpToolInterface
                 'languageId' => $entry->languageId,
                 'channel' => $entry->channel,
                 'client' => $entry->clientTitle,
+                'page' => $entry->pageUrl,
+                'internal' => $entry->internal,
                 'question' => $entry->question,
                 'answer' => $entry->answer,
                 'status' => $entry->status,
