@@ -303,6 +303,12 @@
             <trans-unit id="be.mcp.scope.protocol.read" resname="be.mcp.scope.protocol.read">
                 <source>Read the chat protocol</source>
             </trans-unit>
+            <trans-unit id="be.mcp.scope.config.read" resname="be.mcp.scope.config.read">
+                <source>Read the chat configuration (prompt, settings, regression run)</source>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.index.read" resname="be.mcp.scope.index.read">
+                <source>Read indexed documents in full</source>
+            </trans-unit>
             <trans-unit id="be.knowledge.title" resname="be.knowledge.title">
                 <source>Chatbot knowledge</source>
             </trans-unit>

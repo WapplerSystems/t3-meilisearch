@@ -195,6 +195,20 @@ final class PromptBuilder
      * @param array<string,mixed> $hit
      * @param list<string> $metaFields
      */
+    /**
+     * One document as the model reads it in the context: header with id,
+     * type and the prompt meta fields, the body cut at maxContextChars
+     * (unless it is passed in full). For the MCP tool document_get, so a
+     * reviewer checks a statement against exactly that text.
+     *
+     * @param array<string,mixed> $hit
+     * @param list<string> $metaFields
+     */
+    public function contextBlock(array $hit, int $maxContextChars, array $metaFields = []): string
+    {
+        return $this->renderHit($hit, $maxContextChars, $metaFields);
+    }
+
     private function renderHit(array $hit, int $maxContextChars, array $metaFields = []): string
     {
         $id = (string)($hit['id'] ?? '');

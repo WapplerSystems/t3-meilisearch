@@ -172,6 +172,18 @@ settings:
     type: stringlist
     default: []
 
+  meilisearch.mcp.config.prefixes:
+    label: 'MCP config_get: settings shown'
+    description: 'Site settings the MCP tool config_get returns (access right "config:read"), by key prefix. Keys holding credentials (api key, token, secret, password, dsn) are never returned.'
+    type: stringlist
+    default: ['meilisearch.rag.', 'meilisearch.search.']
+
+  meilisearch.mcp.config.regressionFile:
+    label: 'MCP config_get: regression run'
+    description: 'JSON file under var/ with the last regression run ({"lauf", "zusammenfassung", "fragen": [...]}), written by the catalogue runner; config_get returns it in pages. Empty = none.'
+    type: string
+    default: ''
+
   meilisearch.rag.protocol.retentionDays:
     label: 'RAG: chat protocol retention (days)'
     description: 'Turns older than this are deleted by the console command ws_meilisearch:rag:protocol:prune (schedule it daily via the "Execute console commands" scheduler task). 0 keeps the protocol forever. Default 90.'

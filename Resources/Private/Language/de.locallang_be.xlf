@@ -387,6 +387,14 @@
                 <source>Read the chat protocol</source>
                 <target>Chat-Protokoll lesen</target>
             </trans-unit>
+            <trans-unit id="be.mcp.scope.config.read" resname="be.mcp.scope.config.read">
+                <source>Read the chat configuration (prompt, settings, regression run)</source>
+                <target>Chat-Konfiguration lesen (Prompt, Einstellungen, Regressionslauf)</target>
+            </trans-unit>
+            <trans-unit id="be.mcp.scope.index.read" resname="be.mcp.scope.index.read">
+                <source>Read indexed documents in full</source>
+                <target>Indexierte Dokumente vollständig lesen</target>
+            </trans-unit>
             <trans-unit id="be.knowledge.title" resname="be.knowledge.title">
                 <source>Chatbot knowledge</source>
                 <target>Chatbot-Wissen</target>

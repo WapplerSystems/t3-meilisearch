@@ -15,6 +15,8 @@ final class McpClient
     public const SCOPE_KNOWLEDGE_READ = 'knowledge:read';
     public const SCOPE_KNOWLEDGE_WRITE = 'knowledge:write';
     public const SCOPE_PROTOCOL_READ = 'protocol:read';
+    public const SCOPE_CONFIG_READ = 'config:read';
+    public const SCOPE_INDEX_READ = 'index:read';
 
     public const ALL_SCOPES = [
         self::SCOPE_ASK,
@@ -22,6 +24,8 @@ final class McpClient
         self::SCOPE_KNOWLEDGE_READ,
         self::SCOPE_KNOWLEDGE_WRITE,
         self::SCOPE_PROTOCOL_READ,
+        self::SCOPE_CONFIG_READ,
+        self::SCOPE_INDEX_READ,
     ];
 
     /**
