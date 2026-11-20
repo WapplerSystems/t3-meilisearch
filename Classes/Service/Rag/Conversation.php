@@ -105,6 +105,7 @@ final class Conversation
                 // The buttons offered under the answer, so a reload keeps them.
                 'suggestions' => $t->suggestions,
                 'notes' => $t->notes,
+                'turnKey' => $t->turnKey,
             ], $this->turns),
         ];
     }
@@ -165,6 +166,7 @@ final class Conversation
                     array_map('strval', (array)($row['notes'] ?? [])),
                     static fn (string $n): bool => $n !== '',
                 )),
+                turnKey: preg_match('/^[0-9a-f]{32}$/', (string)($row['turnKey'] ?? '')) === 1 ? (string)$row['turnKey'] : '',
             );
         }
         return new self($turns, $id);

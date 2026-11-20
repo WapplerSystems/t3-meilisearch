@@ -86,6 +86,7 @@ final class RagController extends ActionController
         $this->view->assignMultiple([
             'question' => $q,
             'conversation' => $conversation->turns,
+            'conversationId' => $conversation->id,
             'conversationEnabled' => $this->conversationEnabled($site),
             'escalation' => $escalation?->toArray(),
             'pageType' => $this->currentPageType(),
@@ -224,6 +225,7 @@ final class RagController extends ActionController
             'question' => $q,
             'answer' => $answer,
             'conversation' => $conversation->turns,
+            'conversationId' => $conversation->id,
             'conversationEnabled' => $this->conversationEnabled($site),
             'escalation' => $escalation?->toArray(),
             'pageType' => $this->currentPageType(),

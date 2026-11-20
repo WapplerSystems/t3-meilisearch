@@ -45,6 +45,12 @@ final class Turn
         public readonly array $suggestions = [],
         /** @var list<string> fixed notes under the answer, see RagAnswerNotesEvent */
         public readonly array $notes = [],
+        /**
+         * Key the visitor rates this answer with (protocol turn_key), so the
+         * thumbs stay under every answer of a reloaded transcript, not only
+         * under the one streamed last (LINEAR 20.11.2026). '' = no thumbs.
+         */
+        public readonly string $turnKey = '',
     ) {}
 
     public function isClarification(): bool

@@ -306,6 +306,7 @@ final class RagStreamMiddleware implements MiddlewareInterface
                     CitationRenderer::citationsFor($sources, $citedIds),
                     $suggestions,
                     array_values(array_map('strval', (array)($finalChunk->data['notes'] ?? []))),
+                    $turnKey,
                 );
             }
             $conversation = $conversation->withTurn($turn, $maxTurns);

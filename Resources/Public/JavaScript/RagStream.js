@@ -171,6 +171,16 @@
             askAgain(q);
         });
 
+        // Thumbs under the answers of a reloaded transcript (Thread.html):
+        // the same row as under a streamed answer, keyed by the stored turn.
+        root.querySelectorAll('[data-rag-feedback-key]').forEach(function (slot) {
+            renderFeedback({
+                feedbackEl: slot,
+                key: slot.getAttribute('data-rag-feedback-key') || '',
+                conversation: slot.getAttribute('data-rag-feedback-conversation') || ''
+            });
+        });
+
         // "Was this helpful?" row under a finished answer. Needs the key from
         // the `turn` frame; without it (feature off, old server) nothing is
         // drawn.

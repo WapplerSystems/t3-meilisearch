@@ -41,6 +41,13 @@
                             click before.
                         </f:comment>
                         <f:render partial="Rag/Suggestions" arguments="{suggestions: turn.suggestions, pageType: pageType}"/>
+                        <f:comment>
+                            Thumbs of a stored answer: RagStream.js draws them into
+                            this slot exactly as under a streamed answer.
+                        </f:comment>
+                        <f:if condition="{turn.turnKey}">
+                            <div class="ws-meilisearch-rag-feedback-slot" data-rag-feedback-key="{turn.turnKey}" data-rag-feedback-conversation="{conversationId}"></div>
+                        </f:if>
                     </div>
                 </div>
             </li>

@@ -53,7 +53,7 @@
                 the chat widget the field additionally sticks to the bottom of
                 the scrolling panel (Rag.css).
             </f:comment>
-            <f:render partial="Rag/Thread" arguments="{conversation: conversation, pageType: pageType}"/>
+            <f:render partial="Rag/Thread" arguments="{conversation: conversation, conversationId: conversationId, pageType: pageType}"/>
             <f:render partial="Rag/Form" arguments="{question: question, conversation: conversation, conversationEnabled: conversationEnabled, pageType: pageType}"/>
         </div>
 
