@@ -149,6 +149,16 @@ final class PromptBuilder
                 $languageLabel,
                 $this->isoCode($site, $languageId),
             );
+        } elseif (self::isBareTerm($question)) {
+            // "Partial Network End" on the English page got a German answer
+            // with an English opening (LINEAR 19.11.2026): a term of a few
+            // words tells the model nothing about the language, and the German
+            // examples in the instructions won. The page language decides.
+            $userContent .= "\n\n" . sprintf(
+                'The question is only a term; write the whole answer in %1$s (code "%2$s").',
+                $languageLabel,
+                $this->isoCode($site, $languageId),
+            );
         }
 
         return [
@@ -233,6 +243,18 @@ final class PromptBuilder
      * silently changes the query's language cannot match a retrieval filtered
      * to that language.
      */
+    /**
+     * A question of at most four words without a question mark — a term
+     * rather than a sentence ("Partial Network End", "Teilnetzende").
+     */
+    private static function isBareTerm(string $question): bool
+    {
+        $question = trim($question);
+
+        return $question !== '' && !str_contains($question, '?')
+            && count(preg_split('/\s+/u', $question) ?: []) <= 4;
+    }
+
     private function isoCode(Site $site, int $languageId): string
     {
         try {

@@ -974,6 +974,9 @@
             // no closing partner and stays as it is.
             .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
             .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+            // [text](https://…) — a markdown link the model copied from a
+            // source; without this the reader saw "[url](url)" (LINEAR 18.11.2026).
+            .replace(/\[([^\]\n]+)\]\((https:\/\/[^\s<>"()]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
             // A bare https URL becomes a link (fixed replies carry them, e.g.
             // a manufacturer's help). Trailing punctuation stays outside.
             .replace(/(^|[\s(])(https:\/\/[^\s<>"]+?)(?=[.,;:!?)]*(?:\s|$))/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');

@@ -581,6 +581,9 @@ final class CitationRenderer
             '/(?<!\*)\*([^*\n]+?)\*(?!\*)/u' => '<em>$1</em>',
             // `code`
             '/`([^`\n]+?)`/u' => '<code>$1</code>',
+            // [text](https://…) — a markdown link the model copied from a
+            // source; without this the reader saw "[url](url)" (LINEAR 18.11.2026).
+            '/\[([^\]\n]+)\]\((https:\/\/[^\s<>"()]+)\)/u' => '<a href="$2" target="_blank" rel="noopener">$1</a>',
             // A bare https URL becomes a link (fixed replies carry them, e.g.
             // a manufacturer's help). Trailing punctuation stays outside.
             '/(^|[\s(])(https:\/\/[^\s<>"]+?)(?=[.,;:!?)]*(?:\s|$))/mu' => '$1<a href="$2" target="_blank" rel="noopener">$2</a>',

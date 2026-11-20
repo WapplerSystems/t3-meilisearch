@@ -2594,9 +2594,10 @@ final class RagService implements LoggerAwareInterface
      * @param list<array<string,mixed>> $hits
      * @param list<string> $citedIds
      * @return array{0:string,1:list<string>,2:?Clarification} the third entry
-     *         when a listener asks back instead (RagAnswerGuardEvent::askInstead())
+     *         when a listener asks back instead (RagAnswerGuardEvent::askInstead());
+     *         $topic changes when a listener routes the answer (routeTo())
      */
-    private function guardAnswer(Site $site, string $question, string $answer, array $hits, array $citedIds, string $topic, array $options): array
+    private function guardAnswer(Site $site, string $question, string $answer, array $hits, array $citedIds, string &$topic, array $options): array
     {
         if (trim($answer) === '') {
             return [$answer, $citedIds];
@@ -2614,6 +2615,9 @@ final class RagService implements LoggerAwareInterface
                 $conversation instanceof Conversation ? $conversation : null,
             );
             $this->eventDispatcher->dispatch($event);
+            if (($routed = $event->getRoutedTopic()) !== null) {
+                $topic = $this->knownTopic($site, $routed);
+            }
             if (($clarification = $event->getClarification()) !== null) {
                 $this->lastAskedInstead = $event->getReason() . ' — ' . mb_substr($answer, 0, 600);
                 $this->logger?->info('RAG answer replaced by a question back ({reason}): {question}', [

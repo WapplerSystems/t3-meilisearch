@@ -46,6 +46,8 @@ final class RagAnswerGuardEvent
 
     private ?Clarification $clarification = null;
 
+    private ?string $routedTopic = null;
+
     /**
      * @param list<array<string,mixed>> $sources the documents the model saw
      * @param list<string> $citedIds ids of the sources the answer cites
@@ -196,5 +198,22 @@ final class RagAnswerGuardEvent
     public function getReason(): string
     {
         return $this->reason;
+    }
+
+    /**
+     * Send the answer to a topic (meilisearch.rag.topics) as a [topic:…] tag
+     * of the model would — the card under it follows the topic. For an answer
+     * a listener cut down: what is left still helps, the part taken out needs
+     * a person ("support"). An empty topic takes the answer off the topic
+     * the model chose.
+     */
+    public function routeTo(string $topic): void
+    {
+        $this->routedTopic = $topic;
+    }
+
+    public function getRoutedTopic(): ?string
+    {
+        return $this->routedTopic;
     }
 }
