@@ -114,7 +114,15 @@ final class PromptBuilder
         // defaults to (usually English with multilingual context). The
         // pin is added once, so a prompt that already references
         // {{language}} doesn't double up.
-        if (!str_contains($systemPrompt, '{{language}}')) {
+        // meilisearch.rag.answerLanguage = question: a site that has one page
+        // for visitors of every language (INTEWA 21.11.2026: English questions
+        // on the German page got German answers) answers in the language of
+        // the question; the page language only decides when the question
+        // gives no hint. Default "page" keeps the pin as before.
+        $answerInQuestionLanguage = $this->answerInQuestionLanguage($site);
+        if ($answerInQuestionLanguage) {
+            $systemPrompt = rtrim($systemPrompt) . "\nWrite the whole answer in the language of the user's question, regardless of the language used in the knowledge base entries and in these instructions. Only when the question does not show its language (a single term, a product code) answer in {{language}}.";
+        } elseif (!str_contains($systemPrompt, '{{language}}')) {
             $systemPrompt = rtrim($systemPrompt) . "\nAlways respond in {{language}}, regardless of the language used in the knowledge base entries.";
         }
         // {{today}} lets the prompt weigh dated entries (see
@@ -149,6 +157,10 @@ final class PromptBuilder
                 $languageLabel,
                 $this->isoCode($site, $languageId),
             );
+        } elseif ($answerInQuestionLanguage && !self::isBareTerm($question)) {
+            // Said again next to the question: the German knowledge base and
+            // the German examples in the instructions otherwise win.
+            $userContent .= "\n\nWrite the whole answer in the language of this question, even if the entries above are in another language.";
         } elseif (self::isBareTerm($question)) {
             // "Partial Network End" on the English page got a German answer
             // with an English opening (LINEAR 19.11.2026): a term of a few
@@ -261,6 +273,15 @@ final class PromptBuilder
      * A question of at most four words without a question mark — a term
      * rather than a sentence ("Partial Network End", "Teilnetzende").
      */
+    private function answerInQuestionLanguage(Site $site): bool
+    {
+        try {
+            return (string)$site->getSettings()->get('meilisearch.rag.answerLanguage', 'page') === 'question';
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     private static function isBareTerm(string $question): bool
     {
         $question = trim($question);

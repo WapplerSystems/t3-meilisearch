@@ -833,6 +833,15 @@ settings:
     type: int
     default: 1500
 
+  meilisearch.rag.answerLanguage:
+    label: 'Answer language'
+    description: '"page": the assistant answers in the language of the page (default). "question": it answers in the language of the question, for sites where visitors of every language use the same page; the page language then only decides for a bare term or product code.'
+    type: string
+    enum:
+      page: 'Language of the page'
+      question: 'Language of the question'
+    default: 'page'
+
   meilisearch.rag.temperature:
     label: 'LLM temperature'
     description: 'Sampling temperature passed to the LLM. Low values (0.0-0.3) yield more grounded, deterministic answers. RAG normally benefits from low temperature.'
