@@ -472,6 +472,38 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         return array_values(array_filter($ids, static fn (int $g): bool => $g !== 0));
     }
 
+    /** @var list<string>|null */
+    private ?array $metadataColumns = null;
+
+    /**
+     * Columns read from sys_file_metadata. `keywords` comes from EXT:filemetadata,
+     * `fe_groups` from whatever extension adds file access control — neither is
+     * core. Select only those the table has, so file indexing does not fail with
+     * "Unknown column" on installs without them; missing values read as empty.
+     *
+     * @return list<string>
+     */
+    private function metadataColumns(): array
+    {
+        if ($this->metadataColumns === null) {
+            $wanted = ['title', 'description', 'keywords', 'alternative', 'fe_groups'];
+            try {
+                $existing = array_map(
+                    'strtolower',
+                    array_keys($this->connectionPool->getConnectionForTable('sys_file_metadata')
+                        ->createSchemaManager()->listTableColumns('sys_file_metadata')),
+                );
+                $this->metadataColumns = array_values(array_filter(
+                    $wanted,
+                    static fn (string $column): bool => in_array($column, $existing, true),
+                ));
+            } catch (\Throwable) {
+                $this->metadataColumns = ['title', 'description', 'alternative'];
+            }
+        }
+        return $this->metadataColumns;
+    }
+
     /**
      * Overlay semantics: try the requested language first, then fall back
      * to the default-language row. Mirrors TYPO3's translation overlay for
@@ -483,7 +515,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
     {
         if ($languageId > 0) {
             $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
-            $row = $qb->select('title', 'description', 'keywords', 'alternative', 'fe_groups')
+            $row = $qb->select(...$this->metadataColumns())
                 ->from('sys_file_metadata')
                 ->where(
                     $qb->expr()->eq('file', $qb->createNamedParameter($fileUid, \Doctrine\DBAL\ParameterType::INTEGER)),
@@ -497,7 +529,7 @@ final class FileSchemaProvider implements SchemaProviderInterface, PreReindexCle
         }
 
         $qb = $this->connectionPool->getQueryBuilderForTable('sys_file_metadata');
-        $row = $qb->select('title', 'description', 'keywords', 'alternative', 'fe_groups')
+        $row = $qb->select(...$this->metadataColumns())
             ->from('sys_file_metadata')
             ->where(
                 $qb->expr()->eq('file', $qb->createNamedParameter($fileUid, \Doctrine\DBAL\ParameterType::INTEGER)),
