@@ -8,6 +8,8 @@ use CmsIg\Seal\Schema\Field\TextField;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\LinkHandling\LinkService;
+use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use WapplerSystems\Meilisearch\Domain\RecordSource\PluginRecordSourceInterface;
@@ -25,6 +27,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
         private readonly \WapplerSystems\Meilisearch\Service\LanguageDetector $languageDetector,
         private readonly PluginRecordSourceRegistry $recordSourceRegistry,
         private readonly HtmlToText $htmlToText,
+        private readonly LinkService $linkService,
     ) {}
 
     public function getTable(): string
@@ -142,7 +145,7 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
      */
     private function columnsToSelect(): array
     {
-        return ['uid', 'pid', 'l10n_parent', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'fe_group', 'tx_wsmeilisearch_boost'];
+        return ['uid', 'pid', 'l10n_parent', 'title', 'teaser', 'bodytext', 'datetime', 'sys_language_uid', 'fe_group', 'tx_wsmeilisearch_boost', 'type', 'internalurl', 'externalurl'];
     }
 
     public function getAdditionalFields(): array
@@ -174,10 +177,12 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             'uid' => (int)$row['uid'],
             'pid' => (int)$row['pid'],
             'language' => (int)$row['sys_language_uid'],
-            // Speaking detail URL built from the plugin's detail page +
-            // tx_news route enhancer; '' when no record source / detail
-            // page is resolvable (record still indexed, just without link).
-            'uri' => $source?->buildUri($site, (int)$row['uid'], (int)$row['sys_language_uid']) ?? '',
+            // News type 0: speaking detail URL built from the plugin's detail
+            // page + tx_news route enhancer. Types 1 (internal page) and 2
+            // (external URL, also t3://file etc.) link to their target, as
+            // the news list does. '' when nothing is resolvable (record
+            // still indexed, just without link).
+            'uri' => $this->resolveUri($row, $site, $source),
             'title' => (string)$row['title'],
             'teaser' => $teaser,
             'bodytext' => $bodytext,
@@ -192,6 +197,64 @@ final class NewsSchemaProvider implements SchemaProviderInterface, LoggerAwareIn
             'boost' => $this->boostCalculator->compositeFor($site, 'news', $recordBoost),
             'contentLanguage' => $this->languageDetector->detect($site, trim($teaser . "\n\n" . $bodytext)),
         ];
+    }
+
+    /**
+     * Link target of a news record, following tx_news' type field:
+     * 0 = detail page, 1 = internal page (internalurl), 2 = external link
+     * (externalurl — a URL or any TYPO3 link like t3://file?uid=…).
+     *
+     * @param array<string,mixed> $row
+     */
+    private function resolveUri(array $row, Site $site, ?PluginRecordSourceInterface $source): string
+    {
+        $languageId = (int)$row['sys_language_uid'];
+        $type = (string)($row['type'] ?? '0');
+        $target = match ($type) {
+            '1' => trim((string)($row['internalurl'] ?? '')),
+            '2' => trim((string)($row['externalurl'] ?? '')),
+            default => null,
+        };
+        if ($target === null) {
+            return $source?->buildUri($site, (int)$row['uid'], $languageId) ?? '';
+        }
+        if ($target === '') {
+            return '';
+        }
+        // Bare page uid in internalurl (older tx_news records)
+        if (ctype_digit($target)) {
+            $target = 't3://page?uid=' . $target;
+        }
+        try {
+            $link = $this->linkService->resolve($target);
+            return match ($link['type'] ?? '') {
+                LinkService::TYPE_URL => (string)($link['url'] ?? ''),
+                // getPublicUrl() of local storages has no leading slash; as a
+                // bare href it would resolve relative to the search page.
+                LinkService::TYPE_FILE => ($link['file'] ?? null) instanceof File
+                    ? self::absolutePath((string)$link['file']->getPublicUrl())
+                    : '',
+                LinkService::TYPE_PAGE => (string)$site->getRouter()->generateUri(
+                    (int)$link['pageuid'],
+                    ['_language' => $site->getLanguageById($languageId)],
+                ),
+                default => '',
+            };
+        } catch (\Throwable $e) {
+            $this->logger?->warning(
+                'News link of uid {uid} not resolvable ({target}): {msg}',
+                ['uid' => $row['uid'], 'target' => $target, 'msg' => $e->getMessage()],
+            );
+            return '';
+        }
+    }
+
+    private static function absolutePath(string $url): string
+    {
+        if ($url === '' || str_starts_with($url, '/') || preg_match('#^[a-z][a-z0-9+.-]*://#i', $url) === 1) {
+            return $url;
+        }
+        return '/' . $url;
     }
 
     /**

@@ -198,6 +198,22 @@ referenced from at least one page of the current site. Files
 referenced only from non-page records (e.g. `be_users.avatar`) are
 skipped entirely.
 
+### Indexed record types
+
+`meilisearch.indexedTables` lists the record tables a site indexes (default
+`pages,tx_news_domain_model_news,tx_wsmeilisearch_knowledge_resource,tx_wsmeilisearch_knowledge_entry`).
+A schema provider whose table is not listed is skipped on reindex and on
+backend saves; `pages` also gates the EXT:index page bridge. An empty value
+indexes everything. Files are not part of the list — they follow
+`meilisearch.tika.url` and `meilisearch.indexing.*`. A project that adds its
+own provider must add its table here. After narrowing the list run
+`ws_meilisearch:reindex <site> --rebuild` so documents of dropped tables leave
+the index.
+
+News records link like the news list does: type 0 (news) gets the detail page
+of the site's news plugin, type 1 (internal page) its page, type 2 (external
+URL) its target — a URL or any TYPO3 link such as `t3://file?uid=…`.
+
 ### Index filtering
 
 Three optional settings under `meilisearch.indexing` keep junk files
