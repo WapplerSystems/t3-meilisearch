@@ -25,9 +25,9 @@ settings:
 
   meilisearch.indexedTables:
     label: 'Indexed record types'
-    description: 'Comma-separated list of TCA tables to index. Pages, tx_news and tx_wsmeilisearch_knowledge_resource (knowledge resources imported via ws_meilisearch:import-knowledge-resources) are wired by default. Knowledge resources are indexed for RAG-grounding but hidden from the FE search result list and from the RAG answer''s "Sources" panel.'
+    description: 'Comma-separated list of record tables to index; a schema provider whose table is not listed is skipped (empty = all). Pages, tx_news, knowledge resources (imported via ws_meilisearch:import-knowledge-resources) and knowledge entries are wired by default. Files (sys_file) are not controlled here but by meilisearch.tika.url and meilisearch.indexing.*. Knowledge resources are indexed for RAG-grounding but hidden from the FE search result list and from the RAG answer''s "Sources" panel. A project provider for its own table must add that table here.'
     type: string
-    default: 'pages,tx_news_domain_model_news,tx_wsmeilisearch_knowledge_resource'
+    default: 'pages,tx_news_domain_model_news,tx_wsmeilisearch_knowledge_resource,tx_wsmeilisearch_knowledge_entry'
 
   meilisearch.knowledgeResource.sourceRoot:
     label: 'Knowledge resource source root'

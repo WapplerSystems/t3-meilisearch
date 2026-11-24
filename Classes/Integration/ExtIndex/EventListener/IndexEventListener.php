@@ -14,15 +14,16 @@ use Symfony\Component\Messenger\Event\WorkerStoppedEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
-use WapplerSystems\Meilisearch\Service\Indexing\DocumentBatchWriter;
-use WapplerSystems\Meilisearch\Service\Indexing\EmbeddingFailedException;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use WapplerSystems\Meilisearch\Event\BeforeDocumentIndexedEvent;
 use WapplerSystems\Meilisearch\Integration\ExtIndex\Schema\ExtIndexOrigin;
 use WapplerSystems\Meilisearch\Service\BoostCalculator;
 use WapplerSystems\Meilisearch\Service\EmbeddingPrecomputer;
 use WapplerSystems\Meilisearch\Service\HtmlToText;
-use WapplerSystems\Meilisearch\Service\PageIndexEligibility;
+use WapplerSystems\Meilisearch\Service\Indexing\DocumentBatchWriter;
+use WapplerSystems\Meilisearch\Service\Indexing\EmbeddingFailedException;
 use WapplerSystems\Meilisearch\Service\LanguageDetector;
+use WapplerSystems\Meilisearch\Service\PageIndexEligibility;
 use WapplerSystems\Meilisearch\Service\SearchEngineFactory;
 
 /**
@@ -80,6 +81,12 @@ final class IndexEventListener implements LoggerAwareInterface
     #[AsEventListener('ws-meilisearch-ext-index-page')]
     public function onIndexPage(IndexPageEvent $event): void
     {
+        // meilisearch.indexedTables without "pages": the site indexes no pages
+        // (empty setting = everything, as in IndexerService::providerEnabledForSite()).
+        $tables = GeneralUtility::trimExplode(',', (string)$event->site->getSettings()->get('meilisearch.indexedTables', ''), true);
+        if ($tables !== [] && !in_array('pages', $tables, true)) {
+            return;
+        }
         $engine = $this->engineFactory->createForSite($event->site);
         if ($engine === null) {
             return;

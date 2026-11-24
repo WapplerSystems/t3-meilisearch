@@ -7,6 +7,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use WapplerSystems\Meilisearch\Domain\Schema\PreReindexCleanupInterface;
 use WapplerSystems\Meilisearch\Domain\Schema\SchemaProviderInterface;
 use WapplerSystems\Meilisearch\Domain\Schema\StaleDocumentsInterface;
@@ -98,6 +99,29 @@ final class IndexerService implements LoggerAwareInterface
      * project table. Querying a table that does not exist aborts
      * the whole reindex, so a provider only runs when its table is in TCA.
      */
+    /**
+     * meilisearch.indexedTables: record tables this site indexes. Files
+     * (sys_file) are not part of the list — they are governed by
+     * meilisearch.tika.url and meilisearch.indexing.*. An empty setting
+     * keeps every provider enabled.
+     */
+    public function providerEnabledForSite(SchemaProviderInterface $provider, Site $site): bool
+    {
+        $table = $provider->getTable();
+        if ($table === 'sys_file') {
+            return true;
+        }
+        $tables = GeneralUtility::trimExplode(',', (string)$site->getSettings()->get('meilisearch.indexedTables', ''), true);
+        if ($tables === [] || in_array($table, $tables, true)) {
+            return true;
+        }
+        $this->logger?->debug(
+            'Skipping {provider}: table {table} is not in meilisearch.indexedTables of site {site}',
+            ['provider' => $provider::class, 'table' => $table, 'site' => $site->getIdentifier()],
+        );
+        return false;
+    }
+
     private function providerTableAvailable(SchemaProviderInterface $provider): bool
     {
         $table = $provider->getTable();
@@ -245,7 +269,7 @@ final class IndexerService implements LoggerAwareInterface
         );
 
         foreach ($this->schemaProviders as $provider) {
-            if (!$this->providerTableAvailable($provider)) {
+            if (!$this->providerTableAvailable($provider) || !$this->providerEnabledForSite($provider, $site)) {
                 continue;
             }
             foreach ($provider->iterateDocuments($site) as $document) {
@@ -325,6 +349,9 @@ final class IndexerService implements LoggerAwareInterface
                 continue;
             }
             $supported = true;
+            if (!$this->providerEnabledForSite($provider, $site)) {
+                continue;
+            }
             // A single record is written in place, so unchanged documents
             // can be skipped outright — an editor re-saving a record
             // without touching indexed fields costs nothing.
@@ -411,6 +438,9 @@ final class IndexerService implements LoggerAwareInterface
                 continue;
             }
             $supported = true;
+            if (!$this->providerEnabledForSite($provider, $site)) {
+                continue;
+            }
             $writer = $this->createWriter(
                 $site,
                 $engine,
